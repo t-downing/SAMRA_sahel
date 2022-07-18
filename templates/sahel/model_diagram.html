@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Schéma du modèle</h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                {% load plotly_dash %}
+                {% plotly_app name="sd_model" ratio=1 %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
