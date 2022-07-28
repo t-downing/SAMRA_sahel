@@ -3,7 +3,7 @@
 {% block content %}
 
 <div class="d-sm-flex align-items-center justify-content-between mb-4">
-    <h1 class="h3 mb-0 text-gray-800">Construction du modèle</h1>
+    <h1 class="h3 mb-0 text-gray-800">Comparaison de scénarios et réponses</h1>
 </div>
 
 <div class="row">
@@ -11,7 +11,7 @@
         <div class="card shadow mb-4">
             <div class="card-body">
                 {% load plotly_dash %}
-                {% plotly_app name="sd_model" ratio=1 %}
+                {% plotly_app name="comparison" ratio=1 %}
             </div>
         </div>
     </div>

@@ -1,27 +1,56 @@
 from django.db import models
 
 
-SYSTEM_DYNAMICS_TYPES = (
-    ("Stock", "Stock"),
-    ("Flow", "Flow"),
-    ("Variable", "Variable")
-)
 
 
 class Element(models.Model):
+    SD_TYPES = (
+        ("Stock", "Stock"),
+        ("Flow", "Flow"),
+        ("Variable", "Variable"),
+        ("Input", "Input"),
+        ("Constant", "Constant"),
+        ("Seasonal Input", "Entrée Saisonnière"),
+    )
+    UNIT_OPTIONS = (
+        ("tête", "tête"),
+        ("tête / mois", "tête / mois"),
+        ("FCFA", "FCFA"),
+        ("FCFA / mois", "FCFA / mois"),
+        ("FCFA / jour", "FCFA / jour"),
+        ("FCFA / tête", "FCFA / tête"),
+        ("FCFA / kg", "FCFA / kg"),
+        ("FCFA / L", "FCFA / L"),
+        ("kg", "kg"),
+        ("kg / mois", "kg / mois"),
+        ("kg / jour", "kg / jour"),
+        ("L", "L"),
+        ("L / mois", "L / mois"),
+        ("L / jour", "L / jour"),
+        ("kcal", "kcal"),
+        ("kcal / jour", "kcal / jour"),
+        ("1", "1"),
+    )
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
     x_pos = models.FloatField(null=True, blank=True)
     y_pos = models.FloatField(null=True, blank=True)
     equation = models.CharField(max_length=500, null=True, blank=True)
     sim_input_var = models.BooleanField(default=False)
-    unit = models.CharField(max_length=100, null=True, blank=True)
-    sd_type = models.CharField(max_length=100, choices=SYSTEM_DYNAMICS_TYPES, null=True, blank=True)
+    unit = models.CharField(max_length=100, null=True, blank=True, choices=UNIT_OPTIONS)
+    sd_type = models.CharField(max_length=100, choices=SD_TYPES, null=True, blank=True)
     sd_source = models.ForeignKey("self", related_name="outflows", null=True, blank=True, on_delete=models.SET_NULL)
     sd_sink = models.ForeignKey("self", related_name="inflows", null=True, blank=True, on_delete=models.SET_NULL)
+    element_group = models.ForeignKey("elementgroup", related_name="elements", null=True, blank=True,
+                                      on_delete=models.SET_NULL)
+    vam_commodity = models.CharField(max_length=200, null=True, blank=True)
+    mid_threshold = models.FloatField(null=True, blank=True)
+    high_threshold = models.FloatField(null=True, blank=True)
+    high_is_bad = models.BooleanField(default=False)
+    constant_default_value = models.FloatField(null=True, blank=True)
 
     def __str__(self):
-        return self.label
+        return f"{self.label}; pk: {self.pk}"
 
     class Meta:
         ordering = ["-date_created"]
@@ -40,10 +69,46 @@ class Connection(models.Model):
         unique_together = ("from_element", "to_element")
 
 
+class ElementGroup(models.Model):
+    label = models.CharField(max_length=200)
+    date_created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.label
+
+    class Meta:
+        ordering = ["-date_created"]
+
+
+class Source(models.Model):
+    title = models.CharField(max_length=200)
+    date_created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ["-date_created"]
+
+
+class RegularDataset(models.Model):
+    source = models.OneToOneField("source", related_name="regulardataset", on_delete=models.CASCADE)
+    last_updated_date = models.DateTimeField()
+    hdx_identifier = models.CharField(max_length=200, null=True, blank=True)
+    hdx_resource_number = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.source} RegularDataset"
+
+
 class MeasuredDataPoint(models.Model):
     date = models.DateField()
-    value = models.FloatField()
+    value = models.FloatField(null=True)
     element = models.ForeignKey("element", related_name="measureddatapoints", on_delete=models.CASCADE)
+    source = models.ForeignKey("source", related_name="measureddatapoints", null=True, on_delete=models.SET_NULL)
+    admin1 = models.CharField(max_length=200, null=True, blank=True)
+    admin2 = models.CharField(max_length=200, null=True, blank=True)
+    market = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
         return str(self.value)
@@ -51,9 +116,37 @@ class MeasuredDataPoint(models.Model):
 
 class SimulatedDataPoint(models.Model):
     date = models.DateField()
-    value = models.FloatField()
-    element = models.ForeignKey("element", related_name="simulationdatapoints", on_delete=models.CASCADE)
+    value = models.FloatField(null=True)
+    element = models.ForeignKey("element", related_name="simulateddatapoints", on_delete=models.CASCADE)
     scenario = models.CharField(max_length=200)
+    responseoption = models.ForeignKey("responseoption", related_name="simulateddatapoints", null=True, on_delete=models.SET_NULL)
+    admin1 = models.CharField(max_length=200, null=True, blank=True)
+    admin2 = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
-        return str(self.value)
+        return str(f"Element: {self.element}; Date: {self.date}; Simulated Value: {self.value}")
+
+
+class SeasonalInputDataPoint(models.Model):
+    date = models.DateField()
+    value = models.FloatField()
+    element = models.ForeignKey("element", related_name="seasonalinputdatapoints", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"Element: {self.element}; Date: {self.date}; Seasonal Value: {self.value}"
+
+
+class ResponseOption(models.Model):
+    name = models.CharField(max_length=500)
+
+    def __str__(self):
+        return self.name
+
+
+class ConstantValue(models.Model):
+    element = models.ForeignKey("element", related_name="constantvalues", on_delete=models.CASCADE)
+    responseoption = models.ForeignKey("responseoption", related_name="constantvalues", on_delete=models.CASCADE)
+    value = models.FloatField()
+
+    def __str__(self):
+        return f"Element: {self.element}; ResponseOption: {self.responseoption}; Value: {self.value}"
