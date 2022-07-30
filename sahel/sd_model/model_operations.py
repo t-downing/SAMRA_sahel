@@ -4,7 +4,7 @@ from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
 from ..models import Element, SimulatedDataPoint, MeasuredDataPoint, ConstantValue, ResponseOption, SeasonalInputDataPoint
 from datetime import datetime, date
-import time
+import time, functools
 from django.conf import settings
 from sqlalchemy import create_engine
 from django.db.models import Q
@@ -181,3 +181,14 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
     # df.to_sql("simulateddatapoint", con=engine, if_exists='append')
 
     return df
+
+
+def timer(func):
+    @functools.wraps(func)
+    def wrapper_timer(*args, **kwargs):
+        start_time = time.time()
+        value = func(*args, **kwargs)
+        run_time = time.time() - start_time
+        print(f"Function {func.__name__!r} took {run_time:.4f} s")
+        return value
+    return wrapper_timer

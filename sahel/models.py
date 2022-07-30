@@ -1,8 +1,6 @@
 from django.db import models
 
 
-
-
 class Element(models.Model):
     SD_TYPES = (
         ("Stock", "Stock"),
@@ -47,7 +45,15 @@ class Element(models.Model):
     mid_threshold = models.FloatField(null=True, blank=True)
     high_threshold = models.FloatField(null=True, blank=True)
     high_is_bad = models.BooleanField(default=False)
-    constant_default_value = models.FloatField(null=True, blank=True)
+    constant_default_value = models.FloatField(null=True, blank=True, default=0.0)
+    aggregate_by = models.CharField(max_length=200, choices=(("MEAN", "MEAN"), ("SUM", "SUM")), default="MEAN")
+    dm_globalform_fieldgroup = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_field_good = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_field_ok = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_field = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_field_goodvalue = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_field_okvalue = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_field_badvalue = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
         return f"{self.label}; pk: {self.pk}"
@@ -72,6 +78,7 @@ class Connection(models.Model):
 class ElementGroup(models.Model):
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
+
 
     def __str__(self):
         return self.label
@@ -150,3 +157,4 @@ class ConstantValue(models.Model):
 
     def __str__(self):
         return f"Element: {self.element}; ResponseOption: {self.responseoption}; Value: {self.value}"
+

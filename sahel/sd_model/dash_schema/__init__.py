@@ -1,4 +1,4 @@
-import time, functools
+import re
 
 import pandas as pd
 from django_plotly_dash import DjangoDash
@@ -7,10 +7,10 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_cytoscape as cyto
-from ..models import Element, SimulatedDataPoint, Connection, ElementGroup, \
+from ...models import Element, SimulatedDataPoint, Connection, ElementGroup, \
     MeasuredDataPoint, Source, ResponseOption
 import plotly.graph_objects as go
-from .run_model import run_model
+from ..model_operations import run_model, timer
 import inspect
 from pprint import pprint
 from datetime import date, datetime
@@ -22,17 +22,6 @@ initial_fig.update_xaxes(title_text="Date")
 initial_startdate = date(2020, 1, 1)
 initial_enddate = date(2022, 1, 1)
 initial_response = 1
-
-def timer(func):
-    @functools.wraps(func)
-    def wrapper_timer(*args, **kwargs):
-        start_time = time.time()
-        value = func(*args, **kwargs)
-        run_time = time.time() - start_time
-        print(f"Function {func.__name__!r} took {run_time:.4f} s")
-        return value
-    return wrapper_timer
-
 
 cyto.load_extra_layouts()
 
@@ -59,6 +48,11 @@ stylesheet = [
     {"selector": "[sd_type = 'Input']",
      "style": {
          "shape": "diamond",
+     }},
+    {"selector": "[sd_type = 'Constant']",
+     "style": {
+         "shape": "triangle",
+         "text-valign": "bottom",
      }},
     {"selector": "edge",
      "style": {
@@ -309,8 +303,13 @@ def submit_equation(n_clicks, nodedata, value):
         raise PreventUpdate
     element = Element.objects.get(pk=nodedata.get("id"))
     equation_text = value
-    for key_element in Element.objects.all():
-        equation_text = equation_text.replace(f"_E{key_element.pk}_", key_element.label)
+    element.equation = value
+    element_pks = re.findall(r"_E(.*?)_", equation_text)
+    for element_pk in element_pks:
+        upstream_element = Element.objects.get(pk=element_pk)
+        # if not upstream_element.equation_valid or upstream_element.equation is None:
+        #     print(f"problem with {upstream_element}")
+        equation_text = equation_text.replace(f"_E{element_pk}_", upstream_element.label)
     equation_text = f" = {equation_text}"
     element.save()
     return equation_text, f"equation changed for {element}; RERUN MODEL"

@@ -1,8 +1,7 @@
-from django.shortcuts import render
 from django.views.generic import TemplateView
-from . import dash_app
-from .dash_app import comparison
 
+# for some reason the line below needs to be commented out when running makemigrations
+from .sd_model import dash_schema, dash_comparison
 
 class IndexView(TemplateView):
     template_name = "sahel/index.html"

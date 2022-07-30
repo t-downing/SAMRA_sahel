@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 
 from hdx.utilities.easy_logging import setup_logging
 from hdx.api.configuration import Configuration
@@ -96,10 +97,24 @@ def update_dm_data():
     MeasuredDataPoint.objects.bulk_create(objs)
 
 
+def update_dm_globallivestock():
+    df = pd.read_excel("data/Livestock Risk Monitoring.xlsx")
+    df = df[df["Introduction : Country"] == "Mali"]
+    df["admin1"] = df["Introduction : Admin Level 1"].apply(lambda admin1 : admin1.removesuffix(" (Mali)"))
+    admin1s = ["Tombouctou", "Gao", "Kidal", "Mopti"]
+    df = df[df["admin1"].isin(admin1s)]
 
+    elements = Element.objects.filter(
+        Q(dm_globalform_fieldgroup__isnull=False)
+    )
+
+    objs = []
+    for element in elements:
+        df["value"] = df[[element.dm_globalform_field_good, element.dm_globalform_field_ok]]
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
         # update_wfp_price_data()
-        update_dm_data()
+        # update_dm_data()
+        update_dm_globallivestock()

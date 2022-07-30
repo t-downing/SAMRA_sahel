@@ -1,9 +1,5 @@
 from django.core.management.base import BaseCommand
-from ...dash_app.run_model import run_model
-import pandas as pd
-from ...models import Element, SimulatedDataPoint
-from datetime import date
-from ... import dash_app
+from sahel.sd_model import model_operations
 
 
 class Command(BaseCommand):
