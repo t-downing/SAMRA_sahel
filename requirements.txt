@@ -1,0 +1,8 @@
+Django~=3.2.14
+pandas~=1.4.3
+plotly~=5.9.0
+dash~=2.5.1
+numpy~=1.23.1
+SQLAlchemy~=1.4.39
+python-dateutil~=2.8.2
+python-dotenv~=0.20.0
