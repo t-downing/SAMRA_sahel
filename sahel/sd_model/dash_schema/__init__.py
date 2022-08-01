@@ -72,7 +72,7 @@ stylesheet = [
          "mid-target-arrow-shape": "triangle",
          "mid-target-arrow-color": "grey",
          "width": 20,
-         "arrow-scale": 0.5,
+         "arrow-scale": 0.4,
          "curve-style": "straight",
          "z-index": 1,
      }},
