@@ -89,6 +89,11 @@ stylesheet = [
          "border-color": "lightgrey",
          "background-color": "white",
      }},
+    {"selector": ":selected",
+     "style": {
+         "border-color": "blue",
+         "border-width": 3,
+     }},
 ]
 
 ROWSTYLE = {"margin-bottom": "10px"}
@@ -126,7 +131,10 @@ app.layout = dbc.Container([
         ),
         dbc.Col(
             dbc.Card([
-                dbc.CardHeader("Schéma"),
+                dbc.CardHeader([
+                    html.Div("Schéma"),
+                    dbc.Switch(id="schema-group-switch", label="Montrer les détails", value=True),
+                ], className="d-flex justify-content-between"),
                 dbc.CardBody([
                     cyto.Cytoscape(
                         id="cyto",
@@ -153,7 +161,7 @@ app.layout = dbc.Container([
                                                periods=4
                                            )}
                                        )),
-                ])),
+                ]), style={"overflow": "hidden"}),
             ], style={"height": "900px"}),
             width=7
         ),
@@ -161,13 +169,25 @@ app.layout = dbc.Container([
             dbc.Card([
                 dbc.CardHeader("Détail d'élément"),
                 dbc.CardBody([
-                    html.H4(id="element-detail-title"),
                     dbc.InputGroup([
-                        dbc.Select(id="element-detail-type-input", options=[{"label": sd_type[1], "value": sd_type[0]} for sd_type in Element.SD_TYPES]),
+                        dbc.InputGroupText("Label"),
+                        dbc.Input(id="element-detail-label-input"),
+                        dbc.Button("Changer", id="element-detail-label-submit"),
+                    ], style=ROWSTYLE),
+                    dbc.InputGroup([
+                        dbc.InputGroupText("Type"),
+                        dbc.Select(id="element-detail-type-input",
+                                   options=[{"label": sd_type[1], "value": sd_type[0]} for sd_type in Element.SD_TYPES]),
                         dbc.Button("Changer", id="element-detail-type-submit")
-                    ]),
-                    dbc.Row(dbc.Col(dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"}))),
-                    dbc.Row(dbc.Col(id="element-detail-conn-eq")),
+                    ], size="sm", style=ROWSTYLE),
+                    dbc.InputGroup([
+                        dbc.InputGroupText("Groupe"),
+                        dbc.Select(id="element-detail-group-input",
+                                   options=[{"label": group.label, "value": group.pk} for group in ElementGroup.objects.all()]),
+                        dbc.Button("Changer", id="element-detail-group-submit")
+                    ], size="sm", style=ROWSTYLE),
+                    dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"}),
+                    html.Div(id="element-detail-conn-eq"),
                 ])
             ], style={"height": "900px"}),
             width=3,
@@ -185,7 +205,39 @@ app.layout = dbc.Container([
     html.P(id="outflow-deleted-readout"),
     html.P(id="element-type-changed"),
     html.P("initialized", id="equation-changed"),
+    html.P(id="elementgroup-changed"),
+    html.P(id="element-label-changed"),
 ], fluid=True)
+
+
+@app.callback(
+    Output("cyto", "stylesheet"),
+    Input("schema-group-switch", "value"),
+)
+def set_cyto_stylesheet(switch):
+    print(switch)
+    if switch:
+        return stylesheet
+    else:
+        added_stylesheet = [
+            {"selector": "node",
+             "style": {
+                 "visibility": "hidden",
+             }},
+            {"selector": "edge",
+             "style": {
+                 "visibility": "hidden",
+             }},
+            {"selector": "[hierarchy = 'Group']",
+             "style": {
+                 "visibility": "visible",
+                 "background-color": "lightgray",
+                 "border-color": "gray",
+                 "color": "black",
+                 "text-valign": "center",
+             }},
+        ]
+        return stylesheet + added_stylesheet
 
 
 @app.callback(
@@ -383,15 +435,50 @@ def run_model_from_cyto(n_clicks, eq_readout, response_pk):
 
 
 @app.callback(
-    Output("element-detail-title", "children"),
+    Output("element-detail-label-input", "value"),
     Output("element-detail-type-input", "value"),
+    Output("element-detail-group-input", "value"),
     Input("cyto", "tapNodeData"),
     State("cyto", "tapNode"),
 )
 def element_detail_title(nodedata, layout):
     if nodedata is None:
-        return "", ""
-    return nodedata.get("label"), nodedata.get("sd_type")
+        raise PreventUpdate
+    if nodedata.get("hierarchy") == "Group":
+        return None, None, None
+    element = Element.objects.get(pk=nodedata.get("id"))
+    group = None if element.element_group is None else element.element_group.pk
+    return element.label, element.sd_type, group
+
+
+@app.callback(
+    Output("element-label-changed", "children"),
+    Input("element-detail-label-submit", "n_clicks"),
+    State("element-detail-label-input", "value"),
+    State("cyto", "tapNodeData"),
+)
+def element_label_submit(_, label, nodedata):
+    if None in [label, nodedata]:
+        raise PreventUpdate
+    element = Element.objects.get(pk=nodedata.get("id"))
+    element.label = label
+    element.save()
+    return f"{element} label updated"
+
+
+@app.callback(
+    Output("elementgroup-changed", "children"),
+    Input("element-detail-group-submit", "n_clicks"),
+    State("element-detail-group-input", "value"),
+    State("cyto", "tapNodeData"),
+)
+def elementgroup_submit(_, group_pk, nodedata):
+    if None in [group_pk, nodedata]:
+        raise PreventUpdate
+    element = Element.objects.get(pk=nodedata.get("id"))
+    element.element_group_id = group_pk
+    element.save()
+    return f"{element} is now part of {element.element_group}"
 
 
 @app.callback(
@@ -401,11 +488,12 @@ def element_detail_title(nodedata, layout):
     State("cyto", "tapNodeData")
 )
 def submit_type(_, sd_type, nodedata):
-    if nodedata:
-        element = Element.objects.get(pk=nodedata.get("id"))
-        element.sd_type = sd_type
-        element.save()
-        return f"changed {element} to {sd_type}"
+    if None in [sd_type, nodedata]:
+        raise PreventUpdate
+    element = Element.objects.get(pk=nodedata.get("id"))
+    element.sd_type = sd_type
+    element.save()
+    return f"changed {element} to {sd_type}"
 
 
 @app.callback(
@@ -419,7 +507,7 @@ def submit_type(_, sd_type, nodedata):
 def element_detail_graph(nodedata, admin1, responseoption_pk, *_):
     fig = go.Figure(layout=go.Layout(template="simple_white", margin=go.layout.Margin(l=0, r=0, b=0, t=0)))
     fig.update_xaxes(title_text="Date")
-    if nodedata is None:
+    if nodedata is None or nodedata.get("hierarchy") == "Group":
         return fig
 
     element = Element.objects.get(pk=nodedata.get("id"))
@@ -611,7 +699,6 @@ def element_detail_conn_eq(nodedata, *_):
 def save_element_positions(n_clicks, cyto_elements, layout):
     if n_clicks == 0:
         return "not saved yet"
-    print(cyto_elements[0])
     elements = []
     for cyto_element in cyto_elements:
         if "position" in cyto_element:
@@ -619,7 +706,6 @@ def save_element_positions(n_clicks, cyto_elements, layout):
             element.x_pos, element.y_pos = cyto_element.get("position").get("x"), cyto_element.get("position").get("y")
             elements.append(element)
     Element.objects.bulk_update(elements, ["x_pos", "y_pos"])
-    print(layout)
     return "saved"
 
 
@@ -667,7 +753,9 @@ def redraw_model(date_ord, *_):
     group_nodes = [{"data": {"id": f"group_{element_group.pk}",
                              "label": element_group.label,
                              "hierarchy": "Group"},
-                    "grabbable": False}
+                    "grabbable": False,
+                    "selectable": False,
+                    "pannable": True}
         for element_group in element_groups
     ]
 
