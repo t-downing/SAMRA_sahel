@@ -76,6 +76,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
                 else:
                     model.stock(str(element.pk)).equation += model.flow(inflow.pk)
             for outflow in element.outflows.filter(equation__isnull=False).exclude(equation=""):
+                print(outflow)
                 if "mois" in outflow.unit:
                     model.stock(str(element.pk)).equation -= model.flow(outflow.pk) / 30.437
                 else:
