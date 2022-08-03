@@ -1,0 +1,102 @@
+from django_plotly_dash import DjangoDash
+from dash import html, dcc
+from dash.dependencies import Input, Output, State, ALL
+import dash_bootstrap_components as dbc
+from dash.exceptions import PreventUpdate
+
+from sahel.models import ResponseOption, SimulatedDataPoint, Element, ConstantValue
+
+from .forecasting import forecast_element
+from .model_operations import timer
+import time
+
+import plotly.graph_objects as go
+import plotly
+from plotly.subplots import make_subplots
+import pandas as pd
+
+default_colors = plotly.colors.DEFAULT_PLOTLY_COLORS
+
+app = DjangoDash("forecasts", external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+app.layout = dbc.Container([
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.Select(
+                    id="element-input", value=42,
+                    options=[{"label": element.label, "value": element.pk}
+                             for element in Element.objects.filter(sd_type="Input").exclude(measureddatapoints=None)]),
+                dbc.Button("Forecast", id="forecast-submit"),
+                dbc.Button("Forecast ALL", id="forecast-all-submit", color="danger"),
+            ])
+        ], width=2),
+        dbc.Col([dcc.Loading(dcc.Graph(id="element-graph"))])
+    ]),
+    dcc.Loading(html.Div(id="forecast-readout")),
+    dcc.Loading(html.Div(id="forecast-all-readout")),
+], fluid=True)
+
+
+@app.callback(
+    Output("element-graph", "figure"),
+    Input("element-input", "value"),
+    Input("forecast-readout", "children"),
+)
+def update_graph(element_pk, *_):
+    fig = go.Figure()
+    fig.update_layout(template="simple_white", margin=dict(l=0, r=0, b=0, t=0))
+
+    element = Element.objects.get(pk=element_pk)
+
+    df = pd.DataFrame(element.measureddatapoints.all().values())
+    df["forecasted"] = False
+    df_forecast = pd.DataFrame(element.forecasteddatapoints.all().values())
+    df_forecast["forecasted"] = True
+    df = pd.concat([df, df_forecast], ignore_index=True)
+
+    dff = df.groupby(["date", "forecasted"]).mean().reset_index()
+    fig.add_trace(go.Scatter(
+        x=dff[~dff["forecasted"]]["date"], y=dff[~dff["forecasted"]]["value"], name="AVG",
+        line=dict(color="black", width=2), legendgroup="measured", legendgrouptitle_text="Measuré"))
+    fig.add_trace(go.Scatter(
+        x=dff[dff["forecasted"]]["date"], y=dff[dff["forecasted"]]["value"], name="AVG",
+        line=dict(color="black", width=2, dash="dash"), legendgroup="forecasted", legendgrouptitle_text="Prévisé"))
+
+    for admin1, color in zip(df["admin1"].unique(), default_colors):
+        dff = df[df["admin1"] == admin1]
+        dff = dff.groupby(["date", "forecasted"]).mean().reset_index()
+        fig.add_trace(go.Scatter(
+            x=dff[~dff["forecasted"]]["date"], y=dff[~dff["forecasted"]]["value"],
+            name=admin1, line=dict(color=color, width=1), legendgroup="measured"))
+        fig.add_trace(go.Scatter(
+            x=dff[dff["forecasted"]]["date"], y=dff[dff["forecasted"]]["value"],
+            name=admin1, line=dict(color=color, dash="dash", width=1), legendgroup="forecasted"))
+
+    return fig
+
+
+@app.callback(
+    Output("forecast-readout", "children"),
+    Input("forecast-submit", "n_clicks"),
+    State("element-input", "value"),
+)
+@timer
+def update_forecast(n_clicks, element_pk):
+    if n_clicks is None:
+        raise PreventUpdate
+    forecast_element(element_pk)
+    return f"forecasted {element_pk}"
+
+
+@app.callback(
+    Output("forecast-all-readout", "children"),
+    Input("forecast-all-submit", "n_clicks"),
+)
+def update_forecast_all(n_clicks):
+    if n_clicks is None:
+        raise PreventUpdate
+    start = time.time()
+    for element in Element.objects.filter(sd_type="Input").exclude(measureddatapoints=None):
+        forecast_element(element.pk)
+    return f"forecasted all, took {time.time() - start} s"

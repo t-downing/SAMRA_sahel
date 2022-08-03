@@ -9,6 +9,7 @@ class Element(models.Model):
         ("Input", "Input"),
         ("Constant", "Constant"),
         ("Seasonal Input", "Entrée Saisonnière"),
+        ("Pulse Input", "Entrée Impulsion")
     )
     UNIT_OPTIONS = (
         ("tête", "tête"),
@@ -48,12 +49,14 @@ class Element(models.Model):
     constant_default_value = models.FloatField(null=True, blank=True, default=0.0)
     aggregate_by = models.CharField(max_length=200, choices=(("MEAN", "MEAN"), ("SUM", "SUM")), default="MEAN")
     dm_globalform_fieldgroup = models.CharField(max_length=200, null=True, blank=True)
-    dm_globalform_field_good = models.CharField(max_length=200, null=True, blank=True)
-    dm_globalform_field_ok = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_group_highfield = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_group_midfield = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_group_lowfield = models.CharField(max_length=200, null=True, blank=True)
     dm_globalform_field = models.CharField(max_length=200, null=True, blank=True)
-    dm_globalform_field_goodvalue = models.CharField(max_length=200, null=True, blank=True)
-    dm_globalform_field_okvalue = models.CharField(max_length=200, null=True, blank=True)
-    dm_globalform_field_badvalue = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_field_highvalue = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_field_midvalue = models.CharField(max_length=200, null=True, blank=True)
+    dm_globalform_field_lowvalue = models.CharField(max_length=200, null=True, blank=True)
+    source_for_model = models.ForeignKey("source", related_name="model_element_uses", null=True, blank=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return f"{self.label}; pk: {self.pk}"
@@ -90,9 +93,10 @@ class ElementGroup(models.Model):
 class Source(models.Model):
     title = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
+    number_of_periods = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return self.title
+        return f"{self.title}; pk: {self.pk}"
 
     class Meta:
         ordering = ["-date_created"]
@@ -134,6 +138,17 @@ class SimulatedDataPoint(models.Model):
         return str(f"Element: {self.element}; Date: {self.date}; Simulated Value: {self.value}")
 
 
+class ForecastedDataPoint(models.Model):
+    date = models.DateField()
+    value = models.FloatField()
+    element = models.ForeignKey("element", related_name="forecasteddatapoints", on_delete=models.CASCADE)
+    admin1 = models.CharField(max_length=200, null=True, blank=True)
+    admin2 = models.CharField(max_length=200, null=True, blank=True)
+
+    def __str__(self):
+        return str(f"Element: {self.element}; Date: {self.date}; Forecasted Value: {self.value}")
+
+
 class SeasonalInputDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField()
@@ -158,3 +173,13 @@ class ConstantValue(models.Model):
     def __str__(self):
         return f"Element: {self.element}; ResponseOption: {self.responseoption}; Value: {self.value}"
 
+
+class PulseValue(models.Model):
+    element = models.ForeignKey("element", related_name="pulsevalues", on_delete=models.CASCADE)
+    responseoption = models.ForeignKey("responseoption", related_name="pulsevalues", on_delete=models.CASCADE)
+    value = models.FloatField()
+    startdate = models.DateField()
+    enddate = models.DateField()
+
+    def __str__(self):
+        return f"Element: {self.element}; ResponseOption: {self.responseoption}; Pulse Height: {self.value}"
