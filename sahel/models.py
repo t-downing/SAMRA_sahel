@@ -183,3 +183,4 @@ class PulseValue(models.Model):
 
     def __str__(self):
         return f"Element: {self.element}; ResponseOption: {self.responseoption}; Pulse Height: {self.value}"
+
