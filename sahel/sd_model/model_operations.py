@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
-from ..models import Element, SimulatedDataPoint, MeasuredDataPoint, ConstantValue, ResponseOption, SeasonalInputDataPoint
+from ..models import Element, SimulatedDataPoint, MeasuredDataPoint, ConstantValue, ResponseOption, \
+    SeasonalInputDataPoint, ForecastedDataPoint
 from datetime import datetime, date
 import time, functools
 from django.conf import settings
@@ -12,7 +13,7 @@ from django.db.models import Q
 
 def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
     start = time.time()
-    startdate, enddate = date(2021, 1, 1), date(2022, 1, 1)
+    startdate, enddate = date(2022, 1, 1), date(2023, 1, 1)
 
     model = Model(starttime=startdate.toordinal(), stoptime=enddate.toordinal(), dt=1)
     zero_flow = model.flow("Zero Flow")
@@ -24,7 +25,8 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
         Q(sd_type="Stock") |
         Q(sd_type="Input") |
         Q(sd_type="Seasonal Input") |
-        Q(sd_type="Constant")
+        Q(sd_type="Constant") |
+        Q(sd_type="Pulse Input")
     )
 
     model_output_pks = [str(element.pk) for element in elements]
@@ -44,6 +46,19 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
         elif element.sd_type == "Constant":
             exec(f'_E{element.pk}_ = model.constant("{element.pk}")')
             model.constant(str(element.pk)).equation = element.constant_default_value
+        elif element.sd_type == "Pulse Input":
+            print(f"trying to set up pulse {element}")
+            exec(f'_E{element.pk}_ = model.flow("{element.pk}")')
+            pulsevalues = element.pulsevalues.filter(responseoption_id=responseoption_pk)
+            if pulsevalues is None:
+                continue
+            model.flow(str(element.pk)).equation = 0.0
+            for pulsevalue in pulsevalues:
+                print(datetime.toordinal(pulsevalue.startdate))
+                pulsevar = model.converter(f"{element.pk}pulse{pulsevalue.pk}")
+                pulsevar.equation = sd.pulse(model, pulsevalue.value, float(datetime.toordinal(pulsevalue.startdate)))
+                model.flow(str(element.pk)).equation += pulsevar
+                print(f"set {element} equation to {model.flow(str(element.pk)).equation}")
     stop = time.time()
     print(f"set up elements took {stop - start} s")
     start = time.time()
@@ -71,6 +86,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
             model.stock(str(element.pk)).equation = zero_flow
             exec(f'model.stock(str({element.pk})).initial_value = {element.equation}')
             for inflow in element.inflows.filter(equation__isnull=False).exclude(equation=""):
+                print(f"adding flow {inflow}")
                 if "mois" in inflow.unit:
                     model.stock(str(element.pk)).equation += model.flow(inflow.pk) / 30.437
                 else:
@@ -91,8 +107,13 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
         if element.sd_type in ["Input", "Seasonal Input"]:
             if f"_E{element.pk}_" in all_equations:
                 if element.sd_type == "Input":
-                    df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element).values())
-                    df = df.groupby("date").mean().reset_index()[["date", "value"]]
+                    # load measured points
+                    df_m = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element).values())
+                    df_m = df_m.groupby("date").mean().reset_index()[["date", "value"]]
+                    # load forecasted points
+                    df_f = pd.DataFrame(element.forecasteddatapoints.all().values())
+                    df_f = df_f.groupby("date").mean().reset_index()[["date", "value"]]
+                    df = pd.concat([df_m, df_f], ignore_index=True)
                     df["t"] = df["date"].apply(datetime.toordinal)
                     model.points[str(element.pk)] = df[["t", "value"]].values.tolist()
                     model.converter(str(element.pk)).equation = sd.lookup(sd.time(), str(element.pk))
@@ -106,6 +127,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
                         df[f"year_{yearnum}"] = yearnum
                     df = pd.melt(df, id_vars=["value", "month", "day"], value_name="year")
                     df["date"] = df.apply(lambda row : date(row["year"], row["month"], row["day"]), axis=1)
+
                 df["t"] = df["date"].apply(datetime.toordinal)
                 model.points[str(element.pk)] = df[["t", "value"]].values.tolist()
                 model.converter(str(element.pk)).equation = sd.lookup(sd.time(), str(element.pk))
@@ -119,22 +141,19 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
 
     # set constant values
     constants_values = {}
-    if responseoption_pk is not None:
-        responseoption = ResponseOption.objects.get(pk=responseoption_pk)
-        for element in elements:
-            if element.sd_type == "Constant":
-                try:
-                    constants_values[str(element.pk)] = element.constantvalues.get(responseoption=responseoption).value
-                    print(f"set {element} constant to {responseoption} value")
-                except ConstantValue.DoesNotExist:
-                    pass
+    for element in elements:
+        if element.sd_type == "Constant":
+            try:
+                constants_values[str(element.pk)] = element.constantvalues.get(responseoption_id=responseoption_pk).value
+            except ConstantValue.DoesNotExist:
+                pass
 
-
+    # setup to run model
     model_env = bptk()
     model_env.register_model(model)
     scenario_manager = {"scenario_manager": {"model": model}}
     model_env.register_scenario_manager(scenario_manager)
-
+    # run model
     model_env.register_scenarios(scenarios={scenario: {"constants": constants_values}}, scenario_manager="scenario_manager")
     df = model_env.plot_scenarios(scenarios=scenario, scenario_managers="scenario_manager", equations=model_output_pks, return_df=True).reset_index()
 
@@ -143,12 +162,8 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
     start = time.time()
 
     df["date"] = df["t"].apply(datetime.fromordinal)
-    # for element in elements:
-    #     if str(element.pk) in df.columns:
-    #         if "mois" in element.unit:
-    #             df[str(element.pk)] *= 30.437
     df = pd.melt(df, id_vars=["date"], value_vars=model_output_pks)
-    df = df.groupby(["variable", pd.Grouper(key="date", freq="W-MON")]).mean().reset_index()
+    # df = df.groupby(["variable", pd.Grouper(key="date", freq="W-MON")]).mean().reset_index()
 
     stop = time.time()
     print(f"format results took {stop - start} s")
@@ -160,7 +175,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
             value=row.value,
             date=row.date,
             scenario=scenario,
-            responseoption=responseoption
+            responseoption_id=responseoption_pk
         )
         for row in df.itertuples()
     ]
@@ -169,7 +184,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
     print(f"df iterrows took {stop - start} s")
     start = time.time()
 
-    SimulatedDataPoint.objects.filter(scenario=scenario, responseoption=responseoption).delete()
+    SimulatedDataPoint.objects.filter(scenario=scenario, responseoption_id=responseoption_pk).delete()
     SimulatedDataPoint.objects.bulk_create(simulationdatapoint_list)
 
     stop = time.time()

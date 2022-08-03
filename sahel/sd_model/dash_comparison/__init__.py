@@ -74,7 +74,7 @@ app.layout = dbc.Container([
                    dbc.InputGroup([
                        dbc.InputGroupText("Créer une nouvelle réponse"),
                        dbc.Input(id="create-response-input", placeholder="Nom de réponse"),
-                       dbc.Button("Saisir", id="create-response-submit"),
+                       dbc.Button("Saisir", id="create-response-submit", color="success"),
                    ]),
                ]),
            ]),
@@ -160,7 +160,9 @@ def change_constantvalue(n_clicks, ids, values):
 )
 def build_response(response_pk, *_):
     response = ResponseOption.objects.get(pk=response_pk)
-    table_header = [html.Thead(html.Tr([html.Th("Élément"), html.Th("Valeur"), html.Th("Unité"), html.Th()]))]
+    table_header = [html.Thead(html.Tr([
+        html.Th("Élément"), html.Th("Valeur"), html.Th("Unité"), html.Th("Date"), html.Th()
+    ]))]
     table_rows = []
     for constantvalue in response.constantvalues.all():
         table_rows.append(html.Tr([
@@ -170,20 +172,46 @@ def build_response(response_pk, *_):
                 dbc.Button("Changer", id={"type": "constantvalue-change", "index": constantvalue.pk}),
             ], size="sm")),
             html.Td(constantvalue.element.unit),
+            html.Td("N/A", style={"color": "gray"}),
+            html.Td(dbc.Button("Supprimer", id={"type": "constantvalue-delete", "index": constantvalue.pk}, size="sm",
+                               color="danger", outline=True)),
+        ]))
+
+    for pulsevalue in response.pulsevalues.all():
+        table_rows.append(html.Tr([
+            html.Td(pulsevalue.element.label),
+            html.Td(dbc.InputGroup([
+                dbc.Input(value=pulsevalue.value,
+                          id={"type": "constantvalue-change-input", "index": constantvalue.pk}),
+                dbc.Button("Changer", id={"type": "constantvalue-change", "index": constantvalue.pk}),
+            ], size="sm")),
+            html.Td(constantvalue.element.unit),
+            html.Td("N/A", style={"color": "gray"}),
             html.Td(dbc.Button("Supprimer", id={"type": "constantvalue-delete", "index": constantvalue.pk}, size="sm",
                                color="danger", outline=True)),
         ]))
 
     table_rows.append(html.Tr([
-        html.Td(dbc.Select(id="constantvalue-element-input", placeholder="Ajouter un élément",
+        html.Td(dcc.Dropdown(id="constantvalue-element-input", placeholder="Ajouter un élément",
                            options=[{"label": element.label, "value": element.pk}
                                     for element in Element.objects.filter(sd_type="Constant")])),
         html.Td(dbc.Input(id="constantvalue-value-input")),
-        html.Td(),
+        html.Td(id="constantvalue-unit-input"),
+        html.Td(dcc.DatePickerSingle(id="constantvalue-date-input")),
         html.Td(dbc.Button("Saisir", id="constantvalue-submit", size="sm"))
     ]))
 
     return dbc.Table(table_header + [html.Tbody(table_rows)])
+
+
+@app.callback(
+    Output("constantvalue-unit-input", "children"),
+    Input("constantvalue-element-input", "value")
+)
+def show_constantvalue_unit(element_pk):
+    if element_pk is None:
+        raise PreventUpdate
+    return Element.objects.get(pk=element_pk).unit
 
 
 @app.callback(

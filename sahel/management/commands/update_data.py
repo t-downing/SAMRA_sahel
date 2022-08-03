@@ -6,10 +6,12 @@ from hdx.api.configuration import Configuration
 from hdx.data.dataset import Dataset
 from dateutil import parser
 import pandas as pd
+import numpy as np
 from ...models import RegularDataset, Element, MeasuredDataPoint, Source
 from datetime import datetime, timezone
 import time
 
+admin1s = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
 
 def download_from_hdx(hdx_identifier, last_updated_date, resource_number=0):
     setup_logging()
@@ -40,7 +42,11 @@ def update_wfp_price_data():
     if df is None:
         return
 
+    df = df[df["admin1"].isin(admin1s)]
+    df["price"] = df["price"].replace({0: np.nan})
+
     elements = Element.objects.filter(vam_commodity__isnull=False)
+
     objs = []
     for element in elements:
         print(element)
@@ -103,18 +109,48 @@ def update_dm_globallivestock():
     df["admin1"] = df["Introduction : Admin Level 1"].apply(lambda admin1 : admin1.removesuffix(" (Mali)"))
     admin1s = ["Tombouctou", "Gao", "Kidal", "Mopti"]
     df = df[df["admin1"].isin(admin1s)]
+    df["date"] = pd.to_datetime(df["Introduction : Which period are you reporting for (choose any date from the relevant quarter)"])
+    df["admin2"] = df["Introduction : Admin Level 2"]
 
-    elements = Element.objects.filter(
-        Q(dm_globalform_fieldgroup__isnull=False)
-    )
+    multicol_elements = Element.objects.filter(dm_globalform_fieldgroup__isnull=False)
+    for element in multicol_elements:
+        high_field = f"{element.dm_globalform_fieldgroup} : {element.dm_globalform_group_highfield}"
+        mid_field = f"{element.dm_globalform_fieldgroup} : {element.dm_globalform_group_midfield}"
+        low_field = f"{element.dm_globalform_fieldgroup} : {element.dm_globalform_group_lowfield}"
+        df[element.pk] = (df[high_field].fillna(0) + df[mid_field].fillna(0) * 0.5 + df[low_field].fillna(0) * 0.0) / 100
 
-    objs = []
-    for element in elements:
-        df["value"] = df[[element.dm_globalform_field_good, element.dm_globalform_field_ok]]
+    singlecol_elements = Element.objects.filter(dm_globalform_field__isnull=False)
+    for element in singlecol_elements:
+        qual2quant = {element.dm_globalform_field_highvalue: 1.0,
+                      element.dm_globalform_field_midvalue: 0.5,
+                      element.dm_globalform_field_lowvalue: 0.0}
+        df[element.pk] = df[element.dm_globalform_field].apply(lambda qual: qual2quant.get(qual))
+
+    df = pd.melt(df, id_vars=["date", "admin1", "admin2"],
+                 value_vars=[element.pk for element in (multicol_elements | singlecol_elements).distinct()])
+    print(df)
+
+    source = Source.objects.get(pk=4)
+
+    objs = [MeasuredDataPoint(
+        element_id=row.variable,
+        source=source,
+        value=row.value,
+        date=row.date,
+        admin1=row.admin1,
+        admin2=row.admin2,
+    ) for row in df.itertuples()]
+
+    MeasuredDataPoint.objects.filter(source=source).delete()
+    MeasuredDataPoint.objects.bulk_create(objs)
+
+
+def fix_problem_data_points():
+    pass
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        # update_wfp_price_data()
+        update_wfp_price_data()
         # update_dm_data()
-        update_dm_globallivestock()
+        # update_dm_globallivestock()
