@@ -85,6 +85,10 @@ stylesheet = [
      "style": {
          "color": "green",
      }},
+    {"selector": "[has_equation = 'no']",
+     "style": {
+         "line-style": "dashed"
+     }},
     {"selector": "[hierarchy = 'Group']",
      "style": {
          "text-valign": "top",
@@ -793,9 +797,15 @@ def redraw_model(date_ord, *_):
     ]
 
     connections = Connection.objects.all()
-    edges = [{"data": {"source": connection.from_element.pk,
-                       "target": connection.to_element.pk}}
-             for connection in connections]
+    edges=[]
+    for connection in connections:
+        if connection.to_element.equation is not None:
+            has_equation = "yes" if f"_E{connection.from_element.pk}_" in connection.to_element.equation else "no"
+        else:
+            has_equation = "no"
+        edges.append({"data": {"source": connection.from_element.pk,
+                                "target": connection.to_element.pk,
+                                "has_equation": has_equation}})
 
     flow_edges = []
     stocks = Element.objects.filter(sd_type="Stock")
