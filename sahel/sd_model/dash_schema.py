@@ -119,10 +119,10 @@ app.layout = dbc.Container([
                         dcc.DatePickerRange(id="daterange-input", start_date=initial_startdate, end_date=initial_enddate, style=ROWSTYLE),
                         dbc.Select(id="responseoption-input", placeholder="Réponse", value=initial_response,
                                    options=[{"label": responseoption.name, "value": responseoption.pk}
-                                            for responseoption in ResponseOption.objects.all()]),
+                                            for responseoption in ResponseOption.objects.all()], className="mb-1"),
                         dbc.Button("Réexécuter modèle", n_clicks=0, id="run-model"),
                     ])
-                ], style=ROWSTYLE),
+                ], className="shadow mb-4"),
                 dbc.Card([
                     dbc.CardHeader("Ajouter un élément"),
                     dbc.CardBody([
@@ -134,7 +134,7 @@ app.layout = dbc.Container([
                                    style=ROWSTYLE),
                         dbc.Button("Saisir", id="element-submit"),
                     ])
-                ]),
+                ], className="shadow mb-4"),
             ],
             width=2
         ),
@@ -171,7 +171,7 @@ app.layout = dbc.Container([
                                            )}
                                        )),
                 ]), style={"overflow": "hidden"}),
-            ], style={"height": "900px"}),
+            ], style={"height": "900px"}, className="shadow mb-4"),
             width=7
         ),
         dbc.Col(
@@ -198,7 +198,7 @@ app.layout = dbc.Container([
                     dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"}),
                     html.Div(id="element-detail-conn-eq"),
                 ])
-            ], style={"height": "900px"}),
+            ], style={"height": "900px"}, className="shadow mb-4"),
             width=3,
         )
     ]),
