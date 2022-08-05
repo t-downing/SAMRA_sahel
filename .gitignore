@@ -344,3 +344,4 @@ fabric.properties
 # End of https://www.toptal.com/developers/gitignore/api/python,pycharm+all,django
 /startbootstrap-sb-admin-2-gh-pages/
 /data/
+/output_files/
