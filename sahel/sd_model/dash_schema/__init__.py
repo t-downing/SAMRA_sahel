@@ -8,7 +8,7 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_cytoscape as cyto
 from ...models import Element, SimulatedDataPoint, Connection, ElementGroup, \
-    MeasuredDataPoint, Source, ResponseOption
+    MeasuredDataPoint, Source, ResponseOption, ConstantValue, HouseholdConstantValue
 import plotly.graph_objects as go
 from ..model_operations import run_model, timer
 import inspect
@@ -19,8 +19,8 @@ from django.db.models import Max, Min
 admin1s = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
 initial_fig = go.Figure(layout=go.Layout(template="simple_white"))
 initial_fig.update_xaxes(title_text="Date")
-initial_startdate = date(2020, 1, 1)
-initial_enddate = date(2022, 1, 1)
+initial_startdate = date(2022, 1, 1)
+initial_enddate = date(2023, 1, 1)
 initial_response = 1
 
 cyto.load_extra_layouts()
@@ -50,6 +50,11 @@ stylesheet = [
          "shape": "diamond",
      }},
     {"selector": "[sd_type = 'Constant']",
+     "style": {
+         "shape": "triangle",
+         "text-valign": "bottom",
+     }},
+    {"selector": "[sd_type = 'Pulse Input']",
      "style": {
          "shape": "triangle",
          "text-valign": "bottom",
@@ -207,6 +212,7 @@ app.layout = dbc.Container([
     html.P("initialized", id="equation-changed"),
     html.P(id="elementgroup-changed"),
     html.P(id="element-label-changed"),
+    html.P(id="householdconstantvalue-changed"),
 ], fluid=True)
 
 
@@ -235,6 +241,7 @@ def set_cyto_stylesheet(switch):
                  "border-color": "gray",
                  "color": "black",
                  "text-valign": "center",
+                 "font-size": 80,
              }},
         ]
         return stylesheet + added_stylesheet
@@ -368,6 +375,21 @@ def submit_equation(n_clicks, nodedata, value):
 
 
 @app.callback(
+    Output("householdconstantvalue-changed", "children"),
+    Input("householdconstantvalue-submit", "n_clicks"),
+    State("householdconstantvalue-input", "value"),
+    State("cyto", "tapNodeData"),
+)
+def submit_householdconstantvalue(n_clicks, value, nodedata):
+    if None in [n_clicks, value, nodedata]:
+        raise PreventUpdate
+    householdconstantvalue, _ = HouseholdConstantValue.objects.get_or_create(element_id=nodedata.get("id"))
+    householdconstantvalue.value = value
+    householdconstantvalue.save()
+    return f"saved {householdconstantvalue} RERUN MODEL"
+
+
+@app.callback(
     Output("readout3", "children"),
     Input("element-detail-conn-submit", "n_clicks"),
     State("cyto", "tapNodeData"),
@@ -408,7 +430,7 @@ def submit_inflow(_, nodedata, value):
     State("cyto", "tapNodeData"),
     State("element-detail-outflow-input", "value")
 )
-def submit_inflow(_, nodedata, value):
+def submit_outflow(_, nodedata, value):
     if value is None:
         return "no outflow selected"
     element = Element.objects.get(pk=nodedata.get("id"))
@@ -422,13 +444,13 @@ def submit_inflow(_, nodedata, value):
     Output("model-ran-readout", "children"),
     Input("run-model", "n_clicks"),
     Input("equation-changed", "children"),
+    Input("householdconstantvalue-changed", "children"),
     State("responseoption-input", "value"),
     prevent_initial_call=True,
 )
 @timer
-def run_model_from_cyto(n_clicks, eq_readout, response_pk):
-    readout_strings = eq_readout
-    if "RERUN MODEL" in eq_readout:
+def run_model_from_cyto(n_clicks, eq_readout, cv_readout, response_pk):
+    if "RERUN MODEL" in eq_readout or "RERUN MODEL" in cv_readout:
         run_model(responseoption_pk=response_pk)
         return f"ran model with response_pk {response_pk}"
     return "didn't run model"
@@ -548,8 +570,9 @@ def element_detail_graph(nodedata, admin1, responseoption_pk, *_):
     Input("cyto", "tapNodeData"),
     Input("readout3", "children"),
     Input("connection-deleted-readout", "children"),
+    State("responseoption-input", "value")
 )
-def element_detail_conn_eq(nodedata, *_):
+def element_detail_conn_eq(nodedata, _, _1, response_pk):
     if nodedata is None or nodedata.get("hierarchy") == "Group":
         return None
 
@@ -683,6 +706,16 @@ def element_detail_conn_eq(nodedata, *_):
         ], style=ROWSTYLE)
 
         conn_eq_div = html.Div([inflows_card, outflows_card])
+    elif element.sd_type == "Household Constant":
+        try:
+            value = element.householdconstantvalues.get().value
+        except HouseholdConstantValue.DoesNotExist:
+            value = None
+        conn_eq_div = dbc.InputGroup([
+            dbc.InputGroupText("Value"),
+            dbc.Input(id="householdconstantvalue-input", value=value),
+            dbc.Button("Saisir", id="householdconstantvalue-submit")
+        ])
     else:
         conn_eq_div = None
 

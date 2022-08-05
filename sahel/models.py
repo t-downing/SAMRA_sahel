@@ -9,7 +9,8 @@ class Element(models.Model):
         ("Input", "Input"),
         ("Constant", "Constant"),
         ("Seasonal Input", "Entrée Saisonnière"),
-        ("Pulse Input", "Entrée Impulsion")
+        ("Pulse Input", "Entrée Impulsion"),
+        ("Household Constant", "Qualité Ménage")
     )
     UNIT_OPTIONS = (
         ("tête", "tête"),
@@ -29,6 +30,8 @@ class Element(models.Model):
         ("kcal", "kcal"),
         ("kcal / jour", "kcal / jour"),
         ("1", "1"),
+        ("personne", "personne"),
+        ("kcal / personne / jour", "kcal / personne / jour"),
     )
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -174,12 +177,20 @@ class ConstantValue(models.Model):
         return f"Element: {self.element}; ResponseOption: {self.responseoption}; Value: {self.value}"
 
 
+class HouseholdConstantValue(models.Model):
+    element = models.ForeignKey("element", related_name="householdconstantvalues", on_delete=models.CASCADE)
+    value = models.FloatField(null=True)
+
+    def __str__(self):
+        return f"Element: {self.element}; Value: {self.value}"
+
+
 class PulseValue(models.Model):
     element = models.ForeignKey("element", related_name="pulsevalues", on_delete=models.CASCADE)
     responseoption = models.ForeignKey("responseoption", related_name="pulsevalues", on_delete=models.CASCADE)
     value = models.FloatField()
     startdate = models.DateField()
-    enddate = models.DateField()
+    enddate = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"Element: {self.element}; ResponseOption: {self.responseoption}; Pulse Height: {self.value}"
