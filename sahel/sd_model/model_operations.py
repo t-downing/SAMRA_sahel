@@ -3,7 +3,7 @@ import pandas as pd
 from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
 from ..models import Element, SimulatedDataPoint, MeasuredDataPoint, ConstantValue, ResponseOption, \
-    SeasonalInputDataPoint, ForecastedDataPoint
+    SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue
 from datetime import datetime, date
 import time, functools
 from django.conf import settings
@@ -26,7 +26,8 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
         Q(sd_type="Input") |
         Q(sd_type="Seasonal Input") |
         Q(sd_type="Constant") |
-        Q(sd_type="Pulse Input")
+        Q(sd_type="Pulse Input") |
+        Q(sd_type="Household Constant")
     )
 
     model_output_pks = [str(element.pk) for element in elements]
@@ -43,8 +44,9 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
             exec(f'_E{element.pk}_ = model.flow("{element.pk}")')
         elif element.sd_type == "Stock":
             exec(f'_E{element.pk}_ = model.stock("{element.pk}")')
-        elif element.sd_type == "Constant":
+        elif element.sd_type in ["Constant", "Household Constant"]:
             exec(f'_E{element.pk}_ = model.constant("{element.pk}")')
+            print(f"created {element}")
             model.constant(str(element.pk)).equation = element.constant_default_value
         elif element.sd_type == "Pulse Input":
             print(f"trying to set up pulse {element}")
@@ -81,16 +83,15 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
                 print(f"'{element}' equation could not be defined because {error}. "
                       f"Setting equation to 0.0 instead.")
                 exec(f'_E{element.pk}_.equation = 0.0')
+            except SyntaxError as error:
+                print(f"{element} equation is blank, setting to None")
 
         elif element.sd_type == "Stock":
             model.stock(str(element.pk)).equation = zero_flow
             exec(f'model.stock(str({element.pk})).initial_value = {element.equation}')
             for inflow in element.inflows.filter(equation__isnull=False).exclude(equation=""):
                 print(f"adding flow {inflow}")
-                if "mois" in inflow.unit:
-                    model.stock(str(element.pk)).equation += model.flow(inflow.pk) / 30.437
-                else:
-                    model.stock(str(element.pk)).equation += model.flow(inflow.pk)
+                model.stock(str(element.pk)).equation += model.flow(inflow.pk) / 30.437 if "mois" in inflow.unit else 1.0
             for outflow in element.outflows.filter(equation__isnull=False).exclude(equation=""):
                 print(outflow)
                 if "mois" in outflow.unit:
@@ -108,6 +109,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
             if f"_E{element.pk}_" in all_equations:
                 if element.sd_type == "Input":
                     # load measured points
+                    print(element)
                     df_m = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element).values())
                     df_m = df_m.groupby("date").mean().reset_index()[["date", "value"]]
                     # load forecasted points
@@ -146,6 +148,11 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
             try:
                 constants_values[str(element.pk)] = element.constantvalues.get(responseoption_id=responseoption_pk).value
             except ConstantValue.DoesNotExist:
+                pass
+        elif element.sd_type == "Household Constant":
+            try:
+                constants_values[str(element.pk)] = element.householdconstantvalues.get().value
+            except HouseholdConstantValue.DoesNotExist:
                 pass
 
     # setup to run model

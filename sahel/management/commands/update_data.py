@@ -70,13 +70,29 @@ def update_wfp_price_data():
     MeasuredDataPoint.objects.bulk_create(objs)
 
 
-def update_dm_data():
+def update_dm_suividesprix():
     # only for serving locally
+    # needs rewrite to not iterate over df multiple times, this is probably pretty slow
     df = pd.read_excel("data/Formulaire de suivi des prix du bétail.xlsx")
     df["Date de collecte"] = pd.to_datetime(df["Date de collecte"])
     df = df.drop([3])
-    element = Element.objects.get(label="Prix de bovin")
-    source = Source.objects.get(title="Formulaire de suivi des prix du bétail")
+    source = Source.objects.get(pk=3)
+    objs = []
+
+    # convert to numerical
+    substring = "Disponibilité des aliments sur le marché"
+    avg_cols = [col for col in df.columns if substring in col]
+    for col in avg_cols:
+        df[col] = df[col].apply(
+            lambda
+                value: 0.0 if value == "Mauvaise" else 0.5 if value == "Moyenne" else 1.0 if value == "Bonne" else None)
+
+    # groupby quarter
+    df = df.groupby(["Région ", "Cercle ", pd.Grouper(key="Date de collecte", freq="QS")]).mean().reset_index()
+    df["date"] = df["Date de collecte"].apply(lambda value: value + pd.DateOffset(months=2, days=14))
+
+    # prix de bovin
+    element = Element.objects.get(pk=42)
     include_substrings = [
         "Taurillon moins de 2 ans",
         "Taureau de + 2 ans",
@@ -85,8 +101,6 @@ def update_dm_data():
         "Vache reformée",
     ]
     avg_cols = [col for col in df.columns if any(substring in col for substring in include_substrings)]
-    print(df["Date de collecte"].dtypes)
-    objs = []
     for _, row in df.iterrows():
         print(row["Région "])
         print(row[avg_cols].mean())
@@ -94,7 +108,46 @@ def update_dm_data():
             element=element,
             source=source,
             value=row[avg_cols].mean(),
-            date=row["Date de collecte"],
+            date=row["date"],
+            admin1=row["Région "].capitalize(),
+            admin2=row["Cercle "].capitalize()
+        ))
+
+    # prix alimentation
+    element = Element.objects.get(pk=37)
+    include_substrings = [
+        "Tourteau de coton (sac de 50kg)",
+        "Aliment industriel (Buna Fama, etc..) sac 50kg",
+        "Son de blé (sac de 50 Kg)",
+        "Son de Maïs (sac de 50 Kg)",
+        "Son de mil (sac de 50 Kg)",
+        "Son de Riz (sac de 50 Kg)",
+    ]
+    avg_cols = [col for col in df.columns if any(substring in col for substring in include_substrings)]
+    for _, row in df.iterrows():
+        print(row["Région "])
+        print(row[avg_cols].mean())
+        objs.append(MeasuredDataPoint(
+            element=element,
+            source=source,
+            value=row[avg_cols].mean() / 50.0,
+            date=row["date"],
+            admin1=row["Région "].capitalize(),
+            admin2=row["Cercle "].capitalize()
+        ))
+
+    # disponibilité alimentation
+    element = Element.objects.get(pk=125)
+    substring = "Disponibilité des aliments sur le marché"
+    avg_cols = [col for col in df.columns if substring in col]
+    for _, row in df.iterrows():
+        print(row["Région "])
+        print(row[avg_cols].mean())
+        objs.append(MeasuredDataPoint(
+            element=element,
+            source=source,
+            value=row[avg_cols].mean(),
+            date=row["date"],
             admin1=row["Région "].capitalize(),
             admin2=row["Cercle "].capitalize()
         ))
@@ -129,6 +182,9 @@ def update_dm_globallivestock():
     df = pd.melt(df, id_vars=["date", "admin1", "admin2"],
                  value_vars=[element.pk for element in (multicol_elements | singlecol_elements).distinct()])
     print(df)
+    df = df.groupby(["variable", "admin1", "admin2", pd.Grouper(key="date", freq="QS")]).mean().reset_index()
+    df["date"] = df["date"] + pd.DateOffset(months=2, days=14)
+    print(df)
 
     source = Source.objects.get(pk=4)
 
@@ -151,6 +207,6 @@ def fix_problem_data_points():
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        update_wfp_price_data()
-        # update_dm_data()
+        # update_wfp_price_data()
+        update_dm_suividesprix()
         # update_dm_globallivestock()
