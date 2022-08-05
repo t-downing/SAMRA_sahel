@@ -1,4 +1,5 @@
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, ListView
+from .models import Source
 
 # for some reason the line below needs to be commented out when running makemigrations
 from .sd_model import dash_schema, dash_comparison, dash_forecasts
@@ -22,3 +23,8 @@ class ScenarioView(TemplateView):
 
 class EquationBankView(TemplateView):
     template_name = "sahel/equation_bank.html"
+
+
+class SourceListView(ListView):
+    template_name = "sahel/sources.html"
+    model = Source

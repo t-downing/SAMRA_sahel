@@ -6,15 +6,7 @@
     <h1 class="h3 mb-0 text-gray-800">Construction du modèle</h1>
 </div>
 
-<div class="row">
-    <div class="col-lg-12">
-        <div class="card shadow mb-4">
-            <div class="card-body">
-                {% load plotly_dash %}
-                {% plotly_app name="sd_model" ratio=1 %}
-            </div>
-        </div>
-    </div>
-</div>
+{% load plotly_dash %}
+{% plotly_app name="sd_model" ratio=1 %}
 
 {% endblock %}
