@@ -23,17 +23,34 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             dbc.Card([
-                dbc.Select(
-                    id="element-input", value=42,
-                    options=[{"label": element.label, "value": element.pk}
-                             for element in Element.objects.filter(sd_type="Input").exclude(measureddatapoints=None)]),
-                dbc.Button("Forecast", id="forecast-submit"),
-                dbc.Button("Forecast ALL", id="forecast-all-submit", color="danger"),
+                dbc.CardHeader("Show/modify forecast"),
+                dbc.CardBody([
+                    dbc.Select(
+                        id="element-input", value=42,
+                        options=[{"label": element.label, "value": element.pk}
+                                 for element in Element.objects.filter(sd_type="Input").exclude(measureddatapoints=None)]),
+                    html.Hr(),
+                    html.H6("SARIMA parameters"),
+                    dbc.InputGroup([
+                        dbc.Input(id=f"{letter}-input", value=0)
+                        for letter in "pdq"
+                    ]),
+                    dbc.InputGroup([
+                        dbc.Input(id=f"{letter}-input", value=0)
+                        for letter in "PDQm"
+                    ]),
+                    dbc.Button("Re-forecast", id="forecast-test-submit", color="warning"),
+                    html.Hr(),
+                    html.H5("Forecast using defaults"),
+                    dbc.Button("Forecast", id="forecast-submit"),
+                    dbc.Button("Forecast ALL", id="forecast-all-submit", color="danger"),
+                ]),
             ])
         ], width=2),
         dbc.Col([dcc.Loading(dcc.Graph(id="element-graph"))])
     ]),
     dcc.Loading(html.Div(id="forecast-readout")),
+    dcc.Loading(html.Div(id="forecast-test-readout")),
     dcc.Loading(html.Div(id="forecast-all-readout")),
 ], fluid=True)
 
@@ -42,6 +59,7 @@ app.layout = dbc.Container([
     Output("element-graph", "figure"),
     Input("element-input", "value"),
     Input("forecast-readout", "children"),
+    Input("forecast-test-readout", "children"),
 )
 def update_graph(element_pk, *_):
     fig = go.Figure()
@@ -77,16 +95,28 @@ def update_graph(element_pk, *_):
 
 
 @app.callback(
+    Output("forecast-test-readout", "children"),
+    Input("forecast-test-submit", "n_clicks"),
+    State("element-input", "value"),
+    [State(f"{letter}-input", "value") for letter in "pdqPDQm"],
+)
+@timer
+def update_test_forecast(n_clicks, element_pk, p, d, q, P, D, Q, m):
+    if n_clicks is None: raise PreventUpdate
+    sarima_params = {"p": p, "d": d, "q": q, "P": P, "D": D, "Q": Q, "m": m}
+    forecast_element(element_pk, sarima_params=sarima_params)
+    return f"forecasted {element_pk} with test params"
+
+
+@app.callback(
     Output("forecast-readout", "children"),
     Input("forecast-submit", "n_clicks"),
     State("element-input", "value"),
 )
-@timer
 def update_forecast(n_clicks, element_pk):
-    if n_clicks is None:
-        raise PreventUpdate
+    if n_clicks is None: raise PreventUpdate
     forecast_element(element_pk)
-    return f"forecasted {element_pk}"
+    return f"forecasted {element_pk} with default"
 
 
 @app.callback(

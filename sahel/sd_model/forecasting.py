@@ -1,10 +1,12 @@
 import pandas as pd
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
 from ..models import Element, Source, ForecastedDataPoint
 
 
-def forecast_element(element_pk):
+def forecast_element(element_pk, sarima_params=None):
+    use_ets = True
     forecast_years = 2
     element = Element.objects.get(pk=element_pk)
     df = pd.DataFrame(element.measureddatapoints.all().values())
@@ -27,8 +29,6 @@ def forecast_element(element_pk):
         period = "MS"
 
     df.index = pd.to_datetime(df["date"])
-    order = (0, 1, number_of_periods + 1)
-    seasonal_order = (1, 0, 0, number_of_periods)
     forecast_periods = number_of_periods * forecast_years
 
     objs = []
@@ -36,16 +36,40 @@ def forecast_element(element_pk):
         print(f"FORECASTING {admin1} NOW")
         dff = df[df["admin1"] == admin1]
         dff = dff.resample(period).mean().interpolate()["value"]
-        print(len(dff))
-        if len(dff) < number_of_periods:
-            pass
+
+        if sarima_params is None:
+            order = (0, 1, number_of_periods + 1)
+            seasonal_order = (0, 1, 0, number_of_periods)
+            if element.unit == "1":
+                if len(dff) == number_of_periods:
+                    print(f"setting {element} forecast to simple seasonal")
+                    order = [0, 0, 0]
+                    seasonal_order = [0, 1, 0, number_of_periods]
+                elif len(dff) < number_of_periods:
+                    print(f"setting {element} forecast to single exp")
+                    order = [1, 0, 0]
+                    seasonal_order = [0, 0, 0, 0]
+        else:
+            order = [int(sarima_params.get(letter)) for letter in "pdq"]
+            seasonal_order = [int(sarima_params.get(letter)) for letter in "PDQm"]
+
         print(dff)
-        try:
-            model = SARIMAX(dff, order=order, seasonal_order=seasonal_order)
-            model_fit = model.fit()
-        except Exception as e:
-            print(f"couldn't model because:\n{e}")
-            continue
+        print([order, seasonal_order])
+
+        if use_ets:
+            try:
+                model = ETSModel(dff, error="add", trend="add", seasonal="add", damped_trend=True, seasonal_periods=number_of_periods)
+                model_fit = model.fit()
+            except:
+                model = ETSModel(dff, error="add")
+                model_fit = model.fit()
+        else:
+            try:
+                model = SARIMAX(dff, order=order, seasonal_order=seasonal_order)
+                model_fit = model.fit()
+            except Exception as e:
+                model = SARIMAX(dff, order=[1, 1, 0], seasonal_order=[0, 0, 0, 0])
+                model_fit = model.fit()
 
         forecast_points = model_fit.forecast(steps=forecast_periods)
         print(forecast_points)
