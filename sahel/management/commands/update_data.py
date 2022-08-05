@@ -8,7 +8,7 @@ from dateutil import parser
 import pandas as pd
 import numpy as np
 from ...models import RegularDataset, Element, MeasuredDataPoint, Source
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 import time
 
 admin1s = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
@@ -202,11 +202,13 @@ def update_dm_globallivestock():
 
 
 def fix_problem_data_points():
-    pass
+    points = MeasuredDataPoint.objects.filter(source_id=1, date=date(2020, 5, 15), element_id=131)
+    points.delete()
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
         # update_wfp_price_data()
-        update_dm_suividesprix()
+        # update_dm_suividesprix()
         # update_dm_globallivestock()
+        fix_problem_data_points()

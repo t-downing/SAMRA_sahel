@@ -58,11 +58,21 @@ def forecast_element(element_pk, sarima_params=None):
 
         if use_ets:
             try:
-                model = ETSModel(dff, error="add", trend="add", seasonal="add", damped_trend=True, seasonal_periods=number_of_periods)
-                model_fit = model.fit()
+                model = ETSModel(dff, error="add", trend="add", damped_trend=True, seasonal="add", seasonal_periods=number_of_periods)
             except:
-                model = ETSModel(dff, error="add")
-                model_fit = model.fit()
+                try:
+                    if element.unit == "1":
+                        if len(dff) > number_of_periods - 1:
+                            model = SARIMAX(dff, order=[0, 0, 0], seasonal_order=[0, 1, 0, number_of_periods])
+                        else:
+                            model = SARIMAX(dff, order=[0, 1, 0], seasonal_order=[0, 0, 0, 0])
+                    else:
+                        model = ETSModel(dff, error="add", trend="add", damped_trend=True)
+                except:
+                    try:
+                        model = ETSModel(dff, error="add", trend="add")
+                    except:
+                        model = ETSModel(dff, error="add")
         else:
             try:
                 model = SARIMAX(dff, order=order, seasonal_order=seasonal_order)
@@ -71,6 +81,7 @@ def forecast_element(element_pk, sarima_params=None):
                 model = SARIMAX(dff, order=[1, 1, 0], seasonal_order=[0, 0, 0, 0])
                 model_fit = model.fit()
 
+        model_fit = model.fit()
         forecast_points = model_fit.forecast(steps=forecast_periods)
         print(forecast_points)
 
