@@ -6,7 +6,7 @@ from dash.exceptions import PreventUpdate
 
 from sahel.models import ResponseOption, SimulatedDataPoint, Element, ConstantValue, PulseValue
 
-from ..model_operations import run_model, timer
+from sahel.sd_model.model_operations import run_model, timer
 
 import plotly.graph_objects as go
 import plotly

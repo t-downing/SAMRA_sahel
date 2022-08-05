@@ -7,10 +7,10 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_cytoscape as cyto
-from ...models import Element, SimulatedDataPoint, Connection, ElementGroup, \
+from sahel.models import Element, SimulatedDataPoint, Connection, ElementGroup, \
     MeasuredDataPoint, Source, ResponseOption, ConstantValue, HouseholdConstantValue
 import plotly.graph_objects as go
-from ..model_operations import run_model, timer
+from sahel.sd_model.model_operations import run_model, timer
 import inspect
 from pprint import pprint
 from datetime import date, datetime
