@@ -107,19 +107,19 @@ stylesheet = [
 
 ROWSTYLE = {"margin-bottom": "10px"}
 
-app.layout = dbc.Container([
+app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, children=[
     dbc.Row([
         dbc.Col(
             [
                 dbc.Card([
                     dbc.CardHeader("Contrôles"),
                     dbc.CardBody([
-                        dcc.Dropdown(id="admin1-input", options=admin1s, value=None, placeholder="Région", style=ROWSTYLE),
-                        dcc.Dropdown(id="admin2-input", options=admin1s, value=None, placeholder="Cercle", style=ROWSTYLE),
-                        dcc.DatePickerRange(id="daterange-input", start_date=initial_startdate, end_date=initial_enddate, style=ROWSTYLE),
+                        dcc.Dropdown(id="admin1-input", options=admin1s, value=None, placeholder="Région", className="mb-2"),
+                        dcc.Dropdown(id="admin2-input", options=admin1s, value=None, placeholder="Cercle", className="mb-2"),
+                        dcc.DatePickerRange(id="daterange-input", start_date=initial_startdate, end_date=initial_enddate, className="mb-2"),
                         dbc.Select(id="responseoption-input", placeholder="Réponse", value=initial_response,
                                    options=[{"label": responseoption.name, "value": responseoption.pk}
-                                            for responseoption in ResponseOption.objects.all()], className="mb-1"),
+                                            for responseoption in ResponseOption.objects.all()], className="mb-2"),
                         dbc.Button("Réexécuter modèle", n_clicks=0, id="run-model"),
                     ])
                 ], className="shadow mb-4"),
