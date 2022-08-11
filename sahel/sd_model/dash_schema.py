@@ -107,8 +107,8 @@ stylesheet = [
 
 ROWSTYLE = {"margin-bottom": "10px"}
 
-app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, children=[
-    dbc.Row([
+app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, children=[
+    dbc.Row(children=[
         dbc.Col(
             [
                 dbc.Card([
@@ -122,7 +122,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, children=[
                                             for responseoption in ResponseOption.objects.all()], className="mb-2"),
                         dbc.Button("Réexécuter modèle", n_clicks=0, id="run-model"),
                     ])
-                ], className="shadow mb-4"),
+                ], className="shadow mb-4 mt-4"),
                 dbc.Card([
                     dbc.CardHeader("Ajouter un élément"),
                     dbc.CardBody([
@@ -139,7 +139,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, children=[
             width=2
         ),
         dbc.Col(
-            dbc.Card([
+            dbc.Card(className="shadow mb-4 mt-4", children=[
                 dbc.CardHeader([
                     html.Div("Schéma"),
                     dbc.Switch(id="schema-group-switch", label="Montrer les détails", value=True),
@@ -171,11 +171,11 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, children=[
                                            )}
                                        )),
                 ]), style={"overflow": "hidden"}),
-            ], style={"height": "900px"}, className="shadow mb-4"),
+            ], style={"height": "900px"}, ),
             width=7
         ),
         dbc.Col(
-            dbc.Card([
+            dbc.Card(className="shadow mb-4 mt-4", children=[
                 dbc.CardHeader("Détail d'élément"),
                 dbc.CardBody([
                     dbc.InputGroup([
@@ -198,7 +198,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, children=[
                     dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"}),
                     html.Div(id="element-detail-conn-eq"),
                 ])
-            ], style={"height": "900px"}, className="shadow mb-4"),
+            ], style={"height": "900px"}),
             width=3,
         )
     ]),
@@ -217,7 +217,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, children=[
     html.P(id="elementgroup-changed"),
     html.P(id="element-label-changed"),
     html.P(id="householdconstantvalue-changed"),
-], fluid=True)
+])
 
 
 @app.callback(
@@ -741,9 +741,11 @@ def save_element_positions(n_clicks, cyto_elements, layout):
         if "position" in cyto_element:
             element = Element.objects.get(pk=cyto_element.get("data").get("id"))
             element.x_pos, element.y_pos = cyto_element.get("position").get("x"), cyto_element.get("position").get("y")
+            if element.sd_type == "Flow":
+                print(f"saving position for {element}")
             elements.append(element)
     Element.objects.bulk_update(elements, ["x_pos", "y_pos"])
-    return "saved"
+    return f"saved {n_clicks} times"
 
 
 @app.callback(
