@@ -39,6 +39,7 @@ stylesheet = [
          "text-halign": "center",
          "text-wrap": "wrap",
          "text-max-width": 100,
+         "background-opacity": 0.7,
      }},
     {"selector": "[sd_type = 'Stock']",
      "style": {
@@ -654,7 +655,7 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
     elif element.sd_type == "Stock":
         inflows_card = dbc.Card([
             dbc.CardHeader("Flux intrants"),
-            dbc.CardBody([
+            dbc.CardBody(style={"padding": "0px"}, children=[
                 dbc.ListGroup(
                     [
                         dbc.ListGroupItem([
@@ -667,7 +668,7 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                         for inflow in element.inflows.all()
                     ],
                     flush=True,
-                    style={"height": "150px", "overflow-y": "scroll"}
+                    style={"height": "100px", "overflow-y": "scroll"}
                 ),
                 dbc.InputGroup([
                     dbc.Select(id="element-detail-inflow-input", placeholder="Ajouter un flux entrant",
@@ -678,12 +679,12 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                                 ]),
                     dbc.Button("Saisir", id="element-detail-inflow-submit")
                 ])
-            ], style={"padding": "0px"})
+            ])
         ], style=ROWSTYLE)
 
         outflows_card = dbc.Card([
             dbc.CardHeader("Flux sortants"),
-            dbc.CardBody([
+            dbc.CardBody(style={"padding": "0px"}, children=[
                 dbc.ListGroup(
                     [
                         dbc.ListGroupItem([
@@ -696,7 +697,7 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                         for outflow in element.outflows.all()
                     ],
                     flush=True,
-                    style={"height": "200px", "overflow-y": "scroll"}
+                    style={"height": "100px", "overflow-y": "scroll"}
                 ),
                 dbc.InputGroup([
                     dbc.Select(id="element-detail-outflow-input", placeholder="Ajouter un flux sortant",
@@ -706,7 +707,7 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                                ]),
                     dbc.Button("Saisir", id="element-detail-outflow-submit")
                 ])
-            ], style={"padding": "0px"})
+            ])
         ], style=ROWSTYLE)
 
         conn_eq_div = html.Div([inflows_card, outflows_card])

@@ -28,10 +28,10 @@ responses_dropdown = [{"label": response.name, "value": response.pk} for respons
 elements_dropdown = [{"label": element.label, "value": element.pk}
                      for element in Element.objects.exclude(simulateddatapoints=None)]
 
-app.layout = dbc.Container([
-    dbc.Row([
+app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, children=[
+    dbc.Row(children=[
         dbc.Col([
-            dbc.Card([
+            html.Div(children=dbc.Card(className="shadow mb-4 mt-4", children=[
                 dbc.CardHeader("Comparer des réponses"),
                 dbc.CardBody([
                     dbc.Checklist(
@@ -49,20 +49,25 @@ app.layout = dbc.Container([
                        dbc.Select(id="element2-input", options=elements_dropdown, placeholder="Élément", value=initial_element2),
                     ], size="sm"),
                 ]),
-            ]),
+            ])),
         ], width=2),
         dbc.Col([
-            dcc.Graph(id="bar-graph", style={"height": "800px"})
+            html.Div(style={"height": "900px"}, children=dbc.Card(className="shadow mb-4 mt-4 h-100", children=[
+                dbc.CardBody(children=dcc.Graph(className="h-100", id="bar-graph"))
+            ]))
         ], width=5),
         dbc.Col([
-            dcc.Graph(id="scatter-graph", style={"height": "400px"}),
-            dcc.Graph(id="line-graph", style={"height": "400px"}),
+            html.Div(style={"height": "435px"}, children=dbc.Card(className="shadow mb-4 mt-4 h-100", children=[dbc.CardBody(className="pt-0", children=
+                dcc.Graph(className="h-100", id="scatter-graph"),
+            )])),
+            html.Div(style={"height": "435px"}, children=dbc.Card(className="shadow mb-4 mt-4 h-100", children=[dbc.CardBody(className="pt-0", children=
+                dcc.Graph(className="h-100", id="line-graph"),
+            )])),
         ], width=5),
-    ], style={"margin-bottom": 40}),
-    html.Hr(),
+    ]),
     dbc.Row([
         dbc.Col([
-           dbc.Card([
+           dbc.Card(className="shadow mb-4 mt-4", children=[
                dbc.CardHeader("Construire une réponse"),
                dbc.CardBody([
                    dbc.InputGroup([
@@ -78,7 +83,7 @@ app.layout = dbc.Container([
                    ]),
                ]),
            ]),
-        ], width=6),
+        ], width=12),
     ]),
     dcc.Store(id="df-store"),
     html.Div(id="constantvalue-deleted-readout"),
@@ -86,16 +91,17 @@ app.layout = dbc.Container([
     html.Div(id="pulse-deleted-readout"),
     html.Div(id="pulse-changed-readout"),
     html.Div(id="constantvalue-added-readout")
-], fluid=True)
+])
 
 
 @app.callback(
     Output("build-response-input", "options"),
     Output("build-response-input", "value"),
-    Output("build-input", "value"),
+    Output("response-input", "options"),
     Input("create-response-submit", "n_clicks"),
     State("create-response-input", "value"),
 )
+@timer
 def create_response(_, value):
     if value is None:
         raise PreventUpdate

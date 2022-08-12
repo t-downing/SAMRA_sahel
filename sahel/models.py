@@ -32,6 +32,8 @@ class Element(models.Model):
         ("1", "1"),
         ("personne", "personne"),
         ("kcal / personne / jour", "kcal / personne / jour"),
+        ("1 / mois", "1 / mois"),
+        ("1 / an", "1 / an")
     )
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -97,6 +99,7 @@ class Source(models.Model):
     title = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
     number_of_periods = models.IntegerField(null=True, blank=True)
+    link = models.URLField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.title}; pk: {self.pk}"

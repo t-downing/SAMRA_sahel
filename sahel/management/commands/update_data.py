@@ -10,6 +10,10 @@ import numpy as np
 from ...models import RegularDataset, Element, MeasuredDataPoint, Source
 from datetime import datetime, timezone, date
 import time
+from pathlib import Path
+from dotenv import load_dotenv
+from unidecode import unidecode
+
 
 admin1s = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
 
@@ -200,10 +204,47 @@ def update_dm_globallivestock():
     MeasuredDataPoint.objects.filter(source=source).delete()
     MeasuredDataPoint.objects.bulk_create(objs)
 
+    # delete problem points
+    MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=131).delete()
+    MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=62).delete()
 
-def fix_problem_data_points():
-    points = MeasuredDataPoint.objects.filter(source_id=1, date=date(2020, 5, 15), element_id=131)
-    points.delete()
+
+def update_acled():
+    source = Source.objects.get(pk=6)
+    df = pd.read_csv("data/2019-08-06-2022-08-11-Mali.csv")
+    print(df.columns)
+    print(type(df["event_date"].iloc[0]))
+    print(df["admin1"].unique())
+
+    df = df.replace("Menaka", "Ménaka")
+    df = df[df["admin1"].isin(admin1s)]
+    df["date"] = pd.to_datetime(df["event_date"], format="%d %B %Y")
+    df["number_events"] = 1
+    df = df.groupby(["admin1", "admin2", pd.Grouper(key="date", freq="MS")]).sum().reset_index()
+    df["date"] += pd.DateOffset(days=14)
+    df = df[df["date"] < "2022-08-01"]
+
+    print(df)
+
+    objs = [measureddatapoint for _, row in df.iterrows() for measureddatapoint in
+            [MeasuredDataPoint(
+                element_id=156,
+                source=source,
+                date=row["date"],
+                value=row["number_events"],
+                admin1=row["admin1"],
+                admin2=row["admin2"],
+            ), MeasuredDataPoint(
+                element_id=157,
+                source=source,
+                date=row["date"],
+                value=row["fatalities"],
+                admin1=row["admin1"],
+                admin2=row["admin2"],
+            )]]
+
+    MeasuredDataPoint.objects.filter(source=source).delete()
+    MeasuredDataPoint.objects.bulk_create(objs)
 
 
 class Command(BaseCommand):
@@ -211,4 +252,5 @@ class Command(BaseCommand):
         # update_wfp_price_data()
         # update_dm_suividesprix()
         # update_dm_globallivestock()
-        fix_problem_data_points()
+        update_acled()
+        pass

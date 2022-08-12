@@ -13,7 +13,7 @@ from django.db.models import Q
 
 def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
     start = time.time()
-    startdate, enddate = date(2022, 1, 1), date(2023, 1, 1)
+    startdate, enddate = date(2022, 1, 1), date(2024, 1, 1)
 
     model = Model(starttime=startdate.toordinal(), stoptime=enddate.toordinal(), dt=10)
     zero_flow = model.flow("Zero Flow")

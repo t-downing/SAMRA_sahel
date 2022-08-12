@@ -23,7 +23,7 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader("Show/modify forecast"),
+                dbc.CardHeader("Show/modify forecast", id="element-input-header"),
                 dbc.CardBody([
                     dbc.Select(
                         id="element-input", value=42,
@@ -53,6 +53,15 @@ app.layout = dbc.Container([
     dcc.Loading(html.Div(id="forecast-test-readout")),
     dcc.Loading(html.Div(id="forecast-all-readout")),
 ], fluid=True)
+
+
+@app.callback(
+    Output("element-input", "options"),
+    Input("element-input-header", "children")
+)
+def update_element_dropdown(_):
+    return [{"label": element.label, "value": element.pk}
+            for element in Element.objects.filter(sd_type="Input").exclude(measureddatapoints=None)]
 
 
 @app.callback(
