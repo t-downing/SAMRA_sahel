@@ -20,11 +20,15 @@ def forecast_element(element_pk, sarima_params=None):
     else:
         number_of_periods = 12
 
+
+
     # resample into MS or QS (previously LIKELY on 15th of month etc)
     if number_of_periods == 12:
         period = "MS"
     elif number_of_periods == 4:
         period = "QS"
+    elif number_of_periods == 36:
+        period = f"{31556952 / 36}S"
     else:
         period = "MS"
 
@@ -37,59 +41,36 @@ def forecast_element(element_pk, sarima_params=None):
         dff = df[df["admin1"] == admin1]
         dff = dff.resample(period).mean().interpolate()["value"]
 
-        if sarima_params is None:
-            order = (0, 1, number_of_periods + 1)
-            seasonal_order = (0, 1, 0, number_of_periods)
-            if element.unit == "1":
-                if len(dff) == number_of_periods:
-                    print(f"setting {element} forecast to simple seasonal")
-                    order = [0, 0, 0]
-                    seasonal_order = [0, 1, 0, number_of_periods]
-                elif len(dff) < number_of_periods:
-                    print(f"setting {element} forecast to single exp")
-                    order = [1, 0, 0]
-                    seasonal_order = [0, 0, 0, 0]
-        else:
-            order = [int(sarima_params.get(letter)) for letter in "pdq"]
-            seasonal_order = [int(sarima_params.get(letter)) for letter in "PDQm"]
-
-        print(dff)
-        print([order, seasonal_order])
-
-        if use_ets:
+        try:
+            model = ETSModel(dff, error="add", trend="add", damped_trend=True, seasonal="add", seasonal_periods=number_of_periods)
+        except:
             try:
-                model = ETSModel(dff, error="add", trend="add", damped_trend=True, seasonal="add", seasonal_periods=number_of_periods)
+                if element.unit == "1":
+                    if len(dff) > number_of_periods - 1:
+                        model = SARIMAX(dff, order=[0, 0, 0], seasonal_order=[0, 1, 0, number_of_periods])
+                    else:
+                        model = SARIMAX(dff, order=[0, 1, 0], seasonal_order=[0, 0, 0, 0])
+                else:
+                    model = ETSModel(dff, error="add", trend="add", damped_trend=True)
             except:
                 try:
-                    if element.unit == "1":
-                        if len(dff) > number_of_periods - 1:
-                            model = SARIMAX(dff, order=[0, 0, 0], seasonal_order=[0, 1, 0, number_of_periods])
-                        else:
-                            model = SARIMAX(dff, order=[0, 1, 0], seasonal_order=[0, 0, 0, 0])
-                    else:
-                        model = ETSModel(dff, error="add", trend="add", damped_trend=True)
+                    model = ETSModel(dff, error="add", trend="add")
                 except:
-                    try:
-                        model = ETSModel(dff, error="add", trend="add")
-                    except:
-                        model = ETSModel(dff, error="add")
-        else:
-            try:
-                model = SARIMAX(dff, order=order, seasonal_order=seasonal_order)
-                model_fit = model.fit()
-            except Exception as e:
-                model = SARIMAX(dff, order=[1, 1, 0], seasonal_order=[0, 0, 0, 0])
-                model_fit = model.fit()
+                    model = ETSModel(dff, error="add")
 
+        if Source.objects.get(pk=df["source_id"].iloc[0]).pk == 7:
+            model = SARIMAX(dff, order=[1, 1, number_of_periods + 1], seasonal_order=[1, 1, 0, number_of_periods])
         model_fit = model.fit()
         forecast_points = model_fit.forecast(steps=forecast_periods)
         print(forecast_points)
+
+        dateoffset = pd.DateOffset(months=2 if period == "QS" else 0, days=14 if period in ["QS", "MS"] else 10)
 
         # record and re-shift forward to 15th of month
         objs += [ForecastedDataPoint(
             element=element,
             admin1=admin1,
-            date=date + pd.DateOffset(months=2 if period == "QS" else 0, days=14),
+            date=date + dateoffset,
             value=value
         ) for date, value in forecast_points.iteritems()]
 

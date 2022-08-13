@@ -84,21 +84,21 @@ def update_graph(element_pk, *_):
 
     dff = df.groupby(["date", "forecasted"]).mean().reset_index()
     fig.add_trace(go.Scatter(
-        x=dff[~dff["forecasted"]]["date"], y=dff[~dff["forecasted"]]["value"], name="AVG",
-        line=dict(color="black", width=2), legendgroup="measured", legendgrouptitle_text="Measuré"))
+        x=dff[~dff["forecasted"]]["date"], y=dff[~dff["forecasted"]]["value"], name="Mesuré",
+        line=dict(color="black", width=2), legendgroup="AVG", legendgrouptitle_text="AVG"))
     fig.add_trace(go.Scatter(
-        x=dff[dff["forecasted"]]["date"], y=dff[dff["forecasted"]]["value"], name="AVG",
-        line=dict(color="black", width=2, dash="dash"), legendgroup="forecasted", legendgrouptitle_text="Prévisé"))
+        x=dff[dff["forecasted"]]["date"], y=dff[dff["forecasted"]]["value"], name="Prévisé",
+        line=dict(color="black", width=2, dash="dash"), legendgroup="AVG"))
 
     for admin1, color in zip(df["admin1"].unique(), default_colors):
         dff = df[df["admin1"] == admin1]
         dff = dff.groupby(["date", "forecasted"]).mean().reset_index()
         fig.add_trace(go.Scatter(
             x=dff[~dff["forecasted"]]["date"], y=dff[~dff["forecasted"]]["value"],
-            name=admin1, line=dict(color=color, width=1), legendgroup="measured"))
+            name="Mesuré", line=dict(color=color, width=1), legendgroup=admin1, legendgrouptitle_text=admin1))
         fig.add_trace(go.Scatter(
             x=dff[dff["forecasted"]]["date"], y=dff[dff["forecasted"]]["value"],
-            name=admin1, line=dict(color=color, dash="dash", width=1), legendgroup="forecasted"))
+            name="Prévisé", line=dict(color=color, dash="dash", width=1), legendgroup=admin1))
 
     return fig
 

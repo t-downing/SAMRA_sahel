@@ -15,7 +15,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
     start = time.time()
     startdate, enddate = date(2022, 1, 1), date(2024, 1, 1)
 
-    model = Model(starttime=startdate.toordinal(), stoptime=enddate.toordinal(), dt=10)
+    model = Model(starttime=startdate.toordinal(), stoptime=enddate.toordinal(), dt=7)
     zero_flow = model.flow("Zero Flow")
     zero_flow.equation = 0.0
 
@@ -67,17 +67,19 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
 
     # set equations for modeling elements
     all_equations = ""
+    smoothed_elements = []
     for element in elements:
         # used it once, might as well use it again
         if element.sd_type in ["Variable", "Flow"]:
+            if "smooth" in element.equation:
+                # set equation to zero, return to it later to set it properly once everthing else has been set
+                print(f"setting {element} equation to yero for now, because it is smoothed")
+                all_equations += element.equation
+                exec(f'_E{element.pk}_.equation = 0.0')
+                smoothed_elements.append(element)
+                continue
             try:
                 exec(f'_E{element.pk}_.equation = {element.equation}')
-                # if element.unit is not None:
-                #     if "mois" in element.unit:
-                #         if element.sd_type == "Variable":
-                #             model.converter(str(element.pk)).equation /= 30.437
-                #         else:
-                #             model.flow(str(element.pk)).equation /= 30.437
                 all_equations += element.equation
             except NameError as error:
                 print(f"'{element}' equation could not be defined because {error}. "
@@ -115,6 +117,8 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
                     # load forecasted points
                     df_f = pd.DataFrame(element.forecasteddatapoints.all().values())
                     df_f = df_f.groupby("date").mean().reset_index()[["date", "value"]]
+                    if element.pk == 48:
+                        print(df_m["date"].max())
                     df = pd.concat([df_m, df_f], ignore_index=True)
                     df["t"] = df["date"].apply(datetime.toordinal)
                     model.points[str(element.pk)] = df[["t", "value"]].values.tolist()
@@ -136,9 +140,17 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
             else:
                 model_output_pks.remove(str(element.pk))
 
-
     stop = time.time()
     print(f"set up inputs took {stop - start} s")
+    start = time.time()
+
+    # smoothed variables
+    for element in smoothed_elements:
+        print(f"setting smoothed equation for {element} now")
+        exec(f'_E{element.pk}_.equation = {element.equation}')
+
+    stop = time.time()
+    print(f"set up smoothed variables took {stop - start} s")
     start = time.time()
 
     # set constant values
@@ -204,6 +216,25 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
     # df.to_sql("simulateddatapoint", con=engine, if_exists='append')
 
     return df
+
+
+def smooth(model, input_var, time_constant, initial_value=None):
+    """ Smooth a variable
+    (Built-in sd.smooth function does not work properly)
+    """
+    smoothed_value = model.stock(f"{input_var.name} SMOOTHED")
+    if initial_value is None:
+        print(f"input_var is {input_var}")
+        print(f"input_var name is {input_var.name}")
+        initial_value = model.evaluate_equation(input_var.name, model.starttime)
+    print(f"setting {input_var} initial value to {initial_value}")
+    smoothed_value.initial_value = initial_value
+    value_increase = model.flow(f"{input_var.name} SMOOTHING UP")
+    value_decrease = model.flow(f"{input_var.name} SMOOTHING DOWN")
+    smoothed_value.equation = value_increase - value_decrease
+    value_increase.equation = (input_var - smoothed_value) / time_constant
+    value_decrease.equation = (smoothed_value - input_var) / time_constant
+    return smoothed_value
 
 
 def timer(func):

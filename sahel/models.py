@@ -33,7 +33,9 @@ class Element(models.Model):
         ("personne", "personne"),
         ("kcal / personne / jour", "kcal / personne / jour"),
         ("1 / mois", "1 / mois"),
-        ("1 / an", "1 / an")
+        ("1 / an", "1 / an"),
+        ("mm / jour", "mm / jour"),
+        ("NDVI", "NDVI"),
     )
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -86,7 +88,6 @@ class Connection(models.Model):
 class ElementGroup(models.Model):
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
-
 
     def __str__(self):
         return self.label

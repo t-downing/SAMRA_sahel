@@ -14,8 +14,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from unidecode import unidecode
 
-
 admin1s = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
+
 
 def download_from_hdx(hdx_identifier, last_updated_date, resource_number=0):
     setup_logging()
@@ -247,10 +247,52 @@ def update_acled():
     MeasuredDataPoint.objects.bulk_create(objs)
 
 
+def update_ndvi():
+    source = Source.objects.get(pk=7)
+    admin1_files = (
+        ("Mali - Gao_Pasture_", "Gao"),
+        ("Mali - Kidal__", "Kidal"),
+        ("Mali - Mopti_Pasture_", "Mopti"),
+        ("Mali - Tombouctou_Pasture_", "Tombouctou")
+    )
+    objs = []
+    for admin1_file in admin1_files:
+        for measure in ["NDVI-", "Rainfall"]:
+            element_ids = [169, 170] if measure == "Rainfall" else [171, 172]
+            for year in range(2012, 2023):
+                if not (year == 2022 and admin1_file[1] == "Gao" and measure == "Rainfall"):
+                    pass
+                df = pd.read_csv(f"data/wfp seasonal explorer/{admin1_file[0]}{measure}{year}.csv")
+                df["Day"] = df["Dekad"] * 10 - 5
+                df["date"] = pd.to_datetime(df[["Year", "Month", "Day"]])
+                df = df.dropna()
+                real_column = "NDVI" if measure == "NDVI-" else "Rainfall (mm)"
+                avg_column = "Average" if measure =="NDVI-" else "Average (mm)"
+                for _, row in df.iterrows():
+                    objs.append(MeasuredDataPoint(
+                        element_id=element_ids[0],
+                        source=source,
+                        value=row[real_column],
+                        date=row["date"],
+                        admin1=admin1_file[1],
+                    ))
+                    objs.append(MeasuredDataPoint(
+                        element_id=element_ids[1],
+                        source=source,
+                        value=row[avg_column],
+                        date=row["date"],
+                        admin1=admin1_file[1],
+                    ))
+
+    MeasuredDataPoint.objects.filter(source=source).delete()
+    MeasuredDataPoint.objects.bulk_create(objs)
+
+
 class Command(BaseCommand):
     def handle(self, *args, **options):
         # update_wfp_price_data()
         # update_dm_suividesprix()
         # update_dm_globallivestock()
-        update_acled()
+        # update_acled()
+        update_ndvi()
         pass

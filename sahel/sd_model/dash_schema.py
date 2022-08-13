@@ -50,6 +50,10 @@ stylesheet = [
      "style": {
          "shape": "diamond",
      }},
+    {"selector": "[sd_type = 'Household Constant']",
+     "style": {
+         "shape": "diamond",
+     }},
     {"selector": "[sd_type = 'Constant']",
      "style": {
          "shape": "triangle",
@@ -153,7 +157,8 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                         stylesheet=stylesheet,
                         minZoom=0.2,
                         maxZoom=2.0,
-                        # autoRefreshLayout=True
+                        boxSelectionEnabled=True,
+                        autoRefreshLayout=True,
                     ),
                 ], style={"padding": "0px"}),
                 dbc.CardFooter(dbc.Row([
@@ -617,8 +622,8 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
             dbc.CardBody(
                 [
                     upstream_list,
-                    dbc.InputGroup([
-                        dbc.Select(options=dropdown_list, id="element-detail-conn-input", placeholder="Ajouter une influence"),
+                    dbc.InputGroup(children=[
+                        dcc.Dropdown(style={"width": "250px"}, options=dropdown_list, id="element-detail-conn-input", placeholder="Ajouter une influence"),
                         dbc.Button("Saisir", id="element-detail-conn-submit")
                     ]),
                 ],
@@ -739,11 +744,11 @@ def save_element_positions(n_clicks, cyto_elements, layout):
         return "not saved yet"
     elements = []
     for cyto_element in cyto_elements:
+        # print(f"found for {cyto_element}")
         if "position" in cyto_element:
             element = Element.objects.get(pk=cyto_element.get("data").get("id"))
             element.x_pos, element.y_pos = cyto_element.get("position").get("x"), cyto_element.get("position").get("y")
-            if element.sd_type == "Flow":
-                print(f"saving position for {element}")
+            # print(f"saving position for {element}")
             elements.append(element)
     Element.objects.bulk_update(elements, ["x_pos", "y_pos"])
     return f"saved {n_clicks} times"
@@ -758,23 +763,23 @@ def save_element_positions(n_clicks, cyto_elements, layout):
 @timer
 def redraw_model(date_ord, *_):
     elements = Element.objects.all()
-    nodes =[]
+    nodes = []
     for element in elements:
         dateinput = date.fromordinal(int(date_ord))
         datapoint = element.measureddatapoints.filter(element=element, date__lte=dateinput).order_by("-date").first()
         if datapoint is not None:
             max_value = element.measureddatapoints.aggregate(Max("value")).get("value__max")
             min_value = element.measureddatapoints.aggregate(Min("value")).get("value__min")
-            value_norm = (datapoint.value - min_value) / (max_value - min_value)
-            if value_norm < 1/3:
-                color = "lightcoral"
-            elif value_norm < 2/3:
-                color = "khaki"
+            if max_value != min_value:
+                value_norm = (datapoint.value - min_value) / (max_value - min_value)
+                if value_norm < 1/3:
+                    color = "lightcoral"
+                elif value_norm < 2/3:
+                    color = "khaki"
+                else:
+                    color = "lightgreen"
             else:
-                color = "lightgreen"
-            for node in nodes:
-                if node.get("data").get("id") == element.pk:
-                    node["data"]["color"] = color
+                color = "white"
         else:
             color = "white"
 
