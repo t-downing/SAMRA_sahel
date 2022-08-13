@@ -26,9 +26,7 @@ app.layout = dbc.Container([
                 dbc.CardHeader("Show/modify forecast", id="element-input-header"),
                 dbc.CardBody([
                     dbc.Select(
-                        id="element-input", value=42,
-                        options=[{"label": element.label, "value": element.pk}
-                                 for element in Element.objects.filter(sd_type="Input").exclude(measureddatapoints=None)]),
+                        id="element-input", value=42),
                     html.Hr(),
                     html.H6("SARIMA parameters"),
                     dbc.InputGroup([

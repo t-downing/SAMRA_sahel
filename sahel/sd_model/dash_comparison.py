@@ -13,40 +13,29 @@ import plotly
 from plotly.subplots import make_subplots
 import pandas as pd
 
-initial_response1 = 1
-initial_response2 = 2
-initial_element1 = 15
-initial_element2 = 39
-
 default_colors = plotly.colors.DEFAULT_PLOTLY_COLORS
 
 ROWSTYLE = {"margin-bottom": "10px"}
 
 app = DjangoDash("comparison", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-responses_dropdown = [{"label": response.name, "value": response.pk} for response in ResponseOption.objects.all()]
-elements_dropdown = [{"label": element.label, "value": element.pk}
-                     for element in Element.objects.exclude(simulateddatapoints=None)]
-
 app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, children=[
     dbc.Row(children=[
         dbc.Col([
             html.Div(children=dbc.Card(className="shadow mb-4 mt-4", children=[
-                dbc.CardHeader("Comparer des réponses"),
+                dbc.CardHeader("Comparer des réponses", id="response"),
                 dbc.CardBody([
                     dbc.Checklist(
-                        options=responses_dropdown,
-                        value=[initial_response1, initial_response2],
                         id="response-input",
                         style={"margin-bottom": "20px"}
                     ),
                     dbc.InputGroup([
-                       dbc.InputGroupText(["Élé. 1"]),
-                       dbc.Select(id="element1-input", options=elements_dropdown, placeholder="Élément", value=initial_element1),
+                        dbc.InputGroupText(["Élé. 1"]),
+                        dbc.Select(id="element1-input", placeholder="Élément"),
                     ], size="sm", style={"margin-bottom": "8px"}),
                     dbc.InputGroup([
-                       dbc.InputGroupText(["Élé. 2"]),
-                       dbc.Select(id="element2-input", options=elements_dropdown, placeholder="Élément", value=initial_element2),
+                        dbc.InputGroupText(["Élé. 2"]),
+                        dbc.Select(id="element2-input", placeholder="Élément"),
                     ], size="sm"),
                 ]),
             ])),
@@ -57,32 +46,34 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
             ]))
         ], width=5),
         dbc.Col([
-            html.Div(style={"height": "435px"}, children=dbc.Card(className="shadow mb-4 mt-4 h-100", children=[dbc.CardBody(className="pt-0", children=
-                dcc.Graph(className="h-100", id="scatter-graph"),
-            )])),
-            html.Div(style={"height": "435px"}, children=dbc.Card(className="shadow mb-4 mt-4 h-100", children=[dbc.CardBody(className="pt-0", children=
-                dcc.Graph(className="h-100", id="line-graph"),
-            )])),
+            html.Div(style={"height": "435px"}, children=dbc.Card(className="shadow mb-4 mt-4 h-100",
+                                                                  children=[dbc.CardBody(className="pt-0", children=
+                                                                  dcc.Graph(className="h-100", id="scatter-graph"),
+                                                                                         )])),
+            html.Div(style={"height": "435px"}, children=dbc.Card(className="shadow mb-4 mt-4 h-100",
+                                                                  children=[dbc.CardBody(className="pt-0", children=
+                                                                  dcc.Graph(className="h-100", id="line-graph"),
+                                                                                         )])),
         ], width=5),
     ]),
     dbc.Row([
         dbc.Col([
-           dbc.Card(className="shadow mb-4 mt-4", children=[
-               dbc.CardHeader("Construire une réponse"),
-               dbc.CardBody([
-                   dbc.InputGroup([
-                       dbc.InputGroupText("Modifier une réponse"),
-                       dbc.Select(id="build-response-input", options=responses_dropdown, value=initial_response2),
-                   ]),
-                   dcc.Loading(html.Div(id="response-constants")),
-                   html.P("OU", style={"margin": "20px", "text-align": "center"}),
-                   dbc.InputGroup([
-                       dbc.InputGroupText("Créer une nouvelle réponse"),
-                       dbc.Input(id="create-response-input", placeholder="Nom de réponse"),
-                       dbc.Button("Saisir", id="create-response-submit", color="success"),
-                   ]),
-               ]),
-           ]),
+            dbc.Card(className="shadow mb-4 mt-4", children=[
+                dbc.CardHeader("Construire une réponse"),
+                dbc.CardBody([
+                    dbc.InputGroup([
+                        dbc.InputGroupText("Modifier une réponse"),
+                        dbc.Select(id="build-response-input"),
+                    ]),
+                    dcc.Loading(html.Div(id="response-constants")),
+                    html.P("OU", style={"margin": "20px", "text-align": "center"}),
+                    dbc.InputGroup([
+                        dbc.InputGroupText("Créer une nouvelle réponse"),
+                        dbc.Input(id="create-response-input", placeholder="Nom de réponse"),
+                        dbc.Button("Saisir", id="create-response-submit", color="success"),
+                    ]),
+                ]),
+            ]),
         ], width=12),
     ]),
     dcc.Store(id="df-store"),
@@ -92,6 +83,28 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
     html.Div(id="pulse-changed-readout"),
     html.Div(id="constantvalue-added-readout")
 ])
+
+
+@app.callback(
+    Output("response-input", "options"),
+    Output("response-input", "value"),
+    Output("element1-input", "options"),
+    Output("element1-input", "value"),
+    Output("element2-input", "options"),
+    Output("element2-input", "value"),
+    Output("build-response-input", "options"),
+    Output("build-response-input", "value"),
+    Input("response", "children")
+)
+def populate_initial(_):
+    response_options = [{"label": response.name, "value": response.pk} for response in ResponseOption.objects.all()]
+    response_value = [1, 2]
+    element_options = [{"label": element.label, "value": element.pk}
+                       for element in Element.objects.exclude(simulateddatapoints=None)]
+    element1_value = 15
+    element2_value = 39
+    return response_options, response_value, element_options, element1_value, element_options, element2_value, \
+           response_options, response_value[1]
 
 
 @app.callback(
@@ -217,7 +230,8 @@ def build_response(response_pk, *_):
         table_rows.append(html.Tr([
             html.Td(constantvalue.element.label),
             html.Td(dbc.InputGroup([
-                dbc.Input(value=constantvalue.value, id={"type": "constantvalue-change-input", "index": constantvalue.pk}),
+                dbc.Input(value=constantvalue.value,
+                          id={"type": "constantvalue-change-input", "index": constantvalue.pk}),
                 dbc.Button("Changer", id={"type": "constantvalue-change", "index": constantvalue.pk}),
             ], size="sm")),
             html.Td(constantvalue.element.unit),
@@ -242,8 +256,8 @@ def build_response(response_pk, *_):
 
     table_rows.append(html.Tr([
         html.Td(dcc.Dropdown(id="constantvalue-element-input", placeholder="Ajouter un élément",
-                           options=[{"label": element.label, "value": element.pk}
-                                    for element in Element.objects.filter(sd_type__in=["Constant", "Pulse Input"])])),
+                             options=[{"label": element.label, "value": element.pk}
+                                      for element in Element.objects.filter(sd_type__in=["Constant", "Pulse Input"])])),
         html.Td(dbc.Input(id="constantvalue-value-input")),
         html.Td(id="constantvalue-unit-input"),
         html.Td(dcc.DatePickerSingle(id="constantvalue-date-input")),
@@ -281,7 +295,7 @@ def filter_data(response_pks, element1_pk, element2_pk, *_):
         responseoption_id__in=response_pks, element_id__in=element_pks).values())
     response_pk2color = {response_pk: color for response_pk, color in zip(response_pks, default_colors)}
     df["color"] = df["responseoption_id"].apply(response_pk2color.get)
-    df["secondary_y"] = df["element_id"].apply(lambda pk : True if str(pk) == str(element2_pk) else False)
+    df["secondary_y"] = df["element_id"].apply(lambda pk: True if str(pk) == str(element2_pk) else False)
     df = df.sort_values(["responseoption_id", "secondary_y"])
     return df.to_dict("records")
 
@@ -295,10 +309,12 @@ def update_bar_graph(data):
     if not data:
         raise PreventUpdate
     df = pd.DataFrame(data)
-    df = df.groupby(["responseoption_id", "element_id"]).agg(mean=("value", "mean"), sum=("value", "sum"), secondary_y=("secondary_y", "mean")).reset_index()
+    df = df.groupby(["responseoption_id", "element_id"]).agg(mean=("value", "mean"), sum=("value", "sum"),
+                                                             secondary_y=("secondary_y", "mean")).reset_index()
     # df = df.groupby(["responseoption_id", "element_id"]).mean().reset_index()
     df["value"] = df[["element_id", "mean", "sum"]].apply(
-        lambda row : row["mean"] if Element.objects.get(pk=row["element_id"]).aggregate_by == "MEAN" else row["sum"], axis=1)
+        lambda row: row["mean"] if Element.objects.get(pk=row["element_id"]).aggregate_by == "MEAN" else row["sum"],
+        axis=1)
     df["norm_value"] = df["value"] / df.groupby("element_id")["value"].transform(max)
     df = df.sort_values("secondary_y")
 
@@ -311,11 +327,11 @@ def update_bar_graph(data):
         fig.add_trace(go.Bar(
             name=responseoption.name,
             x=dff["element_id"].apply(
-                lambda pk : f"{Element.objects.get(pk=pk).label}<br>"
-                            f"{'MOYEN' if Element.objects.get(pk=pk).aggregate_by == 'MEAN' else 'TOTAL'}"),
+                lambda pk: f"{Element.objects.get(pk=pk).label}<br>"
+                           f"{'MOYEN' if Element.objects.get(pk=pk).aggregate_by == 'MEAN' else 'TOTAL'}"),
             y=dff["norm_value"],
             text=dff[["value", "element_id"]].apply(
-                lambda row : f'{row["value"]:.2}<br>{Element.objects.get(pk=row["element_id"]).unit}', axis=1),
+                lambda row: f'{row["value"]:.2}<br>{Element.objects.get(pk=row["element_id"]).unit}', axis=1),
         ))
 
     fig.update_layout(barmode="group", showlegend=True, legend=dict(title="Réponse"))
@@ -338,7 +354,8 @@ def update_scatter_graph(data):
     fig = go.Figure()
     fig.update_layout(template="simple_white", margin=go.layout.Margin(l=0, b=0))
 
-    df = df.groupby(["responseoption_id", "element_id"]).agg(mean=("value", "mean"), sum=("value", "sum"), secondary_y=("secondary_y", "mean")).reset_index()
+    df = df.groupby(["responseoption_id", "element_id"]).agg(mean=("value", "mean"), sum=("value", "sum"),
+                                                             secondary_y=("secondary_y", "mean")).reset_index()
     df = df.sort_values("secondary_y")
     print(df)
     x_element = Element.objects.get(pk=df.iloc[-1]["element_id"])

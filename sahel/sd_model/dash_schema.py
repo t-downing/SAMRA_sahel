@@ -21,7 +21,6 @@ initial_fig = go.Figure(layout=go.Layout(template="simple_white"))
 initial_fig.update_xaxes(title_text="Date")
 initial_startdate = date(2022, 1, 1)
 initial_enddate = date(2023, 1, 1)
-initial_response = 1
 
 cyto.load_extra_layouts()
 
@@ -117,14 +116,12 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
         dbc.Col(
             [
                 dbc.Card([
-                    dbc.CardHeader("Contrôles"),
+                    dbc.CardHeader("Contrôles", id="controls"),
                     dbc.CardBody([
                         dcc.Dropdown(id="admin1-input", options=admin1s, value=None, placeholder="Région", className="mb-2"),
                         dcc.Dropdown(id="admin2-input", options=admin1s, value=None, placeholder="Cercle", className="mb-2"),
                         dcc.DatePickerRange(id="daterange-input", start_date=initial_startdate, end_date=initial_enddate, className="mb-2"),
-                        dbc.Select(id="responseoption-input", placeholder="Réponse", value=initial_response,
-                                   options=[{"label": responseoption.name, "value": responseoption.pk}
-                                            for responseoption in ResponseOption.objects.all()], className="mb-2"),
+                        dbc.Select(id="responseoption-input", placeholder="Réponse", className="mb-2"),
                         dbc.Button("Réexécuter modèle", n_clicks=0, id="run-model"),
                     ])
                 ], className="shadow mb-4 mt-4"),
@@ -132,11 +129,8 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                     dbc.CardHeader("Ajouter un élément"),
                     dbc.CardBody([
                         dbc.Input(id="element-label-input", value="", style=ROWSTYLE, placeholder="Label"),
-                        dbc.Select(id="element-type-input", value="", placeholder="Type",
-                                     options=[{"label": sd_type[1], "type": sd_type[0]} for sd_type in Element.SD_TYPES], style=ROWSTYLE),
-                        dbc.Select(id="element-unit-input", value="", placeholder="Unité",
-                                   options=[{"label": unit[1], "value": unit[1]} for unit in Element.UNIT_OPTIONS],
-                                   style=ROWSTYLE),
+                        dbc.Select(id="element-type-input", value="", placeholder="Type", style=ROWSTYLE),
+                        dbc.Select(id="element-unit-input", value="", placeholder="Unité", style=ROWSTYLE),
                         dbc.Button("Saisir", id="element-submit"),
                     ])
                 ], className="shadow mb-4"),
@@ -191,14 +185,12 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                     ], style=ROWSTYLE),
                     dbc.InputGroup([
                         dbc.InputGroupText("Type"),
-                        dbc.Select(id="element-detail-type-input",
-                                   options=[{"label": sd_type[1], "value": sd_type[0]} for sd_type in Element.SD_TYPES]),
+                        dbc.Select(id="element-detail-type-input"),
                         dbc.Button("Changer", id="element-detail-type-submit")
                     ], size="sm", style=ROWSTYLE),
                     dbc.InputGroup([
                         dbc.InputGroupText("Groupe"),
-                        dbc.Select(id="element-detail-group-input",
-                                   options=[{"label": group.label, "value": group.pk} for group in ElementGroup.objects.all()]),
+                        dbc.Select(id="element-detail-group-input"),
                         dbc.Button("Changer", id="element-detail-group-submit")
                     ], size="sm", style=ROWSTYLE),
                     dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"}),
@@ -224,6 +216,26 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
     html.P(id="element-label-changed"),
     html.P(id="householdconstantvalue-changed"),
 ])
+
+
+@app.callback(
+    Output("responseoption-input", "options"),
+    Output("responseoption-input", "value"),
+    Output("element-type-input", "options"),
+    Output("element-unit-input", "options"),
+    Output("element-detail-type-input", "options"),
+    Output("element-detail-group-input", "options"),
+    Input("controls", "children"),
+)
+def populate_initial(_):
+    response_options = [{"label": responseoption.name, "value": responseoption.pk}
+                        for responseoption in ResponseOption.objects.all()]
+    response_value = 1
+    sdtype_options = [{"label": sd_type[1], "value": sd_type[0]} for sd_type in Element.SD_TYPES]
+    unit_options = [{"label": unit[1], "value": unit[0]} for unit in Element.UNIT_OPTIONS]
+    group_options = [{"label": group.label, "value": group.pk} for group in ElementGroup.objects.all()]
+    return response_options, response_value, sdtype_options, unit_options, sdtype_options, group_options
+
 
 
 @app.callback(
