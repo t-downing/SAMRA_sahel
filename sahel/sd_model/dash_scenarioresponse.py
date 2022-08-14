@@ -64,8 +64,9 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
     Input("filters", "children")
 )
 def populate_initial(_):
+    included_types=["Stock", "Flow", "Variable"]
     element_options = [{"label": element.label, "value": element.pk}
-                       for element in Element.objects.exclude(simulateddatapoints=None)]
+                       for element in Element.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types)]
     element_value = 77
     scenario_options = [{"label": scenario.name, "value": scenario.pk}
                         for scenario in Scenario.objects.all()]

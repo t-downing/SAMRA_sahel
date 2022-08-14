@@ -45,7 +45,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
     html.Div(id="pulse-deleted-readout"),
     html.Div(id="pulse-changed-readout"),
     html.Div(id="constantvalue-added-readout"),
-    html.Div(id="response-added-readout"),
+    html.Div(id="response-added-readout", children=""),
 ])
 
 
@@ -69,7 +69,7 @@ def populate_initial(_):
 @timer
 def create_response(_, value):
     if value is None:
-        raise PreventUpdate
+        return "none yet"
     response = ResponseOption(name=value)
     response.save()
     return f"added {response}"
@@ -92,7 +92,7 @@ def create_constantvalue(n_clicks, element_pk, value, date, response_pk):
     elif element.sd_type == "Pulse Input":
         print(date)
         PulseValue(responseoption_id=response_pk, element_id=element_pk, value=value, startdate=date).save()
-    run_model(responseoption_pk=response_pk)
+    # run_model(responseoption_pk=response_pk)
     return f"created {element.sd_type} value with value {value}"
 
 
@@ -106,7 +106,7 @@ def delete_constantvalue(n_clicks, ids):
         if n_click is not None:
             constantvalue = ConstantValue.objects.get(pk=id.get("index"))
             constantvalue.delete()
-            run_model(responseoption_pk=constantvalue.responseoption.pk)
+            # run_model(responseoption_pk=constantvalue.responseoption.pk)
             return f"{id} deleted, RERUN MODEL"
     raise PreventUpdate
 
@@ -121,7 +121,7 @@ def delete_pulse(n_clicks, ids):
         if n_click is not None:
             pulsevalue = PulseValue.objects.get(pk=id.get("index"))
             pulsevalue.delete()
-            run_model(responseoption_pk=pulsevalue.responseoption.pk)
+            # run_model(responseoption_pk=pulsevalue.responseoption.pk)
             return f"{id} deleted, RERUN MODEL"
     raise PreventUpdate
 
@@ -139,7 +139,7 @@ def change_constantvalue(n_clicks, ids, values):
                 constantvalue = ConstantValue.objects.get(pk=id.get("index"))
                 constantvalue.value = value
                 constantvalue.save()
-                run_model(responseoption_pk=constantvalue.responseoption.pk)
+                # run_model(responseoption_pk=constantvalue.responseoption.pk)
                 return f"{constantvalue} changed"
     raise PreventUpdate
 
@@ -157,7 +157,7 @@ def change_pulsevalue(n_clicks, ids, values):
                 pulsevalue = PulseValue.objects.get(pk=id.get("index"))
                 pulsevalue.value = value
                 pulsevalue.save()
-                run_model(responseoption_pk=pulsevalue.responseoption.pk)
+                # run_model(responseoption_pk=pulsevalue.responseoption.pk)
                 return f"{pulsevalue} changed"
     raise PreventUpdate
 
