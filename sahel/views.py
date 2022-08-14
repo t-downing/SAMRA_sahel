@@ -1,7 +1,7 @@
 from django.views.generic import TemplateView, ListView
 from .models import Source
 
-from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse
+from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse, dash_response_builder
 
 
 class IndexView(TemplateView):
