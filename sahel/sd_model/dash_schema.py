@@ -593,7 +593,7 @@ def element_detail_graph(nodedata, admin1, scenario_pk, responseoption_pk, *_):
     fig.update_layout(
         legend=dict(yanchor="bottom", x=0, y=1),
         showlegend=True,
-        yaxis=dict(title=element.unit),
+        yaxis=dict(title=element.unit + " / mois" if element.sd_type == "Pulse Input" else ""),
     )
     return fig
 

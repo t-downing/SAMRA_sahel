@@ -51,17 +51,18 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
             model.constant(str(element.pk)).equation = element.constant_default_value
         elif element.sd_type == "Pulse Input":
             print(f"trying to set up pulse {element}")
-            exec(f'_E{element.pk}_ = model.flow("{element.pk}")')
+            exec(f'_E{element.pk}_ = model.converter("{element.pk}")')
             pulsevalues = element.pulsevalues.filter(responseoption_id=responseoption_pk)
             if pulsevalues is None:
                 continue
-            model.flow(str(element.pk)).equation = 0.0
+            model.converter(str(element.pk)).equation = 0.0
             for pulsevalue in pulsevalues:
-                print(datetime.toordinal(pulsevalue.startdate))
-                pulsevar = model.converter(f"{element.pk}pulse{pulsevalue.pk}")
-                pulsevar.equation = sd.pulse(model, pulsevalue.value, float(datetime.toordinal(pulsevalue.startdate)))
-                model.flow(str(element.pk)).equation += pulsevar
-                print(f"set {element} equation to {model.flow(str(element.pk)).equation}")
+                pulse_start_ord = (pulsevalue.startdate - pd.DateOffset(days=15)).toordinal()
+                pulse_stop_ord = (pulsevalue.startdate + pd.DateOffset(days=15)).toordinal()
+                print(f"start {pulse_start_ord}, stop {pulse_stop_ord}")
+                model.converter(str(element.pk)).equation += sd.If(
+                    sd.And(sd.time() > pulse_start_ord, sd.time() < pulse_stop_ord), pulsevalue.value / 30.437, 0.0)
+                print(f"set {element} equation to {model.converter(str(element.pk)).equation}")
     stop = time.time()
     print(f"set up elements took {stop - start} s")
     start = time.time()
@@ -74,7 +75,7 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
         if element.sd_type in ["Variable", "Flow"]:
             if "smooth" in element.equation:
                 # set equation to zero, return to it later to set it properly once everthing else has been set
-                print(f"setting {element} equation to yero for now, because it is smoothed")
+                print(f"setting {element} equation to zero for now, because it is smoothed")
                 all_equations += element.equation
                 exec(f'_E{element.pk}_.equation = 0.0')
                 smoothed_elements.append(element)
