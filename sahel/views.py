@@ -1,8 +1,7 @@
 from django.views.generic import TemplateView, ListView
 from .models import Source
 
-# for some reason the line below needs to be commented out when running makemigrations
-from .sd_model import dash_schema, dash_comparison, dash_forecasts
+from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse
 
 
 class IndexView(TemplateView):
@@ -19,6 +18,10 @@ class ComparisonView(TemplateView):
 
 class ScenarioView(TemplateView):
     template_name = "sahel/scenarios.html"
+
+
+class ScenarioResponseView(TemplateView):
+    template_name = "sahel/scenarioresponse.html"
 
 
 class EquationBankView(TemplateView):

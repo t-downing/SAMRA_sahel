@@ -137,7 +137,6 @@ class SimulatedDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField(null=True)
     element = models.ForeignKey("element", related_name="simulateddatapoints", on_delete=models.CASCADE)
-    old_scenario = models.CharField(max_length=200)
     scenario = models.ForeignKey("scenario", related_name="simulateddatapoints", null=True, on_delete=models.SET_NULL)
     responseoption = models.ForeignKey("responseoption", related_name="simulateddatapoints", null=True, on_delete=models.SET_NULL)
     admin1 = models.CharField(max_length=200, null=True, blank=True)

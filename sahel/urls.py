@@ -10,4 +10,5 @@ urlpatterns = [
     path("comparison", views.ComparisonView.as_view(), name="comparison"),
     path("scenarios", views.ScenarioView.as_view(), name="scenarios"),
     path("sources", views.SourceListView.as_view(), name="sources"),
+    path("scenarioresponse", views.ScenarioResponseView.as_view(), name="scenarioresponse")
 ]
