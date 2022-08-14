@@ -8,7 +8,7 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_cytoscape as cyto
 from sahel.models import Element, SimulatedDataPoint, Connection, ElementGroup, \
-    MeasuredDataPoint, Source, ResponseOption, ConstantValue, HouseholdConstantValue
+    MeasuredDataPoint, Source, ResponseOption, ConstantValue, HouseholdConstantValue, Scenario
 import plotly.graph_objects as go
 from sahel.sd_model.model_operations import run_model, timer
 import inspect
@@ -121,6 +121,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                         dcc.Dropdown(id="admin1-input", options=admin1s, value=None, placeholder="Région", className="mb-2"),
                         dcc.Dropdown(id="admin2-input", options=admin1s, value=None, placeholder="Cercle", className="mb-2"),
                         dcc.DatePickerRange(id="daterange-input", start_date=initial_startdate, end_date=initial_enddate, className="mb-2"),
+                        dbc.Select(id="scenario-input", placeholder="Scénario", className="mb-2"),
                         dbc.Select(id="responseoption-input", placeholder="Réponse", className="mb-2"),
                         dbc.Button("Réexécuter modèle", n_clicks=0, id="run-model"),
                     ])
@@ -219,6 +220,8 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
 
 
 @app.callback(
+    Output("scenario-input", "options"),
+    Output("scenario-input", "value"),
     Output("responseoption-input", "options"),
     Output("responseoption-input", "value"),
     Output("element-type-input", "options"),
@@ -228,13 +231,17 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
     Input("controls", "children"),
 )
 def populate_initial(_):
+    scenario_options = [{"label": scenario.name, "value": scenario.pk}
+                        for scenario in Scenario.objects.all()]
+    scenario_value = 1
     response_options = [{"label": responseoption.name, "value": responseoption.pk}
                         for responseoption in ResponseOption.objects.all()]
     response_value = 1
     sdtype_options = [{"label": sd_type[1], "value": sd_type[0]} for sd_type in Element.SD_TYPES]
     unit_options = [{"label": unit[1], "value": unit[0]} for unit in Element.UNIT_OPTIONS]
     group_options = [{"label": group.label, "value": group.pk} for group in ElementGroup.objects.all()]
-    return response_options, response_value, sdtype_options, unit_options, sdtype_options, group_options
+    return scenario_options, scenario_value, response_options, response_value, sdtype_options, unit_options, \
+           sdtype_options, group_options
 
 
 
@@ -467,14 +474,15 @@ def submit_outflow(_, nodedata, value):
     Input("run-model", "n_clicks"),
     Input("equation-changed", "children"),
     Input("householdconstantvalue-changed", "children"),
+    State("scenario-input", "value"),
     State("responseoption-input", "value"),
     prevent_initial_call=True,
 )
 @timer
-def run_model_from_cyto(n_clicks, eq_readout, cv_readout, response_pk):
+def run_model_from_cyto(n_clicks, eq_readout, cv_readout, scenario_pk, response_pk):
     if "RERUN MODEL" in eq_readout or "RERUN MODEL" in cv_readout:
-        run_model(responseoption_pk=response_pk)
-        return f"ran model with response_pk {response_pk}"
+        run_model(scenario_pk=scenario_pk, responseoption_pk=response_pk)
+        return f"ran model with scenario_pk {scenario_pk} and response_pk {response_pk}"
     return "didn't run model"
 
 
@@ -544,11 +552,12 @@ def submit_type(_, sd_type, nodedata):
     Output("element-detail-graph", "figure"),
     Input("cyto", "tapNodeData"),
     Input("admin1-input", "value"),
+    Input("scenario-input", "value"),
     Input("responseoption-input", "value"),
     Input("model-ran-readout", "children"),
 )
 @timer
-def element_detail_graph(nodedata, admin1, responseoption_pk, *_):
+def element_detail_graph(nodedata, admin1, scenario_pk, responseoption_pk, *_):
     fig = go.Figure(layout=go.Layout(template="simple_white", margin=go.layout.Margin(l=0, r=0, b=0, t=0)))
     fig.update_xaxes(title_text="Date")
     if nodedata is None or nodedata.get("hierarchy") == "Group":
@@ -556,7 +565,9 @@ def element_detail_graph(nodedata, admin1, responseoption_pk, *_):
 
     element = Element.objects.get(pk=nodedata.get("id"))
 
-    df = pd.DataFrame(SimulatedDataPoint.objects.filter(element=element, responseoption_id=responseoption_pk).values("date", "value"))
+    df = pd.DataFrame(SimulatedDataPoint.objects
+                      .filter(element=element, scenario_id=scenario_pk, responseoption_id=responseoption_pk)
+                      .values("date", "value"))
     if not df.empty:
         fig.add_trace(go.Scatter(
             x=df["date"],

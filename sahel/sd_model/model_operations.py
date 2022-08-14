@@ -3,7 +3,7 @@ import pandas as pd
 from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
 from ..models import Element, SimulatedDataPoint, MeasuredDataPoint, ConstantValue, ResponseOption, \
-    SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue
+    SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue
 from datetime import datetime, date
 import time, functools
 from django.conf import settings
@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 from django.db.models import Q
 
 
-def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
+def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     start = time.time()
     startdate, enddate = date(2022, 1, 1), date(2024, 1, 1)
 
@@ -25,6 +25,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
         Q(sd_type="Stock") |
         Q(sd_type="Input") |
         Q(sd_type="Seasonal Input") |
+        Q(sd_type="Scenario Constant") |
         Q(sd_type="Constant") |
         Q(sd_type="Pulse Input") |
         Q(sd_type="Household Constant")
@@ -44,7 +45,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
             exec(f'_E{element.pk}_ = model.flow("{element.pk}")')
         elif element.sd_type == "Stock":
             exec(f'_E{element.pk}_ = model.stock("{element.pk}")')
-        elif element.sd_type in ["Constant", "Household Constant"]:
+        elif element.sd_type in ["Constant", "Household Constant", "Scenario Constant"]:
             exec(f'_E{element.pk}_ = model.constant("{element.pk}")')
             print(f"created {element}")
             model.constant(str(element.pk)).equation = element.constant_default_value
@@ -161,6 +162,11 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
                 constants_values[str(element.pk)] = element.constantvalues.get(responseoption_id=responseoption_pk).value
             except ConstantValue.DoesNotExist:
                 pass
+        elif element.sd_type == "Scenario Constant":
+            try:
+                constants_values[str(element.pk)] = element.scenarioconstantvalues.get(scenario_id=scenario_pk).value
+            except ScenarioConstantValue.DoesNotExist:
+                pass
         elif element.sd_type == "Household Constant":
             try:
                 constants_values[str(element.pk)] = element.householdconstantvalues.get().value
@@ -173,8 +179,10 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
     scenario_manager = {"scenario_manager": {"model": model}}
     model_env.register_scenario_manager(scenario_manager)
     # run model
-    model_env.register_scenarios(scenarios={scenario: {"constants": constants_values}}, scenario_manager="scenario_manager")
-    df = model_env.plot_scenarios(scenarios=scenario, scenario_managers="scenario_manager", equations=model_output_pks, return_df=True).reset_index()
+    # for purposes of running bptk, just set scenario to "base"
+    bptk_scenario = "base"
+    model_env.register_scenarios(scenarios={bptk_scenario: {"constants": constants_values}}, scenario_manager="scenario_manager")
+    df = model_env.plot_scenarios(scenarios=bptk_scenario, scenario_managers="scenario_manager", equations=model_output_pks, return_df=True).reset_index()
 
     stop = time.time()
     print(f"run model took {stop - start} s")
@@ -193,7 +201,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
             element_id=row.variable,
             value=row.value,
             date=row.date,
-            scenario=scenario,
+            scenario_id=scenario_pk,
             responseoption_id=responseoption_pk
         )
         for row in df.itertuples()
@@ -203,7 +211,7 @@ def run_model(scenario: str = "default_scenario", responseoption_pk: int = 1):
     print(f"df iterrows took {stop - start} s")
     start = time.time()
 
-    SimulatedDataPoint.objects.filter(scenario=scenario, responseoption_id=responseoption_pk).delete()
+    SimulatedDataPoint.objects.filter(scenario_id=scenario_pk, responseoption_id=responseoption_pk).delete()
     SimulatedDataPoint.objects.bulk_create(simulationdatapoint_list)
 
     stop = time.time()

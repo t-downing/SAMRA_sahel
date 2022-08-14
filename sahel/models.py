@@ -10,7 +10,8 @@ class Element(models.Model):
         ("Constant", "Constant"),
         ("Seasonal Input", "Entrée Saisonnière"),
         ("Pulse Input", "Entrée Impulsion"),
-        ("Household Constant", "Qualité Ménage")
+        ("Household Constant", "Qualité Ménage"),
+        ("Scenario Constant", "Variation Scénario"),
     )
     UNIT_OPTIONS = (
         ("tête", "tête"),
@@ -136,7 +137,8 @@ class SimulatedDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField(null=True)
     element = models.ForeignKey("element", related_name="simulateddatapoints", on_delete=models.CASCADE)
-    scenario = models.CharField(max_length=200)
+    old_scenario = models.CharField(max_length=200)
+    scenario = models.ForeignKey("scenario", related_name="simulateddatapoints", null=True, on_delete=models.SET_NULL)
     responseoption = models.ForeignKey("responseoption", related_name="simulateddatapoints", null=True, on_delete=models.SET_NULL)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
@@ -172,6 +174,13 @@ class ResponseOption(models.Model):
         return self.name
 
 
+class Scenario(models.Model):
+    name = models.CharField(max_length=500)
+
+    def __str__(self):
+        return self.name
+
+
 class ConstantValue(models.Model):
     element = models.ForeignKey("element", related_name="constantvalues", on_delete=models.CASCADE)
     responseoption = models.ForeignKey("responseoption", related_name="constantvalues", on_delete=models.CASCADE)
@@ -179,6 +188,15 @@ class ConstantValue(models.Model):
 
     def __str__(self):
         return f"Element: {self.element}; ResponseOption: {self.responseoption}; Value: {self.value}"
+
+
+class ScenarioConstantValue(models.Model):
+    element = models.ForeignKey("element", related_name="scenarioconstantvalues", on_delete=models.CASCADE)
+    scenario = models.ForeignKey("scenario", related_name="scenarioconstantvalues", on_delete=models.CASCADE)
+    value = models.FloatField()
+
+    def __str__(self):
+        return f"Element: {self.element}; Scenario: {self.scenario}; Value: {self.value}"
 
 
 class HouseholdConstantValue(models.Model):

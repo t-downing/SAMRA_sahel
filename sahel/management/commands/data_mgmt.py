@@ -4,7 +4,7 @@ from ... import models
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        print(models.Element.objects.get(pk=100).sd_type)
+        models.SimulatedDataPoint.objects.filter(old_scenario__isnull=False).delete()
 
 
 
