@@ -11,6 +11,7 @@ from sahel.sd_model.model_operations import run_model
 
 import plotly.graph_objects as go
 from plotly.colors import DEFAULT_PLOTLY_COLORS
+import itertools
 import pandas as pd
 
 app = DjangoDash("scenarioresponse", external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -125,15 +126,18 @@ def rerun_model(n_clicks, scenario_pks, response_pks):
     Input("response-input", "value")
 )
 def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
+    baseline_response_pk = 1
     scenario_pks.sort()
     response_pks.sort()
-    response2color = {response_pk: color for response_pk, color in zip(response_pks, DEFAULT_PLOTLY_COLORS)}
+    response2color = {response_pk: color
+                      for response_pk, color in zip(response_pks[1:], itertools.cycle(DEFAULT_PLOTLY_COLORS))}
+    response2color[baseline_response_pk] = "black"
+    print(response2color)
     DASHES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
     scenario2dash = {scenario_pk: dash for scenario_pk, dash in zip(scenario_pks, DASHES)}
     element = Element.objects.get(pk=element_pk)
 
     response_pks_filter = response_pks.copy()
-    baseline_response_pk = 1
     if baseline_response_pk not in response_pks:
         response_pks_filter.append(baseline_response_pk)
 
@@ -143,6 +147,9 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
         responseoption_id__in=response_pks_filter,
     ).values("responseoption_id", "scenario_id", "value",
              "responseoption__name", "scenario__name", "date"))
+    if "FCFA" in element.unit:
+        df["value"] /= 1000
+        element.unit = "1000 " + element.unit
     # must be sorted by date last
     df = df.sort_values(["scenario_id", "responseoption_id", "date"])
 
@@ -180,6 +187,10 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
             agg_unit = "%"
             agg_text = "% change"
         df_agg = df_agg.reset_index()
+    else:
+        print("invalid aggregation")
+        agg_text = "INVALID"
+        agg_unit = "INVALID"
 
     # bar graph
     bar_fig = go.Figure(layout=dict(template="simple_white"))
@@ -191,13 +202,13 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
             name=dff_agg.iloc[0].responseoption__name,
             x=dff_agg["scenario__name"],
             y=dff_agg["value"],
-            text=dff_agg["value"].apply(lambda value: f"{value:.2}<br>{agg_unit}"),
+            text=dff_agg["value"].round(1),
             marker_color=response2color.get(response_pk)
         ))
     bar_fig.update_layout(barmode="group", showlegend=True, legend=dict(title="Réponse"),
                           title_text=f"{element.label}: {agg_text}")
-    bar_fig.update_yaxes(visible=False)
-    bar_fig.update_xaxes(ticklen=0, showline=False)
+    bar_fig.update_yaxes(title_text=agg_unit)
+    bar_fig.update_xaxes(ticklen=0, showline=False, tickfont_size=14)
     bar_fig.add_hline(y=0, line_width=1, line_color="black", opacity=1)
 
     # time graph
@@ -300,14 +311,16 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
             name=dff_agg.iloc[0].responseoption__name,
             x=dff_agg["scenario__name"],
             y=dff_agg["cost_eff"],
-            text=dff_agg["cost_eff"].apply(lambda value: f"{value:.2}<br>{agg_unit} / 1000 FCFA"),
+            text=dff_agg["cost_eff"].round(1),
             marker_color=response2color.get(response_pk)
         ))
 
     eff_fig.update_layout(barmode="group", showlegend=True, legend=dict(title="Réponse"),
-                          title_text=f"Rapport coût-efficacité contre {ResponseOption.objects.get(pk=baseline_response_pk)}",
+                          title_text=f"Rapport coût-efficacité contre {ResponseOption.objects.get(pk=baseline_response_pk)}"
+                                     f" pour {element.label}",
                           )
-    eff_fig.update_yaxes(visible=False)
+    y_title = "1" if agg_unit == "1000 FCFA" else f"{agg_unit} / 1000 FCFA"
+    eff_fig.update_yaxes(title_text=y_title)
     eff_fig.update_xaxes(ticklen=0, showline=False)
     eff_fig.add_hline(y=0, line_width=1, line_color="black", opacity=1)
 
