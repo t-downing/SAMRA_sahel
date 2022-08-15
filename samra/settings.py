@@ -136,3 +136,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # for dash
 X_FRAME_OPTIONS = "SAMEORIGIN"
+
+import django_heroku
+django_heroku.settings(locals())
