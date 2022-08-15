@@ -30,7 +30,7 @@ cycler==0.11.0
 Cython==0.29.32
 daphne==2.5.0
 dash==2.5.1
-dash-bootstrap-components==1.2.1
+dash-bootstrap-components
 dash-core-components==2.0.0
 dash-cytoscape==0.3.0
 dash-html-components==2.0.0
