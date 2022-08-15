@@ -142,7 +142,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
             dbc.Card(className="shadow mb-4 mt-4", children=[
                 dbc.CardHeader([
                     html.Div("Schéma"),
-                    dbc.Switch(id="schema-group-switch", label="Montrer les détails", value=True),
+                    # dbc.Switch(id="schema-group-switch", label="Montrer les détails", value=True),
                 ], className="d-flex justify-content-between"),
                 dbc.CardBody([
                     cyto.Cytoscape(
@@ -245,35 +245,35 @@ def populate_initial(_):
 
 
 
-@app.callback(
-    Output("cyto", "stylesheet"),
-    Input("schema-group-switch", "value"),
-)
-def set_cyto_stylesheet(switch):
-    print(switch)
-    if switch:
-        return stylesheet
-    else:
-        added_stylesheet = [
-            {"selector": "node",
-             "style": {
-                 "visibility": "hidden",
-             }},
-            {"selector": "edge",
-             "style": {
-                 "visibility": "hidden",
-             }},
-            {"selector": "[hierarchy = 'Group']",
-             "style": {
-                 "visibility": "visible",
-                 "background-color": "lightgray",
-                 "border-color": "gray",
-                 "color": "black",
-                 "text-valign": "center",
-                 "font-size": 80,
-             }},
-        ]
-        return stylesheet + added_stylesheet
+# @app.callback(
+#     Output("cyto", "stylesheet"),
+#     Input("schema-group-switch", "value"),
+# )
+# def set_cyto_stylesheet(switch):
+#     print(switch)
+#     if switch:
+#         return stylesheet
+#     else:
+#         added_stylesheet = [
+#             {"selector": "node",
+#              "style": {
+#                  "visibility": "hidden",
+#              }},
+#             {"selector": "edge",
+#              "style": {
+#                  "visibility": "hidden",
+#              }},
+#             {"selector": "[hierarchy = 'Group']",
+#              "style": {
+#                  "visibility": "visible",
+#                  "background-color": "lightgray",
+#                  "border-color": "gray",
+#                  "color": "black",
+#                  "text-valign": "center",
+#                  "font-size": 80,
+#              }},
+#         ]
+#         return stylesheet + added_stylesheet
 
 
 @app.callback(
