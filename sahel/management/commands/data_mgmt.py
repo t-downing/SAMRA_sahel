@@ -4,7 +4,8 @@ from ... import models
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        models.SimulatedDataPoint.objects.filter(old_scenario__isnull=False).delete()
+        sum_elements = models.Element.objects.filter(label__contains="Revenu")
+        sum_elements.update(aggregate_by="SUM")
 
 
 

@@ -16,9 +16,11 @@ class Element(models.Model):
     UNIT_OPTIONS = (
         ("tête", "tête"),
         ("tête / mois", "tête / mois"),
+        ("tête / an", "tête / an"),
         ("FCFA", "FCFA"),
         ("FCFA / mois", "FCFA / mois"),
         ("FCFA / jour", "FCFA / jour"),
+        ("FCFA / an", "FCFA / an"),
         ("FCFA / tête", "FCFA / tête"),
         ("FCFA / kg", "FCFA / kg"),
         ("FCFA / L", "FCFA / L"),
@@ -37,6 +39,12 @@ class Element(models.Model):
         ("1 / an", "1 / an"),
         ("mm / jour", "mm / jour"),
         ("NDVI", "NDVI"),
+    )
+    AGG_OPTIONS = (
+        ("MEAN", "MEAN"),
+        ("SUM", "SUM"),
+        ("CHANGE", "CHANGE"),
+        ("%CHANGE", "%CHANGE"),
     )
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)

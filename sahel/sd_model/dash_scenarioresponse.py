@@ -1,3 +1,5 @@
+import time
+
 from django_plotly_dash import DjangoDash
 from dash import html, dcc
 from dash.dependencies import Input, Output, State
@@ -5,6 +7,7 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
 from sahel.models import ResponseOption, SimulatedDataPoint, Element, Scenario
+from sahel.sd_model.model_operations import run_model
 
 import plotly.graph_objects as go
 from plotly.colors import DEFAULT_PLOTLY_COLORS
@@ -19,10 +22,13 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
                 dbc.CardHeader("Filtres", id="filters"),
                 dbc.CardBody([
                     dbc.Select(id="element-input", className="mb-2", size="sm"),
-                    html.H5("Scénarios:"),
-                    dbc.Checklist(id="scenario-input", className="mb-2"),
-                    html.H5("Réponses:"),
-                    dbc.Checklist(id="response-input", className="mb-2"),
+                    dbc.Select(id="agg-input", className="mb-2", size="sm"),
+                    html.H6("Scénarios:"),
+                    dbc.Checklist(id="scenario-input", className="mb-2", style={"font-size": "small"}),
+                    html.H6("Réponses:"),
+                    dbc.Checklist(id="response-input", className="mb-2",
+                                  style={"height": "200px", "overflow-y": "scroll", "font-size": "small"}),
+                    dbc.Button("Réexécuter", id="rerun-submit", color="danger"),
                 ])
             ])
         ]),
@@ -50,13 +56,15 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
                 dbc.CardBody(dcc.Graph(id="eff-graph"))
             ])
         ])
-    ])
+    ]),
+    html.Div(id="rerun-readout")
 ])
 
 
 @app.callback(
     Output("element-input", "options"),
     Output("element-input", "value"),
+    Output("agg-input", "options"),
     Output("scenario-input", "options"),
     Output("scenario-input", "value"),
     Output("response-input", "options"),
@@ -68,13 +76,42 @@ def populate_initial(_):
     element_options = [{"label": element.label, "value": element.pk}
                        for element in Element.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types)]
     element_value = 77
+    agg_options = [{"label": agg[1], "value": agg[0]} for agg in Element.AGG_OPTIONS]
     scenario_options = [{"label": scenario.name, "value": scenario.pk}
                         for scenario in Scenario.objects.all()]
     scenario_value = [scenario.get("value") for scenario in scenario_options]
     response_options = [{"label": scenario.name, "value": scenario.pk}
                         for scenario in ResponseOption.objects.all()]
     response_value = [response.get("value") for response in response_options]
-    return element_options, element_value, scenario_options, scenario_value, response_options, response_value
+    return element_options, element_value, agg_options, scenario_options, scenario_value, response_options, response_value
+
+
+@app.callback(
+    Output("agg-input", "value"),
+    Input("element-input", "value"),
+)
+def update_default_agg(element_pk):
+    return Element.objects.get(pk=element_pk).aggregate_by
+
+
+@app.callback(
+    Output("rerun-readout", "children"),
+    Input("rerun-submit", "n_clicks"),
+    State("scenario-input", "value"),
+    State("response-input", "value"),
+)
+def rerun_model(n_clicks, scenario_pks, response_pks):
+    if n_clicks is None:
+        raise PreventUpdate
+    start = time.time()
+    n = len(scenario_pks) * len(response_pks)
+    for scenario_pk in scenario_pks:
+        for response_pk in response_pks:
+            run_model(scenario_pk=scenario_pk, responseoption_pk=response_pk)
+    stop = time.time()
+    duration = stop - start
+    duration_per = duration / n
+    return f"ran model {n} times, {duration:.2f} total, {duration_per:.2f} per run"
 
 
 @app.callback(
@@ -83,31 +120,42 @@ def populate_initial(_):
     Output("scatter-graph", "figure"),
     Output("eff-graph", "figure"),
     Input("element-input", "value"),
+    Input("agg-input", "value"),
     Input("scenario-input", "value"),
     Input("response-input", "value")
 )
-def update_graphs(element_pk, scenario_pks, response_pks):
+def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
+    scenario_pks.sort()
+    response_pks.sort()
     response2color = {response_pk: color for response_pk, color in zip(response_pks, DEFAULT_PLOTLY_COLORS)}
     DASHES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
     scenario2dash = {scenario_pk: dash for scenario_pk, dash in zip(scenario_pks, DASHES)}
     element = Element.objects.get(pk=element_pk)
+
+    response_pks_filter = response_pks.copy()
+    baseline_response_pk = 1
+    if baseline_response_pk not in response_pks:
+        response_pks_filter.append(baseline_response_pk)
+
     df = pd.DataFrame(SimulatedDataPoint.objects.filter(
         element_id=element_pk,
         scenario_id__in=scenario_pks,
-        responseoption_id__in=response_pks,
+        responseoption_id__in=response_pks_filter,
     ).values("responseoption_id", "scenario_id", "value",
              "responseoption__name", "scenario__name", "date"))
+    # must be sorted by date last
+    df = df.sort_values(["scenario_id", "responseoption_id", "date"])
 
     df_agg = df.groupby([
         "responseoption_id", "scenario_id", "responseoption__name", "scenario__name"
-    ])
+    ])["value"]
     period = (df["date"].iloc[1] - df["date"].iloc[0]).days
 
-    if element.aggregate_by == "MEAN":
+    if agg_value == "MEAN":
         df_agg = df_agg.mean().reset_index()
         agg_unit = element.unit
         agg_text = "moyen"
-    else:
+    elif agg_value == "SUM":
         agg_text = "total"
         df_agg = df_agg.sum().reset_index()
         df_agg["value"] *= period
@@ -121,6 +169,17 @@ def update_graphs(element_pk, scenario_pks, response_pks):
             agg_unit = element.unit.removesuffix(" / an")
         else:
             agg_unit = "INCORRECT UNIT"
+    elif "CHANGE" in agg_value:
+        agg_text = "change"
+        df_agg_initial = df_agg.nth(0)
+        df_agg_final = df_agg.nth(-1)
+        df_agg = df_agg_final - df_agg_initial
+        agg_unit = element.unit
+        if "%" in agg_value:
+            df_agg *= 100 / df_agg_initial
+            agg_unit = "%"
+            agg_text = "% change"
+        df_agg = df_agg.reset_index()
 
     # bar graph
     bar_fig = go.Figure(layout=dict(template="simple_white"))
@@ -167,9 +226,10 @@ def update_graphs(element_pk, scenario_pks, response_pks):
     df_cost = pd.DataFrame(SimulatedDataPoint.objects.filter(
         element_id=102,
         scenario_id__in=scenario_pks,
-        responseoption_id__in=response_pks,
+        responseoption_id__in=response_pks_filter,
     ).values("responseoption_id", "scenario_id", "value",
              "responseoption__name", "scenario__name", "date"))
+    df_cost = df_cost.sort_values(["scenario_id", "responseoption_id", "date"])
     df_cost_agg = df_cost.groupby([
         "responseoption_id", "scenario_id",
         "responseoption__name", "scenario__name"
@@ -179,12 +239,13 @@ def update_graphs(element_pk, scenario_pks, response_pks):
     scatter_fig = go.Figure(layout=dict(template="simple_white"))
     show_response_legend = True
     for scenario_pk in scenario_pks:
-        dff_cost_agg = df_cost_agg[df_cost_agg["scenario_id"] == scenario_pk]
-        dff_agg = df_agg[df_cost_agg["scenario_id"] == scenario_pk]
+        dff_agg = df_agg.loc[df_cost_agg["scenario_id"] == scenario_pk]
+        dff_agg.loc[:, "cost"] = df_cost_agg.loc[df_cost_agg["scenario_id"] == scenario_pk]["value"]
+        dff_agg = dff_agg.sort_values(["cost"])
         if dff_agg.empty:
             continue
         scatter_fig.add_trace(go.Scatter(
-            x=dff_cost_agg["value"],
+            x=dff_agg["cost"],
             y=dff_agg["value"],
             mode="lines",
             line=dict(color="gray", width=1, dash=scenario2dash.get(scenario_pk)),
@@ -193,12 +254,11 @@ def update_graphs(element_pk, scenario_pks, response_pks):
             name=dff_agg.iloc[0]["scenario__name"],
         ))
         for response_pk in response_pks:
-            dfff_cost_agg = dff_cost_agg[dff_cost_agg["responseoption_id"] == response_pk]
-            dfff_agg = dff_agg[dff_cost_agg["responseoption_id"] == response_pk]
+            dfff_agg = dff_agg[dff_agg["responseoption_id"] == response_pk]
             if dfff_agg.empty:
                 continue
             scatter_fig.add_trace(go.Scatter(
-                x=dfff_cost_agg["value"],
+                x=dfff_agg["cost"],
                 y=dfff_agg["value"],
                 mode="markers",
                 marker_color=response2color.get(response_pk),
@@ -217,7 +277,6 @@ def update_graphs(element_pk, scenario_pks, response_pks):
 
     # effciency graph
     eff_fig = go.Figure(layout=dict(template="simple_white"))
-    baseline_response_pk = 1
     for scenario_pk in scenario_pks:
         baseline_value = df_agg.loc[(df_agg["scenario_id"] == scenario_pk) &
                                 (df_agg["responseoption_id"] == baseline_response_pk)]["value"]

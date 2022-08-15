@@ -582,18 +582,22 @@ def element_detail_graph(nodedata, admin1, scenario_pk, responseoption_pk, *_):
     if not df.empty:
         source_ids = df["source_id"].drop_duplicates()
         for source_id in source_ids:
-            source = Source.objects.get(pk=source_id)
-            print(source)
+            try:
+                source = Source.objects.get(pk=source_id)
+            except Source.DoesNotExist:
+                print(f"no source for datapoint in {element}")
+                continue
             dff = df[df["source_id"] == source_id].groupby("date").mean().reset_index()
             fig.add_trace(go.Scatter(
                 x=dff["date"],
                 y=dff["value"],
                 name=source.title,
             ))
+    unit_append = " / mois" if element.sd_type == "Pulse Input" else ""
     fig.update_layout(
         legend=dict(yanchor="bottom", x=0, y=1),
         showlegend=True,
-        yaxis=dict(title=element.unit + " / mois" if element.sd_type == "Pulse Input" else ""),
+        yaxis=dict(title=element.unit + unit_append),
     )
     return fig
 
@@ -842,15 +846,19 @@ def redraw_model(date_ord, *_):
     stocks = Element.objects.filter(sd_type="Stock")
     for stock in stocks:
         for inflow in stock.inflows.all():
+            has_equation = "no" if inflow.equation is None else "yes"
             flow_edges.append(
                 {"data": {"source": inflow.pk,
                           "target": stock.pk,
+                          "has_equation": has_equation,
                           "edge_type": "Flow"}}
             )
         for outflow in stock.outflows.all():
+            has_equation = "no" if outflow.equation is None else "yes"
             flow_edges.append(
                 {"data": {"source": stock.pk,
                           "target": outflow.pk,
+                          "has_equation": has_equation,
                           "edge_type": "Flow"}}
             )
     # print([pan, zoom])

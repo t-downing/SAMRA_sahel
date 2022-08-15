@@ -13,9 +13,9 @@ from django.db.models import Q
 
 def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     start = time.time()
-    startdate, enddate = date(2022, 1, 1), date(2024, 1, 1)
+    startdate, enddate = date(2022, 9, 1), date(2024, 9, 1)
 
-    model = Model(starttime=startdate.toordinal(), stoptime=enddate.toordinal(), dt=7)
+    model = Model(starttime=startdate.toordinal(), stoptime=enddate.toordinal(), dt=2)
     zero_flow = model.flow("Zero Flow")
     zero_flow.equation = 0.0
 
@@ -61,7 +61,7 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                 pulse_stop_ord = (pulsevalue.startdate + pd.DateOffset(days=15)).toordinal()
                 print(f"start {pulse_start_ord}, stop {pulse_stop_ord}")
                 model.converter(str(element.pk)).equation += sd.If(
-                    sd.And(sd.time() > pulse_start_ord, sd.time() < pulse_stop_ord), pulsevalue.value / 30.437, 0.0)
+                    sd.And(sd.time() > pulse_start_ord, sd.time() < pulse_stop_ord), pulsevalue.value, 0.0)
                 print(f"set {element} equation to {model.converter(str(element.pk)).equation}")
     stop = time.time()
     print(f"set up elements took {stop - start} s")
@@ -113,7 +113,6 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
             if f"_E{element.pk}_" in all_equations:
                 if element.sd_type == "Input":
                     # load measured points
-                    print(element)
                     df_m = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element).values())
                     df_m = df_m.groupby("date").mean().reset_index()[["date", "value"]]
                     # load forecasted points
@@ -127,6 +126,10 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                     model.converter(str(element.pk)).equation = sd.lookup(sd.time(), str(element.pk))
                 else:
                     df = pd.DataFrame(SeasonalInputDataPoint.objects.filter(element=element).values())
+                    if df.empty:
+                        model.converter(str(element.pk)).equation = 1.0
+                        print(f"couldn't find seasonal values for {element}, setting eq to 1.0")
+                        continue
                     df["date"] = pd.to_datetime(df["date"])
                     df["month"] = df["date"].dt.month
                     df["day"] = df["date"].dt.day
