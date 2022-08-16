@@ -346,3 +346,5 @@ fabric.properties
 /data/
 /output_files/
 /whole_alltables.json
+/whole_sometables.json
+.DS_Store

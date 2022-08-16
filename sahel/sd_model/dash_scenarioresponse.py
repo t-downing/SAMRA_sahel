@@ -193,6 +193,7 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
         agg_unit = "INVALID"
 
     # bar graph
+    decimals = 2 if element.unit == "1" else 1
     bar_fig = go.Figure(layout=dict(template="simple_white"))
     for response_pk in response_pks:
         dff_agg = df_agg[df_agg["responseoption_id"] == response_pk]
@@ -202,7 +203,7 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
             name=dff_agg.iloc[0].responseoption__name,
             x=dff_agg["scenario__name"],
             y=dff_agg["value"],
-            text=dff_agg["value"].round(1),
+            text=dff_agg["value"].round(decimals),
             marker_color=response2color.get(response_pk)
         ))
     bar_fig.update_layout(barmode="group", showlegend=True, legend=dict(title="Réponse"),
@@ -296,11 +297,14 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
         df_agg.loc[df_agg["scenario_id"] == scenario_pk, "baseline_value"] = float(baseline_value)
         df_cost_agg.loc[df_cost_agg["scenario_id"] == scenario_pk, "baseline_cost"] = float(baseline_cost)
 
+    divider = 1000000 if element.unit in ["1", "tête"] else 1000
+    divider_text = f"{divider:,}".replace(",", " ")
     df_agg["cost_eff"] = (
             (df_agg["value"] - df_agg["baseline_value"]) /
-            (df_cost_agg["value"] - df_cost_agg["baseline_cost"]) * 1000
+            (df_cost_agg["value"] - df_cost_agg["baseline_cost"]) * divider
     )
 
+    decimals = 1
     for response_pk in response_pks:
         if response_pk == baseline_response_pk:
             continue
@@ -311,7 +315,7 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
             name=dff_agg.iloc[0].responseoption__name,
             x=dff_agg["scenario__name"],
             y=dff_agg["cost_eff"],
-            text=dff_agg["cost_eff"].round(1),
+            text=dff_agg["cost_eff"].round(decimals),
             marker_color=response2color.get(response_pk)
         ))
 
@@ -319,7 +323,7 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
                           title_text=f"Rapport coût-efficacité contre {ResponseOption.objects.get(pk=baseline_response_pk)}"
                                      f" pour {element.label}",
                           )
-    y_title = "1" if agg_unit == "1000 FCFA" else f"{agg_unit} / 1000 FCFA"
+    y_title = "1" if agg_unit == "1000 FCFA" else f"{agg_unit} / {divider_text} FCFA"
     eff_fig.update_yaxes(title_text=y_title)
     eff_fig.update_xaxes(ticklen=0, showline=False, tickfont_size=14)
     eff_fig.add_hline(y=0, line_width=1, line_color="black", opacity=1)
