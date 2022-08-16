@@ -20,16 +20,16 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
     dbc.Row([
         dbc.Col(width=2, children=[
             dbc.Card(className="shadow mb-4 mt-4", children=[
-                dbc.CardHeader("Filtres", id="filters"),
                 dbc.CardBody([
-                    dbc.Select(id="element-input", className="mb-2"),
-                    dbc.Select(id="agg-input", className="mb-2"),
+                    html.Div(id="filters"),
+                    dbc.Select(id="element-input", className="mb-2", style={"font-size": "small"}),
+                    dbc.Select(id="agg-input", className="mb-2", style={"font-size": "small"}),
                     html.H6("Scénarios:"),
                     dbc.Checklist(id="scenario-input", className="mb-2", style={"font-size": "small"}),
                     html.H6("Réponses:"),
                     dbc.Checklist(id="response-input", className="mb-2",
-                                  style={"height": "200px", "overflow-y": "scroll", "font-size": "small"}),
-                    dbc.Button("Réexécuter", id="rerun-submit", color="danger"),
+                                  style={"height": "195px", "overflow-y": "scroll", "font-size": "small"}),
+                    dbc.Button("Réexécuter", id="rerun-submit", color="danger", size="sm"),
                 ])
             ])
         ]),
