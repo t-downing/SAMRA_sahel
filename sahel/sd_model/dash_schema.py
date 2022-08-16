@@ -123,7 +123,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                         dcc.DatePickerRange(id="daterange-input", start_date=initial_startdate, end_date=initial_enddate, className="mb-2"),
                         dbc.Select(id="scenario-input", placeholder="Scénario", className="mb-2"),
                         dbc.Select(id="responseoption-input", placeholder="Réponse", className="mb-2"),
-                        dbc.Button("Réexécuter modèle", n_clicks=0, id="run-model"),
+                        dbc.Button("Réexécuter modèle", n_clicks=0, id="run-model", disabled=True),
                     ])
                 ], className="shadow mb-4 mt-4"),
                 dbc.Card([
