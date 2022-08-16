@@ -19,11 +19,11 @@ default_colors = plotly.colors.DEFAULT_PLOTLY_COLORS
 
 app = DjangoDash("forecasts", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-app.layout = dbc.Container([
+app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, children=[
     dbc.Row([
         dbc.Col([
-            dbc.Card([
-                dbc.CardHeader("Show/modify forecast", id="element-input-header"),
+            dbc.Card(className="shadow mb-4 mt-4", children=[
+                dbc.CardHeader("Montrer prévision", id="element-input-header"),
                 dbc.CardBody([
                     dbc.Select(
                         id="element-input", value=42),
@@ -37,20 +37,27 @@ app.layout = dbc.Container([
                         dbc.Input(id=f"{letter}-input", value=0)
                         for letter in "PDQm"
                     ]),
-                    dbc.Button("Re-forecast", id="forecast-test-submit", color="warning"),
+                    dbc.Button("Re-forecast", id="forecast-test-submit", color="warning", disabled=True),
                     html.Hr(),
-                    html.H5("Forecast using defaults"),
-                    dbc.Button("Forecast", id="forecast-submit"),
-                    dbc.Button("Forecast ALL", id="forecast-all-submit", color="danger"),
+                    html.H5("Préviser avec les défauts"),
+                    dbc.Button("Préviser", id="forecast-submit", disabled=True),
+                    dbc.Button("Préviser TOUS", id="forecast-all-submit", color="danger", disabled=True),
                 ]),
             ])
         ], width=2),
-        dbc.Col([dcc.Loading(dcc.Graph(id="element-graph"))])
+        dbc.Col(width=10, children=[
+            dbc.Card(className="shadow mb-4 mt-4", children=[
+                dbc.CardHeader("Prévision"),
+                dbc.CardBody([
+                    dcc.Loading(dcc.Graph(id="element-graph"))
+                ])
+            ]),
+        ])
     ]),
     dcc.Loading(html.Div(id="forecast-readout")),
     dcc.Loading(html.Div(id="forecast-test-readout")),
     dcc.Loading(html.Div(id="forecast-all-readout")),
-], fluid=True)
+])
 
 
 @app.callback(

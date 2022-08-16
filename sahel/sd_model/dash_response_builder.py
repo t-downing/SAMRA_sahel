@@ -26,15 +26,15 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                 dbc.CardHeader("Construire une réponse"),
                 dbc.CardBody([
                     dbc.InputGroup([
-                        dbc.InputGroupText("Modifier une réponse"),
+                        dbc.InputGroupAddon("Modifier une réponse", addon_type="prepend"),
                         dbc.Select(id="build-response-input"),
                     ]),
                     dcc.Loading(html.Div(id="response-constants")),
                     html.P("OU", style={"margin": "20px", "text-align": "center"}),
                     dbc.InputGroup([
-                        dbc.InputGroupText("Créer une nouvelle réponse"),
+                        dbc.InputGroupAddon("Créer une nouvelle réponse", addon_type="prepend"),
                         dbc.Input(id="create-response-input", placeholder="Nom de réponse"),
-                        dbc.Button("Saisir", id="create-response-submit", color="success"),
+                        dbc.InputGroupAddon(dbc.Button("Saisir", id="create-response-submit", color="success"), addon_type="append"),
                     ]),
                 ]),
             ]),
@@ -185,7 +185,7 @@ def build_response(response_pk, *_):
             html.Td(dbc.InputGroup([
                 dbc.Input(value=constantvalue.value,
                           id={"type": "constantvalue-change-input", "index": constantvalue.pk}),
-                dbc.Button("Changer", id={"type": "constantvalue-change", "index": constantvalue.pk}),
+                dbc.InputGroupAddon(dbc.Button("Changer", id={"type": "constantvalue-change", "index": constantvalue.pk}), addon_type="append"),
             ], size="sm")),
             html.Td(constantvalue.element.unit),
             html.Td("N/A", style={"color": "gray"}),
@@ -199,7 +199,7 @@ def build_response(response_pk, *_):
             html.Td(dbc.InputGroup([
                 dbc.Input(value=pulsevalue.value,
                           id={"type": "pulse-change-input", "index": pulsevalue.pk}),
-                dbc.Button("Changer", id={"type": "pulse-change", "index": pulsevalue.pk}),
+                dbc.InputGroupAddon(dbc.Button("Changer", id={"type": "pulse-change", "index": pulsevalue.pk}), addon_type="append"),
             ], size="sm")),
             html.Td(pulsevalue.element.unit),
             html.Td(pulsevalue.startdate),

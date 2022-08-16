@@ -180,19 +180,19 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                 dbc.CardHeader("Détail d'élément"),
                 dbc.CardBody([
                     dbc.InputGroup([
-                        dbc.InputGroupText("Label"),
+                        dbc.InputGroupAddon("Label", addon_type="prepend"),
                         dbc.Input(id="element-detail-label-input"),
-                        dbc.Button("Changer", id="element-detail-label-submit"),
+                        dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-label-submit"), addon_type="append"),
                     ], style=ROWSTYLE),
                     dbc.InputGroup([
-                        dbc.InputGroupText("Type"),
+                        dbc.InputGroupAddon("Type", addon_type="prepend"),
                         dbc.Select(id="element-detail-type-input"),
-                        dbc.Button("Changer", id="element-detail-type-submit")
+                        dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-type-submit"), addon_type="append"),
                     ], size="sm", style=ROWSTYLE),
                     dbc.InputGroup([
-                        dbc.InputGroupText("Groupe"),
+                        dbc.InputGroupAddon("Groupe", addon_type="prepend"),
                         dbc.Select(id="element-detail-group-input"),
-                        dbc.Button("Changer", id="element-detail-group-submit")
+                        dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-group-submit"), addon_type="append"),
                     ], size="sm", style=ROWSTYLE),
                     dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"}),
                     html.Div(id="element-detail-conn-eq"),
@@ -673,7 +673,7 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                     html.P(equation_text, id="element-detail-eq-text"),
                     dbc.InputGroup([
                         dbc.Input(value=element.equation, id="element-detail-eq-input"),
-                        dbc.Button("Saisir", id="element-detail-eq-submit")
+                        dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-eq-submit"), addon_type="append"),
                     ]),
 
                 ]
