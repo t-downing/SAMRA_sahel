@@ -321,7 +321,7 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
                           )
     y_title = "1" if agg_unit == "1000 FCFA" else f"{agg_unit} / 1000 FCFA"
     eff_fig.update_yaxes(title_text=y_title)
-    eff_fig.update_xaxes(ticklen=0, showline=False)
+    eff_fig.update_xaxes(ticklen=0, showline=False, tickfont_size=14)
     eff_fig.add_hline(y=0, line_width=1, line_color="black", opacity=1)
 
 
