@@ -3,7 +3,7 @@ from . import views
 
 
 urlpatterns = [
-    # path("home", views.IndexView.as_view(), name="index"),
+    path("index", views.IndexView.as_view(), name="index"),
     path("model_diagram", views.ModelDiagramView.as_view(), name="model_diagram"),
     path("django_plotly_dash/", include("django_plotly_dash.urls")),
     path("equation_bank", views.EquationBankView.as_view(), name="equation_bank"),
