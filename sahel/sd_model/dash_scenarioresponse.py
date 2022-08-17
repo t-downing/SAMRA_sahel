@@ -77,6 +77,7 @@ def populate_initial(_):
     element_options = [{"label": element.label, "value": element.pk}
                        for element in Element.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types)]
     element_value = 77
+    print([agg[1] for agg in Element.AGG_OPTIONS])
     agg_options = [{"label": agg[1], "value": agg[0]} for agg in Element.AGG_OPTIONS]
     scenario_options = [{"label": scenario.name, "value": scenario.pk}
                         for scenario in Scenario.objects.all()]

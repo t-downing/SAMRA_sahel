@@ -147,3 +147,5 @@ X_FRAME_OPTIONS = "SAMEORIGIN"
 
 import django_heroku
 django_heroku.settings(locals())
+
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
