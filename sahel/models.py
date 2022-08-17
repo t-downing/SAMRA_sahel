@@ -41,10 +41,10 @@ class Element(models.Model):
         ("NDVI", "NDVI"),
     )
     AGG_OPTIONS = (
-        ("MEAN", "MEAN"),
-        ("SUM", "SUM"),
-        ("CHANGE", "CHANGE"),
-        ("%CHANGE", "%CHANGE"),
+        ("moyen", "MEAN"),
+        ("total", "SUM"),
+        ("change", "CHANGE"),
+        ("% change", "%CHANGE"),
     )
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
