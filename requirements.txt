@@ -30,7 +30,7 @@ cycler==0.11.0
 Cython==0.29.32
 daphne==2.5.0
 dash==2.5.1
-dash-bootstrap-components
+dash-bootstrap-components==0.13.1
 dash-core-components==2.0.0
 dash-cytoscape==0.3.0
 dash-html-components==2.0.0
@@ -60,6 +60,7 @@ Flask-Compress==1.12
 fonttools==4.34.4
 frictionless==4.40.5
 greenlet==1.1.2
+gunicorn==20.1.0
 hdx-python-api==5.8.0
 hdx-python-country==3.3.0
 hdx-python-utilities==3.3.6
