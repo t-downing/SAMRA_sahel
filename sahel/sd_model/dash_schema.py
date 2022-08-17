@@ -140,10 +140,17 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
         ),
         dbc.Col(
             dbc.Card(className="shadow mb-4 mt-4", children=[
-                dbc.CardHeader([
-                    html.Div("Schéma"),
-                    # dbc.Switch(id="schema-group-switch", label="Montrer les détails", value=True),
-                ], className="d-flex justify-content-between"),
+                dbc.CardHeader(
+                    className="d-flex justify-content-between", style={"overflow": "hidden", "height": "50px"},
+                    children=[
+                        html.Div("Schéma"),
+                        dbc.FormGroup([
+                            dbc.Checklist(id="schema-group-switch", options=[{"label": "Montrer les détails", "value": 1}],
+                                          value=[1], switch=True, inline=True),
+                        ]),
+                        # dbc.Switch(id="schema-group-switch", label="Montrer les détails", value=True),
+                    ]
+                ),
                 dbc.CardBody([
                     cyto.Cytoscape(
                         id="cyto",
@@ -157,7 +164,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                     ),
                 ], style={"padding": "0px"}),
                 dbc.CardFooter(dbc.Row([
-                    dbc.Col([dbc.Button("Sauvegarder positions d'éléments", n_clicks=0, id="save-positions", size="sm",
+                    dbc.Col([dbc.Button("Sauvegarder mise en page", n_clicks=0, id="save-positions", size="sm",
                                         style={"marginRight": 10}),
                             dbc.Button("Download SVG", id="download", size="sm")]),
                     dbc.Col(dcc.Slider(id="map-date-input",
@@ -245,35 +252,35 @@ def populate_initial(_):
 
 
 
-# @app.callback(
-#     Output("cyto", "stylesheet"),
-#     Input("schema-group-switch", "value"),
-# )
-# def set_cyto_stylesheet(switch):
-#     print(switch)
-#     if switch:
-#         return stylesheet
-#     else:
-#         added_stylesheet = [
-#             {"selector": "node",
-#              "style": {
-#                  "visibility": "hidden",
-#              }},
-#             {"selector": "edge",
-#              "style": {
-#                  "visibility": "hidden",
-#              }},
-#             {"selector": "[hierarchy = 'Group']",
-#              "style": {
-#                  "visibility": "visible",
-#                  "background-color": "lightgray",
-#                  "border-color": "gray",
-#                  "color": "black",
-#                  "text-valign": "center",
-#                  "font-size": 80,
-#              }},
-#         ]
-#         return stylesheet + added_stylesheet
+@app.callback(
+    Output("cyto", "stylesheet"),
+    Input("schema-group-switch", "value"),
+)
+def set_cyto_stylesheet(switch):
+    print(switch)
+    if switch == [1]:
+        return stylesheet
+    else:
+        added_stylesheet = [
+            {"selector": "node",
+             "style": {
+                 "visibility": "hidden",
+             }},
+            {"selector": "edge",
+             "style": {
+                 "visibility": "hidden",
+             }},
+            {"selector": "[hierarchy = 'Group']",
+             "style": {
+                 "visibility": "visible",
+                 "background-color": "lightgray",
+                 "border-color": "gray",
+                 "color": "black",
+                 "text-valign": "center",
+                 "font-size": 80,
+             }},
+        ]
+        return stylesheet + added_stylesheet
 
 
 @app.callback(
