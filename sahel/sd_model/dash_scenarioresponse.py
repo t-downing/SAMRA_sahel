@@ -132,7 +132,7 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
     response2color = {response_pk: color
                       for response_pk, color in zip(response_pks[1:], itertools.cycle(DEFAULT_PLOTLY_COLORS))}
     response2color[baseline_response_pk] = "black"
-    print(response2color)
+
     DASHES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
     scenario2dash = {scenario_pk: dash for scenario_pk, dash in zip(scenario_pks, DASHES)}
     element = Element.objects.get(pk=element_pk)
