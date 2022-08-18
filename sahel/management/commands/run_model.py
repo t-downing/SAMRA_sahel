@@ -9,15 +9,18 @@ class Command(BaseCommand):
         scenarios = models.Scenario.objects.all()
         responses = models.ResponseOption.objects.all()
 
+        total = len(scenarios) * len(responses)
         count = 0
-
-        start = time.time()
         for scenario in scenarios:
             for response in responses:
+                start = time.time()
                 run_model(scenario.pk, response.pk)
+                duration = time.time() - start
                 count += 1
-        duration = time.time() - start
-        print(f"Count: {count}, Total time: {duration:.2f} s, Time per run: {duration / count :2.f} s")
+                eta = duration * (total - count)
+                print(f"Progress: {round(count / total, 3)}; ETA: {round(eta)} s")
+
+
 
 
 

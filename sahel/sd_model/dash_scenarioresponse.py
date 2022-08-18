@@ -29,7 +29,7 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
                     html.H6("Réponses:"),
                     dbc.Checklist(id="response-input", className="mb-2",
                                   style={"height": "195px", "overflow-y": "scroll", "font-size": "small"}),
-                    dbc.Button("Réexécuter", id="rerun-submit", color="danger", size="sm", disabled=True),
+                    dbc.Button("Réexécuter", id="rerun-submit", color="danger", size="sm", disabled=False),
                 ])
             ])
         ]),
@@ -77,7 +77,6 @@ def populate_initial(_):
     element_options = [{"label": element.label, "value": element.pk}
                        for element in Element.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types)]
     element_value = 77
-    print([agg[1] for agg in Element.AGG_OPTIONS])
     agg_options = [{"label": agg[1], "value": agg[0]} for agg in Element.AGG_OPTIONS]
     scenario_options = [{"label": scenario.name, "value": scenario.pk}
                         for scenario in Scenario.objects.all()]

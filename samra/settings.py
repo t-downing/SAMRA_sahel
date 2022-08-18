@@ -82,11 +82,11 @@ WSGI_APPLICATION = 'samra.wsgi.application'
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    },
-    "remote": {
+    # 'default': {
+    #     'ENGINE': 'django.db.backends.sqlite3',
+    #     'NAME': BASE_DIR / 'db.sqlite3',
+    # },
+    "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": "d446lmk1hkk665",
         "USER": os.environ.get("PSQL_USER"),
@@ -145,7 +145,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # for dash
 X_FRAME_OPTIONS = "SAMEORIGIN"
 
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
 import django_heroku
 django_heroku.settings(locals())
 
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
