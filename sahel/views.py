@@ -2,7 +2,8 @@ from django.views.generic import TemplateView, ListView
 from .models import Source
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse, dash_response_builder
+from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse, dash_response_builder, \
+    dash_termsoftrade
 
 
 class IndexView(TemplateView):
@@ -29,6 +30,12 @@ class ScenarioView(LoginRequiredMixin, TemplateView):
 
 class ScenarioResponseView(LoginRequiredMixin, TemplateView):
     template_name = "sahel/scenarioresponse.html"
+    login_url = '/accounts/login/'
+    redirect_field_name = 'next'
+
+
+class TermsOfTradeView(LoginRequiredMixin, TemplateView):
+    template_name = "sahel/termsoftrade.html"
     login_url = '/accounts/login/'
     redirect_field_name = 'next'
 
