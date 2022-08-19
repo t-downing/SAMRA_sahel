@@ -82,11 +82,11 @@ WSGI_APPLICATION = 'samra.wsgi.application'
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
+    'local': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     },
-    "remote": {
+    "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": "d446lmk1hkk665",
         "USER": os.environ.get("PSQL_USER"),
