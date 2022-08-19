@@ -6,14 +6,15 @@ System Awareness and Modelling for Response Analysis (SAMRA) is a method of anal
 ## Getting Started
 1. Clone repo
 2. Setup venv
-3. Install requirements.txt
-4. Setup database
-   1. Create SQL database
-   2. Modify `samra/settings.py` to connect to database
-   3. Run `python manage.py makemigrations` and `python manage.py migrate`
+3. Install requirements with `pip install -r requirements.txt`
+4. ~~Setup database~~ no longer needed as connected to remote PostgreSQL
+   1. ~~Create SQL database~~
+   2. ~~Modify `samra/settings.py` to connect to database~~
+   3. ~~Run `python manage.py makemigrations` and `python manage.py migrate`~~
 5. Run with `python manage.py runserver`
 
 ## Current Issues
-- the version of `dash-bootstrap-components` used is technically not compatible with `django-plotly-dash`
-- there are a few packages that appear to be only required for windows (`pywin32`, `pywinpty`, and `twisted-iocpsupport`)
-- the line `from .sd_model import ...` in `sahel/views.py` needs to be commented out when running `python manage.py makemigrations`
+Nothing major right now.
+- ~~the version of `dash-bootstrap-components` used is technically not compatible with `django-plotly-dash`~~ 
+- ~~there are a few packages that appear to be only required for windows (`pywin32`, `pywinpty`, and `twisted-iocpsupport`)~~ 
+- ~~the line `from .sd_model import ...` in `sahel/views.py` needs to be commented out when running `python manage.py makemigrations`~~ 
