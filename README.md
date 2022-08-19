@@ -7,11 +7,13 @@ System Awareness and Modelling for Response Analysis (SAMRA) is a method of anal
 1. Clone repo
 2. Setup venv
 3. Install requirements with `pip install -r requirements.txt`
-4. ~~Setup database~~ no longer needed as connected to remote PostgreSQL
+4. Generate `SECRET_KEY` and store in `.env`
+5. Get PostgreSQL database credentials (`PSQL_USER` and `PSQL_PASSWORD`) from Tristan and store in `.env`
+6. ~~Setup database~~ no longer needed as connected to remote PostgreSQL
    1. ~~Create SQL database~~
    2. ~~Modify `samra/settings.py` to connect to database~~
    3. ~~Run `python manage.py makemigrations` and `python manage.py migrate`~~
-5. Run with `python manage.py runserver`
+7. Run with `python manage.py runserver`
 
 ## Current Issues
 Nothing major right now.
