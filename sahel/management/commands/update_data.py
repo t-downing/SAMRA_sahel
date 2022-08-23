@@ -73,6 +73,12 @@ def update_wfp_price_data():
     MeasuredDataPoint.objects.filter(source=regulardataset.source).delete()
     MeasuredDataPoint.objects.bulk_create(objs)
 
+    source = regulardataset.source
+
+    MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=62).delete()
+    MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=63).delete()
+    MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=42).delete()
+
 
 def update_dm_suividesprix():
     # only for serving locally
@@ -205,8 +211,7 @@ def update_dm_globallivestock():
     MeasuredDataPoint.objects.bulk_create(objs)
 
     # delete problem points
-    MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=131).delete()
-    MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=62).delete()
+
 
 
 def update_acled():
