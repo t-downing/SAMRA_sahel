@@ -74,6 +74,7 @@ class Element(models.Model):
     dm_globalform_field_lowvalue = models.CharField(max_length=200, null=True, blank=True)
     source_for_model = models.ForeignKey("source", related_name="model_element_uses", null=True, blank=True, on_delete=models.SET_NULL)
     kcal_per_kg = models.IntegerField(null=True, blank=True)
+    model_output_variable = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.label}; pk: {self.pk}"
