@@ -5,10 +5,12 @@ from BPTK_Py import sd_functions as sd
 from ..models import Element, SimulatedDataPoint, MeasuredDataPoint, ConstantValue, ResponseOption, \
     SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue
 from datetime import datetime, date
-import time, functools
+import time, functools, warnings
 from django.conf import settings
 from sqlalchemy import create_engine
 from django.db.models import Q
+from django.db import connection
+from contextlib import closing
 
 
 def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
@@ -36,9 +38,13 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     print(f"init took {stop - start} s")
     start = time.time()
 
+    model_output_pks = []
+    for element in elements:
+        if element.sd_type in ["Variable",  "Stock", "Flow"] and element.model_output_variable:
+            model_output_pks.append(str(element.pk))
+
     # initialise all elements and set constants
     for element in elements:
-        # so so sorry for using exec, this is the way life must be for now
         if element.sd_type in ["Variable", "Input", "Seasonal Input"]:
             exec(f'_E{element.pk}_ = model.converter("{element.pk}")')
         elif element.sd_type == "Flow":
@@ -47,10 +53,8 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
             exec(f'_E{element.pk}_ = model.stock("{element.pk}")')
         elif element.sd_type in ["Constant", "Household Constant", "Scenario Constant"]:
             exec(f'_E{element.pk}_ = model.constant("{element.pk}")')
-            print(f"created {element}")
             model.constant(str(element.pk)).equation = element.constant_default_value
         elif element.sd_type == "Pulse Input":
-            print(f"trying to set up pulse {element}")
             exec(f'_E{element.pk}_ = model.converter("{element.pk}")')
             pulsevalues = element.pulsevalues.filter(responseoption_id=responseoption_pk)
             if pulsevalues is None:
@@ -59,10 +63,8 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
             for pulsevalue in pulsevalues:
                 pulse_start_ord = (pulsevalue.startdate - pd.DateOffset(days=15)).toordinal()
                 pulse_stop_ord = (pulsevalue.startdate + pd.DateOffset(days=15)).toordinal()
-                print(f"start {pulse_start_ord}, stop {pulse_stop_ord}")
                 model.converter(str(element.pk)).equation += sd.If(
                     sd.And(sd.time() > pulse_start_ord, sd.time() < pulse_stop_ord), pulsevalue.value, 0.0)
-                print(f"set {element} equation to {model.converter(str(element.pk)).equation}")
     stop = time.time()
     print(f"set up elements took {stop - start} s")
     start = time.time()
@@ -71,11 +73,9 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     all_equations = ""
     smoothed_elements = []
     for element in elements:
-        # used it once, might as well use it again
         if element.sd_type in ["Variable", "Flow"]:
             if "smooth" in element.equation:
                 # set equation to zero, return to it later to set it properly once everthing else has been set
-                print(f"setting {element} equation to zero for now, because it is smoothed")
                 all_equations += element.equation
                 exec(f'_E{element.pk}_.equation = 0.0')
                 smoothed_elements.append(element)
@@ -94,10 +94,8 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
             model.stock(str(element.pk)).equation = zero_flow
             exec(f'model.stock(str({element.pk})).initial_value = {element.equation}')
             for inflow in element.inflows.filter(equation__isnull=False).exclude(equation=""):
-                print(f"adding flow {inflow}")
                 model.stock(str(element.pk)).equation += model.flow(inflow.pk) / 30.437 if "mois" in inflow.unit else 1.0
             for outflow in element.outflows.filter(equation__isnull=False).exclude(equation=""):
-                print(outflow)
                 if "mois" in outflow.unit:
                     model.stock(str(element.pk)).equation -= model.flow(outflow.pk) / 30.437
                 else:
@@ -118,8 +116,6 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                     # load forecasted points
                     df_f = pd.DataFrame(element.forecasteddatapoints.all().values())
                     df_f = df_f.groupby("date").mean().reset_index()[["date", "value"]]
-                    if element.pk == 48:
-                        print(df_m["date"].max())
                     df = pd.concat([df_m, df_f], ignore_index=True)
                     df["t"] = df["date"].apply(datetime.toordinal)
                     model.points[str(element.pk)] = df[["t", "value"]].values.tolist()
@@ -143,7 +139,7 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                 model.points[str(element.pk)] = df[["t", "value"]].values.tolist()
                 model.converter(str(element.pk)).equation = sd.lookup(sd.time(), str(element.pk))
             else:
-                model_output_pks.remove(str(element.pk))
+                if str(element.pk) in model_output_pks: model_output_pks.remove(str(element.pk))
 
     stop = time.time()
     print(f"set up inputs took {stop - start} s")
@@ -151,7 +147,6 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
 
     # smoothed variables
     for element in smoothed_elements:
-        print(f"setting smoothed equation for {element} now")
         exec(f'_E{element.pk}_.equation = {element.equation}')
 
     stop = time.time()
@@ -182,12 +177,15 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     model_env.register_model(model)
     scenario_manager = {"scenario_manager": {"model": model}}
     model_env.register_scenario_manager(scenario_manager)
+
     # run model
     # for purposes of running bptk, just set scenario to "base"
     bptk_scenario = "base"
     model_env.register_scenarios(scenarios={bptk_scenario: {"constants": constants_values}}, scenario_manager="scenario_manager")
-    df = model_env.plot_scenarios(scenarios=bptk_scenario, scenario_managers="scenario_manager", equations=model_output_pks, return_df=True).reset_index()
-
+    # ignore pandas PerformanceWarnings since bptk will always throw these up if given enough variables to output
+    with warnings.catch_warnings():
+        warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+        df = model_env.plot_scenarios(scenarios=bptk_scenario, scenario_managers="scenario_manager", equations=model_output_pks, return_df=True).reset_index()
     stop = time.time()
     print(f"run model took {stop - start} s")
     start = time.time()
@@ -200,32 +198,30 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     print(f"format results took {stop - start} s")
     start = time.time()
 
-    simulationdatapoint_list = [
-        SimulatedDataPoint(
-            element_id=row.variable,
-            value=row.value,
-            date=row.date,
-            scenario_id=scenario_pk,
-            responseoption_id=responseoption_pk
-        )
-        for row in df.itertuples()
-    ]
+    # delete and save done with raw SQL delete and insert (twice as fast as built-in bulk_create)
+    insert_stmt = (
+        "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id) "
+        f"VALUES {', '.join(['(%s, %s, %s, %s, %s)'] * len(df))}"
+    )
+    delete_stmt = (
+        f"DELETE FROM sahel_simulateddatapoint WHERE "
+        f"scenario_id = {scenario_pk} AND responseoption_id = {responseoption_pk}"
+    )
 
-    stop = time.time()
-    print(f"df iterrows took {stop - start} s")
+    data = []
+
+    for row in df.itertuples():
+        data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk])
+
+    print(f"SQL iterrows took {time.time() - start} s")
     start = time.time()
 
-    SimulatedDataPoint.objects.filter(scenario_id=scenario_pk, responseoption_id=responseoption_pk).delete()
-    SimulatedDataPoint.objects.bulk_create(simulationdatapoint_list)
+    with closing(connection.cursor()) as cursor:
+        cursor.execute(delete_stmt)
+        cursor.execute(insert_stmt, data)
 
-    stop = time.time()
-    print(f"delete and save took {stop - start} s")
-
-    # database_name = settings.DATABASES['default']['NAME']
-    # database_url = 'sqlite:///{database_name}'.format(database_name=database_name)
-    # engine = create_engine(database_url, echo=False)
-    # print(df)
-    # df.to_sql("simulateddatapoint", con=engine, if_exists='append')
+    print(f"SQL bulk delete and insert took {time.time() - start} s")
+    start = time.time()
 
     return df
 
@@ -236,10 +232,7 @@ def smooth(model, input_var, time_constant, initial_value=None):
     """
     smoothed_value = model.stock(f"{input_var.name} SMOOTHED")
     if initial_value is None:
-        print(f"input_var is {input_var}")
-        print(f"input_var name is {input_var.name}")
         initial_value = model.evaluate_equation(input_var.name, model.starttime)
-    print(f"setting {input_var} initial value to {initial_value}")
     smoothed_value.initial_value = initial_value
     value_increase = model.flow(f"{input_var.name} SMOOTHING UP")
     value_decrease = model.flow(f"{input_var.name} SMOOTHING DOWN")
@@ -258,3 +251,4 @@ def timer(func):
         print(f"Function {func.__name__!r} took {run_time:.4f} s")
         return value
     return wrapper_timer
+
