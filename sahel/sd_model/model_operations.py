@@ -46,16 +46,16 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     # initialise all elements and set constants
     for element in elements:
         if element.sd_type in ["Variable", "Input", "Seasonal Input"]:
-            exec(f'_E{element.pk}_ = model.converter("{element.pk}")')
+            locals()[f'_E{element.pk}_'] = model.converter(str(element.pk))
         elif element.sd_type == "Flow":
-            exec(f'_E{element.pk}_ = model.flow("{element.pk}")')
+            locals()[f'_E{element.pk}_'] = model.flow(str(element.pk))
         elif element.sd_type == "Stock":
-            exec(f'_E{element.pk}_ = model.stock("{element.pk}")')
+            locals()[f'_E{element.pk}_'] = model.stock(str(element.pk))
         elif element.sd_type in ["Constant", "Household Constant", "Scenario Constant"]:
-            exec(f'_E{element.pk}_ = model.constant("{element.pk}")')
+            locals()[f'_E{element.pk}_'] = model.constant(str(element.pk))
             model.constant(str(element.pk)).equation = element.constant_default_value
         elif element.sd_type == "Pulse Input":
-            exec(f'_E{element.pk}_ = model.converter("{element.pk}")')
+            locals()[f'_E{element.pk}_'] = model.converter(str(element.pk))
             pulsevalues = element.pulsevalues.filter(responseoption_id=responseoption_pk)
             if pulsevalues is None:
                 continue
@@ -251,4 +251,6 @@ def timer(func):
         print(f"Function {func.__name__!r} took {run_time:.4f} s")
         return value
     return wrapper_timer
+
+
 
