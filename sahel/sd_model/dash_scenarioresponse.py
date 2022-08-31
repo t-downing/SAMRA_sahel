@@ -7,7 +7,7 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
 from sahel.models import ResponseOption, SimulatedDataPoint, Element, Scenario
-from sahel.sd_model.model_operations import run_model
+from sahel.sd_model.model_operations import run_model, timer
 
 import plotly.graph_objects as go
 from plotly.colors import DEFAULT_PLOTLY_COLORS
@@ -72,18 +72,19 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
     Output("response-input", "value"),
     Input("filters", "children")
 )
+@timer
 def populate_initial(_):
     included_types=["Stock", "Flow", "Variable"]
-    element_options = [{"label": element.label, "value": element.pk}
-                       for element in Element.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types)]
+    element_options = [{"label": element.get("label"), "value": element.get("id")}
+                       for element in Element.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types).values("id", "label")]
     element_value = 77
     agg_options = [{"label": agg[1], "value": agg[0]} for agg in Element.AGG_OPTIONS]
-    scenario_options = [{"label": scenario.name, "value": scenario.pk}
-                        for scenario in Scenario.objects.all()]
+    scenario_options = [{"label": scenario.get("name"), "value": scenario.get("id")}
+                        for scenario in Scenario.objects.all().values("id", "name")]
     scenario_value = [scenario.get("value") for scenario in scenario_options]
-    response_options = [{"label": scenario.name, "value": scenario.pk}
-                        for scenario in ResponseOption.objects.all()]
-    response_value = [response.get("value") for response in response_options]
+    response_options = [{"label": obj.get("name"), "value": obj.get("id")}
+                        for obj in ResponseOption.objects.all().values("id", "name")]
+    response_value = [obj.get("value") for obj in response_options[0:3]]
     return element_options, element_value, agg_options, scenario_options, scenario_value, response_options, response_value
 
 
@@ -91,6 +92,7 @@ def populate_initial(_):
     Output("agg-input", "value"),
     Input("element-input", "value"),
 )
+@timer
 def update_default_agg(element_pk):
     return Element.objects.get(pk=element_pk).aggregate_by
 
@@ -101,6 +103,7 @@ def update_default_agg(element_pk):
     State("scenario-input", "value"),
     State("response-input", "value"),
 )
+@timer
 def rerun_model(n_clicks, scenario_pks, response_pks):
     if n_clicks is None:
         raise PreventUpdate
@@ -125,6 +128,7 @@ def rerun_model(n_clicks, scenario_pks, response_pks):
     Input("scenario-input", "value"),
     Input("response-input", "value")
 )
+@timer
 def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
     baseline_response_pk = 1
     scenario_pks.sort()
@@ -327,6 +331,5 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
     eff_fig.update_yaxes(title_text=y_title)
     eff_fig.update_xaxes(ticklen=0, showline=False, tickfont_size=14)
     eff_fig.add_hline(y=0, line_width=1, line_color="black", opacity=1)
-
 
     return bar_fig, time_fig, scatter_fig, eff_fig
