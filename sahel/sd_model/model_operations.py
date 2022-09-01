@@ -114,20 +114,39 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     start = time.time()
 
     # set inputs
+    df_m_all = pd.DataFrame(MeasuredDataPoint.objects.filter(date__gte=startdate, date__lte=enddate).values())
+    df_f_all = pd.DataFrame(ForecastedDataPoint.objects.filter(date__gte=startdate, date__lte=enddate).values())
+
+    m_time = 0.0
+    f_time = 0.0
+
     for element in elements:
+        pk = str(element.pk)
         if element.sd_type in ["Input", "Seasonal Input"]:
             if f"_E{element.pk}_" in all_equations:
                 if element.sd_type == "Input":
                     # load measured points
-                    df_m = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element).values())
-                    df_m = df_m.groupby("date").mean().reset_index()[["date", "value"]]
+                    m_start = time.time()
+                    # df_m = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element).values())
+                    # df_m = pd.DataFrame(measureddatapoints.filter(element_id=pk))
+                    df_m = df_m_all[df_m_all["element_id"] == int(pk)]
+                    if not df_m.empty:
+                        df_m = df_m.groupby("date").mean().reset_index()[["date", "value"]]
+                    m_time += time.time() - m_start
+
                     # load forecasted points
-                    df_f = pd.DataFrame(element.forecasteddatapoints.all().values())
-                    df_f = df_f.groupby("date").mean().reset_index()[["date", "value"]]
+                    f_start = time.time()
+                    # df_f = pd.DataFrame(element.forecasteddatapoints.all().values())
+                    # df_f = pd.DataFrame(forecasteddatapoints.filter(element_id=pk))
+                    df_f = df_f_all[df_f_all["element_id"] == int(pk)]
+                    if not df_f.empty:
+                        df_f = df_f.groupby("date").mean().reset_index()[["date", "value"]]
+                    f_time += time.time() - f_start
+
                     df = pd.concat([df_m, df_f], ignore_index=True)
                     df["t"] = df["date"].apply(datetime.toordinal)
-                    model.points[str(element.pk)] = df[["t", "value"]].values.tolist()
-                    model.converter(str(element.pk)).equation = sd.lookup(sd.time(), str(element.pk))
+                    model.points[pk] = df[["t", "value"]].values.tolist()
+                    model.converter(pk).equation = sd.lookup(sd.time(), pk)
                 else:
                     df = pd.DataFrame(SeasonalInputDataPoint.objects.filter(element=element).values())
                     if df.empty:
@@ -144,10 +163,12 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                     df["date"] = df.apply(lambda row : date(row["year"], row["month"], row["day"]), axis=1)
 
                 df["t"] = df["date"].apply(datetime.toordinal)
-                model.points[str(element.pk)] = df[["t", "value"]].values.tolist()
-                model.converter(str(element.pk)).equation = sd.lookup(sd.time(), str(element.pk))
+                model.points[pk] = df[["t", "value"]].values.tolist()
+                model.converter(pk).equation = sd.lookup(sd.time(), pk)
             else:
-                if str(element.pk) in model_output_pks: model_output_pks.remove(str(element.pk))
+                if pk in model_output_pks: model_output_pks.remove(pk)
+
+    print(f"m took {m_time}, f took {f_time}")
 
     stop = time.time()
     print(f"set up inputs took {stop - start} s")
@@ -203,13 +224,19 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
 
     df["date"] = df["t"].apply(datetime.fromordinal)
     df = pd.melt(df, id_vars=["date"], value_vars=model_output_pks)
-    # df = df.groupby(["variable", pd.Grouper(key="date", freq="W-MON")]).mean().reset_index()
 
     stop = time.time()
     print(f"format results took {stop - start} s")
     start = time.time()
 
     # delete and save done with raw SQL delete and insert (twice as fast as built-in bulk_create)
+    data = []
+    for row in df.itertuples():
+        data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk])
+
+    print(f"SQL iterrows took {time.time() - start} s")
+    start = time.time()
+
     insert_stmt = (
         "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id) "
         f"VALUES {', '.join(['(%s, %s, %s, %s, %s)'] * len(df))}"
@@ -218,15 +245,6 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
         f"DELETE FROM sahel_simulateddatapoint WHERE "
         f"scenario_id = {scenario_pk} AND responseoption_id = {responseoption_pk}"
     )
-
-    data = []
-
-    for row in df.itertuples():
-        data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk])
-
-    print(f"SQL iterrows took {time.time() - start} s")
-    start = time.time()
-
     with closing(connection.cursor()) as cursor:
         cursor.execute(delete_stmt)
         cursor.execute(insert_stmt, data)
