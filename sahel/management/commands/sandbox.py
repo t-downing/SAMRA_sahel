@@ -1,18 +1,23 @@
 from django.core.management.base import BaseCommand
-from sahel.sd_model import model_operations
-from sahel.models import Element, ElementGroup, Source
-from sahel import models
-import plotly.graph_objects as go
-import plotly.express as px
-import pandas as pd
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-import time
-import pmdarima as pm
+import math
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        string = "print(5+5), print(time.time()), print(dir())"
-        exec(string, {"time": time, "__builtins__": None}, {"print": print, "dir": dir})
+        exec("print('hello')", {"__builtins__": None, "print": print})
 
-        pass
+        def smooth(input):
+            return input + 5
+
+        model_locals = {}
+        model_locals.update({"dog": 50})
+        model_locals.update({"cosine": math.cos})
+
+        print(model_locals.get("dog"))
+
+        exec("a = cosine", {"__builtins__": None, "math": math, "smooth": smooth}, model_locals)
+        a = model_locals.get("a")
+        print(a(1))
+
+
+

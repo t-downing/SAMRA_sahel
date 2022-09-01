@@ -348,3 +348,4 @@ fabric.properties
 /whole_alltables.json
 /whole_sometables.json
 .DS_Store
+requirements_mac.txt

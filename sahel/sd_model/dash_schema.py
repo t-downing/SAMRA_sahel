@@ -15,6 +15,7 @@ import inspect
 from pprint import pprint
 from datetime import date, datetime
 from django.db.models import Max, Min
+import time
 
 admin1s = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
 initial_fig = go.Figure(layout=go.Layout(template="simple_white"))
@@ -120,7 +121,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                     dbc.CardBody([
                         dcc.Dropdown(id="admin1-input", options=admin1s, value=None, placeholder="Région", className="mb-2"),
                         dcc.Dropdown(id="admin2-input", options=admin1s, value=None, placeholder="Cercle", className="mb-2"),
-                        dcc.DatePickerRange(id="daterange-input", start_date=initial_startdate, end_date=initial_enddate, className="mb-2"),
+                        # dcc.DatePickerRange(id="daterange-input", start_date=initial_startdate, end_date=initial_enddate, className="mb-2"),
                         dbc.Select(id="scenario-input", placeholder="Scénario", className="mb-2"),
                         dbc.Select(id="responseoption-input", placeholder="Réponse", className="mb-2"),
                         dbc.Button("Réexécuter modèle", n_clicks=0, id="run-model", disabled=True),
@@ -575,6 +576,7 @@ def element_detail_graph(nodedata, admin1, scenario_pk, responseoption_pk, *_):
     df = pd.DataFrame(SimulatedDataPoint.objects
                       .filter(element=element, scenario_id=scenario_pk, responseoption_id=responseoption_pk)
                       .values("date", "value"))
+
     if not df.empty:
         fig.add_trace(go.Scatter(
             x=df["date"],
@@ -583,9 +585,10 @@ def element_detail_graph(nodedata, admin1, scenario_pk, responseoption_pk, *_):
         ))
 
     if admin1 is None:
-        df = pd.DataFrame(list(MeasuredDataPoint.objects.filter(element=element).values()))
+        df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element).values())
     else:
-        df = pd.DataFrame(list(MeasuredDataPoint.objects.filter(element=element, admin1=admin1).values()))
+        df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element, admin1=admin1).values())
+
     if not df.empty:
         source_ids = df["source_id"].drop_duplicates()
         for source_id in source_ids:
@@ -693,11 +696,11 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
         ])
     elif element.sd_type == "Stock":
         inflows_card = dbc.Card([
-            dbc.CardHeader("Flux intrants"),
+            dbc.CardHeader(className="p-1", children="Flux intrants"),
             dbc.CardBody(style={"padding": "0px"}, children=[
                 dbc.ListGroup(
                     [
-                        dbc.ListGroupItem([
+                        dbc.ListGroupItem(style={"font-size": "small"}, children=[
                             inflow.label,
                             dbc.Button("Supprimer",
                                        id={"type": "element-detail-inflow-del",
@@ -796,61 +799,76 @@ def save_element_positions(n_clicks, cyto_elements, layout):
 )
 @timer
 def redraw_model(date_ord, *_):
-    elements = Element.objects.all()
+    start = time.time()
+    elements = Element.objects.all().values()
     nodes = []
     for element in elements:
-        dateinput = date.fromordinal(int(date_ord))
-        datapoint = element.measureddatapoints.filter(element=element, date__lte=dateinput).order_by("-date").first()
-        if datapoint is not None:
-            max_value = element.measureddatapoints.aggregate(Max("value")).get("value__max")
-            min_value = element.measureddatapoints.aggregate(Min("value")).get("value__min")
-            if max_value != min_value:
-                value_norm = (datapoint.value - min_value) / (max_value - min_value)
-                if value_norm < 1/3:
-                    color = "lightcoral"
-                elif value_norm < 2/3:
-                    color = "khaki"
-                else:
-                    color = "lightgreen"
-            else:
-                color = "white"
-        else:
-            color = "white"
+        color = "white"
+        # dateinput = date.fromordinal(int(date_ord))
+        # datapoint = element.measureddatapoints.filter(element=element, date__lte=dateinput).order_by("-date").first()
+        # if datapoint is not None:
+        #     max_value = element.measureddatapoints.aggregate(Max("value")).get("value__max")
+        #     min_value = element.measureddatapoints.aggregate(Min("value")).get("value__min")
+        #     if max_value != min_value:
+        #         value_norm = (datapoint.value - min_value) / (max_value - min_value)
+        #         if value_norm < 1/3:
+        #             color = "lightcoral"
+        #         elif value_norm < 2/3:
+        #             color = "khaki"
+        #         else:
+        #             color = "lightgreen"
 
         nodes.append(
-            {"data": {"id": element.pk,
-                      "label": element.label,
-                      "sd_type": element.sd_type,
-                      "sim_input_var": element.sim_input_var,
-                      "equation_stored": "yes" if element.equation else "no",
-                      "parent": None if element.element_group is None else f"group_{element.element_group.pk}",
+            {"data": {"id": element.get("id"),
+                      "label": element.get("label"),
+                      "sd_type": element.get("sd_type"),
+                      "equation_stored": "yes" if element.get("equation") else "no",
+                      "parent": None if element.get("element_group_id") is None else f"group_{element.get('element_group_id')}",
                       "color": color},
-             "position": {"x": element.x_pos, "y": element.y_pos}}
+             "position": {"x": element.get("x_pos"), "y": element.get("y_pos")}}
         )
+    print(f"elements took {time.time() - start}")
+    start = time.time()
 
-    element_groups = ElementGroup.objects.all()
-    group_nodes = [{"data": {"id": f"group_{element_group.pk}",
-                             "label": element_group.label,
-                             "hierarchy": "Group"},
-                    "grabbable": False,
-                    "selectable": False,
-                    "pannable": True}
+    element_groups = ElementGroup.objects.all().values()
+    group_nodes = [
+        {"data": {"id": f"group_{element_group.get('id')}",
+                  "label": element_group.get("label"),
+                  "hierarchy": "Group"},
+         "grabbable": False,
+         "selectable": False,
+         "pannable": True}
         for element_group in element_groups
     ]
+    print(f"groups took {time.time() - start}")
+    start = time.time()
 
-    connections = Connection.objects.all()
+    connections = Connection.objects.all().select_related("to_element")
     edges=[]
+    eq_time = 0
+    append_time = 0
+    eq_read_time = 0
     for connection in connections:
-        if connection.to_element.equation is not None:
-            has_equation = "yes" if f"_E{connection.from_element.pk}_" in connection.to_element.equation else "no"
-        else:
-            has_equation = "no"
-        edges.append({"data": {"source": connection.from_element.pk,
-                                "target": connection.to_element.pk,
+        eq_start = time.time()
+        has_equation = "no"
+        if connection.to_element is not None:
+            if connection.to_element.equation is not None:
+                eq_read_start = time.time()
+                has_equation = "yes" if f"_E{connection.from_element_id}_" in connection.to_element.equation else "no"
+                eq_read_time += time.time() - eq_read_start
+
+        eq_time += time.time() - eq_start
+        append_start = time.time()
+        edges.append({"data": {"source": connection.from_element_id,
+                                "target": connection.to_element_id,
                                 "has_equation": has_equation}})
+        append_time += time.time() - append_start
+    print(f"eq took {eq_time}, eq_read took {eq_read_time}, append took {append_time}")
+    print(f"connections took {time.time() - start}")
+    start = time.time()
 
     flow_edges = []
-    stocks = Element.objects.filter(sd_type="Stock")
+    stocks = Element.objects.filter(sd_type="Stock").prefetch_related("inflows", "outflows")
     for stock in stocks:
         for inflow in stock.inflows.all():
             has_equation = "no" if inflow.equation is None else "yes"
@@ -868,5 +886,6 @@ def redraw_model(date_ord, *_):
                           "has_equation": has_equation,
                           "edge_type": "Flow"}}
             )
-    # print([pan, zoom])
+    print(f"stocks took {time.time() - start}")
+    start = time.time()
     return nodes + group_nodes + edges + flow_edges

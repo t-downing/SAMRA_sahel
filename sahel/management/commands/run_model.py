@@ -6,8 +6,8 @@ import time
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        scenarios = models.Scenario.objects.all()
-        responses = models.ResponseOption.objects.all()
+        scenarios = models.Scenario.objects.filter(pk=1)
+        responses = models.ResponseOption.objects.filter(pk=1)
 
         total = len(scenarios) * len(responses)
         count = 0
