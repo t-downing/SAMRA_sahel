@@ -12,4 +12,5 @@ urlpatterns = [
     path("sources", views.SourceListView.as_view(), name="sources"),
     path("", views.ScenarioResponseView.as_view(), name="scenarioresponse"),
     path("termsoftrade", views.TermsOfTradeView.as_view(), name="termsoftrade"),
+    path("response_list", views.ResponseListView.as_view(), name="response_list"),
 ]
