@@ -48,29 +48,24 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     for element in elements:
         pk = str(element.pk)
         if element.sd_type in ["Variable", "Input", "Seasonal Input"]:
-            locals()[f'_E{pk}_'] = model.converter(pk)
             model_locals.update({f'_E{pk}_': model.converter(pk)})
         elif element.sd_type == "Flow":
-            locals()[f'_E{pk}_'] = model.flow(pk)
-            model_locals.update({f'_E{element.pk}_': model.flow(str(element.pk))})
+            model_locals.update({f'_E{element.pk}_': model.flow(pk)})
         elif element.sd_type == "Stock":
-            locals()[f'_E{element.pk}_'] = model.stock(str(element.pk))
-            model_locals.update({f'_E{element.pk}_': model.stock(str(element.pk))})
+            model_locals.update({f'_E{element.pk}_': model.stock(pk)})
         elif element.sd_type in ["Constant", "Household Constant", "Scenario Constant"]:
-            locals()[f'_E{element.pk}_'] = model.constant(str(element.pk))
-            model_locals.update({f'_E{element.pk}_': model.constant(str(element.pk))})
-            model.constant(str(element.pk)).equation = element.constant_default_value
+            model_locals.update({f'_E{element.pk}_': model.constant(pk)})
+            model.constant(pk).equation = element.constant_default_value
         elif element.sd_type == "Pulse Input":
-            locals()[f'_E{element.pk}_'] = model.converter(str(element.pk))
-            model_locals.update({f'_E{element.pk}_': model.converter(str(element.pk))})
+            model_locals.update({f'_E{element.pk}_': model.converter(pk)})
             pulsevalues = element.pulsevalues.filter(responseoption_id=responseoption_pk)
             if pulsevalues is None:
                 continue
-            model.converter(str(element.pk)).equation = 0.0
+            model.converter(pk).equation = 0.0
             for pulsevalue in pulsevalues:
                 pulse_start_ord = (pulsevalue.startdate - pd.DateOffset(days=15)).toordinal()
                 pulse_stop_ord = (pulsevalue.startdate + pd.DateOffset(days=15)).toordinal()
-                model.converter(str(element.pk)).equation += sd.If(
+                model.converter(pk).equation += sd.If(
                     sd.And(sd.time() > pulse_start_ord, sd.time() < pulse_stop_ord), pulsevalue.value, 0.0)
     stop = time.time()
     print(f"set up elements took {stop - start} s")
@@ -89,29 +84,30 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                 smoothed_elements.append(element)
                 continue
             try:
-                # exec(f'_E{element.pk}_.equation = {element.equation}')
                 # exec is limited to use sd.* and smooth functions, and can only see and edit the dict model_locals
                 exec(f"temp_eq = {element.equation}", {"__builtins__": None, "sd": sd, "smooth": smooth}, model_locals)
-                model.converter(pk).equation = model_locals.get("temp_eq")
+                if element.sd_type == "Variable":
+                    model.converter(pk).equation = model_locals.get("temp_eq")
+                else:
+                    model.flow(pk).equation = model_locals.get("temp_eq")
                 all_equations += element.equation
             except NameError as error:
                 print(f"'{element}' equation could not be defined because {error}. "
                       f"Setting equation to 0.0 instead.")
-                model.converter()
-                exec(f'_E{element.pk}_.equation = 0.0')
+                model.converter(pk).equation = 0.0
             except SyntaxError as error:
                 print(f"{element} equation is blank, setting to None")
 
         elif element.sd_type == "Stock":
-            model.stock(str(element.pk)).equation = zero_flow
-            exec(f'model.stock(str({element.pk})).initial_value = {element.equation}')
+            model.stock(pk).equation = zero_flow
+            model.stock(pk).initial_value = element.stock_initial_value
             for inflow in element.inflows.filter(equation__isnull=False).exclude(equation=""):
-                model.stock(str(element.pk)).equation += model.flow(inflow.pk) / 30.437 if "mois" in inflow.unit else 1.0
+                model.stock(pk).equation += model.flow(inflow.pk) / 30.437 if "mois" in inflow.unit else 1.0
             for outflow in element.outflows.filter(equation__isnull=False).exclude(equation=""):
                 if "mois" in outflow.unit:
-                    model.stock(str(element.pk)).equation -= model.flow(outflow.pk) / 30.437
+                    model.stock(pk).equation -= model.flow(outflow.pk) / 30.437
                 else:
-                    model.stock(str(element.pk)).equation -= model.flow(outflow.pk)
+                    model.stock(pk).equation -= model.flow(outflow.pk)
 
     stop = time.time()
     print(f"set up equations took {stop - start} s")
@@ -159,7 +155,10 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
 
     # smoothed variables
     for element in smoothed_elements:
-        exec(f'_E{element.pk}_.equation = {element.equation}')
+        pk = str(element.pk)
+        # exec is limited to use sd.* and smooth functions, and can only see and edit the dict model_locals
+        exec(f"temp_eq = {element.equation}", {"__builtins__": None, "sd": sd, "smooth": smooth}, model_locals)
+        model.converter(pk).equation = model_locals.get("temp_eq")
 
     stop = time.time()
     print(f"set up smoothed variables took {stop - start} s")

@@ -75,6 +75,7 @@ class Element(models.Model):
     source_for_model = models.ForeignKey("source", related_name="model_element_uses", null=True, blank=True, on_delete=models.SET_NULL)
     kcal_per_kg = models.IntegerField(null=True, blank=True)
     model_output_variable = models.BooleanField(default=True)
+    stock_initial_value = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.label}; pk: {self.pk}"
