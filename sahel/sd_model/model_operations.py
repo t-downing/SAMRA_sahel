@@ -46,11 +46,12 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     # initialise all elements and set constants
     model_locals = {"model": model}
     for element in elements:
+        pk = str(element.pk)
         if element.sd_type in ["Variable", "Input", "Seasonal Input"]:
-            locals()[f'_E{element.pk}_'] = model.converter(str(element.pk))
-            model_locals.update({f'_E{element.pk}_': model.converter(str(element.pk))})
+            locals()[f'_E{pk}_'] = model.converter(pk)
+            model_locals.update({f'_E{pk}_': model.converter(pk)})
         elif element.sd_type == "Flow":
-            locals()[f'_E{element.pk}_'] = model.flow(str(element.pk))
+            locals()[f'_E{pk}_'] = model.flow(pk)
             model_locals.update({f'_E{element.pk}_': model.flow(str(element.pk))})
         elif element.sd_type == "Stock":
             locals()[f'_E{element.pk}_'] = model.stock(str(element.pk))
@@ -79,21 +80,24 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     all_equations = ""
     smoothed_elements = []
     for element in elements:
+        pk = str(element.pk)
         if element.sd_type in ["Variable", "Flow"]:
             if "smooth" in element.equation:
                 # set equation to zero, return to it later to set it properly once everthing else has been set
                 all_equations += element.equation
-                exec(f'_E{element.pk}_.equation = 0.0')
+                model.converter(pk).equation = 0.0
                 smoothed_elements.append(element)
                 continue
             try:
                 # exec(f'_E{element.pk}_.equation = {element.equation}')
+                # exec is limited to use sd.* and smooth functions, and can only see and edit the dict model_locals
                 exec(f"temp_eq = {element.equation}", {"__builtins__": None, "sd": sd, "smooth": smooth}, model_locals)
-                model.converter(str(element.pk)).equation = model_locals.get("temp_eq")
+                model.converter(pk).equation = model_locals.get("temp_eq")
                 all_equations += element.equation
             except NameError as error:
                 print(f"'{element}' equation could not be defined because {error}. "
                       f"Setting equation to 0.0 instead.")
+                model.converter()
                 exec(f'_E{element.pk}_.equation = 0.0')
             except SyntaxError as error:
                 print(f"{element} equation is blank, setting to None")
@@ -180,7 +184,6 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
             except HouseholdConstantValue.DoesNotExist:
                 pass
 
-    print(constants_values)
     # setup to run model
     model_env = bptk()
     model_env.register_model(model)
