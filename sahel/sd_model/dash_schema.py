@@ -202,28 +202,28 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                         dbc.Select(id="element-detail-group-input"),
                         dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-group-submit"), addon_type="append"),
                     ], size="sm", style=ROWSTYLE),
-                    dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"}),
+                    dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2"),
                     html.Div(id="element-detail-conn-eq"),
                 ])
             ], style={"height": "900px"}),
             width=3,
         )
     ]),
-    html.H6("Debugging:"),
-    html.P(id="readout"),
-    html.P(id="model-ran-readout"),
-    html.P(id="readout3"),
-    html.P(id="connection-deleted-readout"),
-    html.P(id="element-created-readout"),
-    html.P(id="inflow-added"),
-    html.P(id="outflow-added"),
-    html.P(id="inflow-deleted-readout"),
-    html.P(id="outflow-deleted-readout"),
-    html.P(id="element-type-changed"),
-    html.P("initialized", id="equation-changed"),
-    html.P(id="elementgroup-changed"),
-    html.P(id="element-label-changed"),
-    html.P(id="householdconstantvalue-changed"),
+    html.H6("Debugging:", hidden=True),
+    html.P(id="readout", hidden=True),
+    html.P(id="model-ran-readout", hidden=True),
+    html.P(id="readout3", hidden=True),
+    html.P(id="connection-deleted-readout", hidden=True),
+    html.P(id="element-created-readout", hidden=True),
+    html.P(id="inflow-added", hidden=True),
+    html.P(id="outflow-added", hidden=True),
+    html.P(id="inflow-deleted-readout", hidden=True),
+    html.P(id="outflow-deleted-readout", hidden=True),
+    html.P(id="element-type-changed", hidden=True),
+    html.P("initialized", id="equation-changed", hidden=True),
+    html.P(id="elementgroup-changed", hidden=True),
+    html.P(id="element-label-changed", hidden=True),
+    html.P(id="householdconstantvalue-changed", hidden=True),
 ])
 
 
@@ -628,18 +628,19 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
         upstream_elements = Element.objects.filter(downstream_connections__to_element=element)
         upstream_list = dbc.ListGroup(
             [
-                dbc.ListGroupItem(
-                    html.Div(
+                dbc.ListGroupItem(className="p-1 justify-content-between", children=
+                    html.Div(className="d-flex justify-content-between", children=
                         [
-                            html.P(f"{upstream_element.label} _E{upstream_element.pk}_"),
-                            dbc.Button("Supprimer",
+                            html.P(style={"font-size": "small"}, children=f"{upstream_element.label} _E{upstream_element.pk}_"),
+                            dbc.Button("X",
                                        id={"type": "element-detail-conn-del",
                                            "index": f"{upstream_element.pk}-to-{element.pk}"},
                                        size="sm",
                                        color="danger",
+                                       className="p-1",
                                        outline=True)
                         ],
-                        className="d-flex justify-content-between"
+
                     )
                 )
                 for upstream_element in upstream_elements
@@ -654,19 +655,19 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
             for possible_element in dropdown_options
         ]
 
-        upstream_card = dbc.Card([
-            dbc.CardHeader("Influencé par"),
+        upstream_card = dbc.Card(className="mb-2", children=[
+            dbc.CardHeader("Influencé par", className="p-1", style={"font-size": "small"}),
             dbc.CardBody(
                 [
                     upstream_list,
                     dbc.InputGroup(children=[
-                        dcc.Dropdown(style={"width": "250px"}, options=dropdown_list, id="element-detail-conn-input", placeholder="Ajouter une influence"),
-                        dbc.Button("Saisir", id="element-detail-conn-submit")
+                        dbc.Select(options=dropdown_list, id="element-detail-conn-input", placeholder="Ajouter une influence", bs_size="sm"),
+                        dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-conn-submit", size="sm"), addon_type="append")
                     ]),
                 ],
                 style={"padding": "0px"},
             )
-        ], style=ROWSTYLE)
+        ])
 
         equation_text = element.equation
         if equation_text is not None:
@@ -677,13 +678,13 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
             equation_text = f" = {equation_text}"
 
         equation_card = dbc.Card([
-            dbc.CardHeader("Équation"),
-            dbc.CardBody(
+            dbc.CardHeader("Équation", className="p-1", style={"font-size": "small"}),
+            dbc.CardBody(className="p-2", children=
                 [
-                    html.P(equation_text, id="element-detail-eq-text"),
+                    html.P(equation_text, id="element-detail-eq-text", style={"font-size": "small", "height": "50px", "overflow-y": "scroll"}),
                     dbc.InputGroup([
-                        dbc.Input(value=element.equation, id="element-detail-eq-input"),
-                        dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-eq-submit"), addon_type="append"),
+                        dbc.Input(value=element.equation, id="element-detail-eq-input", bs_size="sm"),
+                        dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-eq-submit", size="sm"), addon_type="append"),
                     ]),
 
                 ]
@@ -696,16 +697,16 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
         ])
     elif element.sd_type == "Stock":
         inflows_card = dbc.Card([
-            dbc.CardHeader(className="p-1", children="Flux intrants"),
+            dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux intrants"),
             dbc.CardBody(style={"padding": "0px"}, children=[
                 dbc.ListGroup(
                     [
-                        dbc.ListGroupItem(style={"font-size": "small"}, children=[
+                        dbc.ListGroupItem(className="p-1 d-flex justify-content-between", style={"font-size": "small"}, children=[
                             inflow.label,
-                            dbc.Button("Supprimer",
+                            dbc.Button("X",
                                        id={"type": "element-detail-inflow-del",
                                            "index": f"{element.pk}-inflow-{inflow.pk}"},
-                                       size="sm", color="danger", outline=True)
+                                       size="sm", color="danger", className="p-1", outline=True)
                         ])
                         for inflow in element.inflows.all()
                     ],
@@ -713,28 +714,28 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                     style={"height": "100px", "overflow-y": "scroll"}
                 ),
                 dbc.InputGroup([
-                    dbc.Select(id="element-detail-inflow-input", placeholder="Ajouter un flux entrant",
+                    dbc.Select(id="element-detail-inflow-input", bs_size="sm", placeholder="Ajouter un flux entrant",
                                options=[
                                     {"label": potential_inflow.label, "value": potential_inflow.pk}
                                     for potential_inflow in Element.objects.filter(sd_type="Flow")
                                         .exclude(sd_sink__isnull=False).exclude(sd_source=element)
                                 ]),
-                    dbc.Button("Saisir", id="element-detail-inflow-submit")
+                    dbc.Button("Saisir", id="element-detail-inflow-submit", size="sm")
                 ])
             ])
         ], style=ROWSTYLE)
 
         outflows_card = dbc.Card([
-            dbc.CardHeader("Flux sortants"),
+            dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux sortants"),
             dbc.CardBody(style={"padding": "0px"}, children=[
                 dbc.ListGroup(
                     [
-                        dbc.ListGroupItem([
+                        dbc.ListGroupItem(className="p-1 d-flex justify-content-between", style={"font-size": "small"}, children=[
                             outflow.label,
-                            dbc.Button("Supprimer",
+                            dbc.Button("X",
                                        id={"type": "element-detail-outflow-del",
                                            "index": f"{element.pk}-outflow-{outflow.pk}"},
-                                       size="sm", color="danger", outline=True)
+                                       size="sm", color="danger", className="p-1", outline=True)
                         ])
                         for outflow in element.outflows.all()
                     ],
@@ -742,12 +743,12 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                     style={"height": "100px", "overflow-y": "scroll"}
                 ),
                 dbc.InputGroup([
-                    dbc.Select(id="element-detail-outflow-input", placeholder="Ajouter un flux sortant",
+                    dbc.Select(id="element-detail-outflow-input", bs_size="sm", placeholder="Ajouter un flux sortant",
                                options=[
                                    {"label": potential_outflow.label, "value": potential_outflow.pk}
                                    for potential_outflow in Element.objects.filter(sd_type="Flow").exclude(sd_sink=element).exclude(sd_source=element)
                                ]),
-                    dbc.Button("Saisir", id="element-detail-outflow-submit")
+                    dbc.Button("Saisir", id="element-detail-outflow-submit", size="sm")
                 ])
             ])
         ], style=ROWSTYLE)

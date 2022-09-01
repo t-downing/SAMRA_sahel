@@ -128,7 +128,7 @@ def populate_initial(_):
             html.Tr([
                 html.Td(cereal_option.get("label")),
                 html.Td(dbc.Input(
-                    id={"type": "cereal-input", "index": cereal_option.get('value')}, type="number", size="sm",
+                    id={"type": "cereal-input", "index": cereal_option.get('value')}, type="number", bs_size="sm",
                     value=value
                 )),
                 html.Td(id={"type": "cereal-kg", "index": cereal_option.get('value')})
@@ -142,7 +142,7 @@ def populate_initial(_):
             html.Tr([
                 html.Td(livestock_option.get("label")),
                 html.Td(dbc.Input(id={"type": "livestock-input", "index": livestock_option.get('value')}, type="number",
-                                  size="sm", value=value)),
+                                  bs_size="sm", value=value)),
             ]),
         )
 
