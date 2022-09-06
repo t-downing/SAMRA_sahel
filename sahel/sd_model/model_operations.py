@@ -40,7 +40,7 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
 
     model_output_pks = []
     for element in elements:
-        if element.sd_type in ["Variable",  "Stock", "Flow"] and element.model_output_variable:
+        if element.sd_type in ["Variable", "Stock", "Flow"] and element.model_output_variable:
             model_output_pks.append(str(element.pk))
 
     # initialise all elements and set constants
@@ -160,7 +160,7 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                     for yearnum in range(startdate.year - 1, enddate.year + 2):
                         df[f"year_{yearnum}"] = yearnum
                     df = pd.melt(df, id_vars=["value", "month", "day"], value_name="year")
-                    df["date"] = df.apply(lambda row : date(row["year"], row["month"], row["day"]), axis=1)
+                    df["date"] = df.apply(lambda row: date(row["year"], row["month"], row["day"]), axis=1)
 
                 df["t"] = df["date"].apply(datetime.toordinal)
                 model.points[pk] = df[["t", "value"]].values.tolist()
@@ -190,7 +190,8 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     for element in elements:
         if element.sd_type == "Constant":
             try:
-                constants_values[str(element.pk)] = element.constantvalues.get(responseoption_id=responseoption_pk).value
+                constants_values[str(element.pk)] = element.constantvalues.get(
+                    responseoption_id=responseoption_pk).value
             except ConstantValue.DoesNotExist:
                 pass
         elif element.sd_type == "Scenario Constant":
@@ -213,11 +214,13 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     # run model
     # for purposes of running bptk, just set scenario to "base"
     bptk_scenario = "base"
-    model_env.register_scenarios(scenarios={bptk_scenario: {"constants": constants_values}}, scenario_manager="scenario_manager")
+    model_env.register_scenarios(scenarios={bptk_scenario: {"constants": constants_values}},
+                                 scenario_manager="scenario_manager")
     # ignore pandas PerformanceWarnings since bptk will always throw these up if given enough variables to output
     with warnings.catch_warnings():
         warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
-        df = model_env.plot_scenarios(scenarios=bptk_scenario, scenario_managers="scenario_manager", equations=model_output_pks, return_df=True).reset_index()
+        df = model_env.plot_scenarios(scenarios=bptk_scenario, scenario_managers="scenario_manager",
+                                      equations=model_output_pks, return_df=True).reset_index()
     stop = time.time()
     print(f"run model took {stop - start} s")
     start = time.time()
@@ -279,7 +282,87 @@ def timer(func):
         run_time = time.time() - start_time
         print(f"Function {func.__name__!r} took {run_time:.4f} s")
         return value
+
     return wrapper_timer
 
 
+def read_results(element_pk, scenario_pks, response_pks, df: pd.DataFrame,
+                      df_cost: pd.DataFrame):
+    # initialize
+    baseline_response_pk = 1
+    response_pks_filter = response_pks.copy()
+    if baseline_response_pk not in response_pks:
+        response_pks_filter.append(baseline_response_pk)
 
+    element = Element.objects.get(pk=element_pk)
+    agg_value = element.aggregate_by
+
+    # read in element df
+    df = pd.DataFrame(SimulatedDataPoint.objects.filter(
+        element_id=element_pk,
+        scenario_id__in=scenario_pks,
+        responseoption_id__in=response_pks_filter,
+    ).values("responseoption_id", "scenario_id", "value",
+             "responseoption__name", "scenario__name", "date"))
+    if "FCFA" in element.unit:
+        df["value"] /= 1000
+        element.unit = "1000 " + element.unit
+    # must be sorted by date last
+    df = df.sort_values(["scenario_id", "responseoption_id", "date"])
+
+    # group by response and scenario
+    df_agg = df.groupby([
+        "responseoption_id", "scenario_id", "responseoption__name", "scenario__name"
+    ])["value"]
+    period = (df["date"].iloc[1] - df["date"].iloc[0]).days
+
+    # perform correct aggregation
+    if agg_value == "MEAN":
+        df_agg = df_agg.mean().reset_index()
+        agg_unit = element.unit
+        agg_text = "moyen"
+    elif agg_value == "SUM":
+        agg_text = "total"
+        df_agg = df_agg.sum().reset_index()
+        df_agg["value"] *= period
+        if "mois" in element.unit:
+            df_agg["value"] /= 30.437
+            agg_unit = element.unit.removesuffix(" / mois")
+        elif "jour" in element.unit:
+            agg_unit = element.unit.removesuffix(" / jour")
+        elif "an" in element.unit:
+            df_agg["value"] /= 365.25
+            agg_unit = element.unit.removesuffix(" / an")
+        else:
+            agg_unit = "INCORRECT UNIT"
+    elif "CHANGE" in agg_value:
+        agg_text = "change"
+        df_agg_initial = df_agg.nth(0)
+        df_agg_final = df_agg.nth(-1)
+        df_agg = df_agg_final - df_agg_initial
+        agg_unit = element.unit
+        if "%" in agg_value:
+            df_agg *= 100 / df_agg_initial
+            agg_unit = "%"
+            agg_text = "% change"
+        df_agg = df_agg.reset_index()
+    else:
+        print("invalid aggregation")
+        agg_text = "INVALID"
+        agg_unit = "INVALID"
+
+    # read in cost df
+    df_cost = pd.DataFrame(SimulatedDataPoint.objects.filter(
+        element_id=102,
+        scenario_id__in=scenario_pks,
+        responseoption_id__in=response_pks_filter,
+    ).values("responseoption_id", "scenario_id", "value",
+             "responseoption__name", "scenario__name", "date"))
+    df_cost = df_cost.sort_values(["scenario_id", "responseoption_id", "date"])
+    df_cost_agg = df_cost.groupby([
+        "responseoption_id", "scenario_id",
+        "responseoption__name", "scenario__name"
+    ]).sum().reset_index()
+    df_cost_agg["value"] *= period / 30.437
+
+    return df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit
