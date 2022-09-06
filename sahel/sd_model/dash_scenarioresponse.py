@@ -130,12 +130,13 @@ def rerun_model(n_clicks, scenario_pks, response_pks):
 )
 @timer
 def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
-    baseline_response_pk = 1
-
+    # read results
     df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(
         element_pk=element_pk, scenario_pks=scenario_pks, response_pks=response_pks, agg_value=agg_value
     )
 
+    # set colors
+    baseline_response_pk = 1
     scenario_pks.sort()
     response_pks.sort()
     response2color = {response_pk: color
@@ -145,61 +146,6 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
     DASHES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
     scenario2dash = {scenario_pk: dash for scenario_pk, dash in zip(scenario_pks, DASHES)}
     element = Element.objects.get(pk=element_pk)
-
-    response_pks_filter = response_pks.copy()
-    if baseline_response_pk not in response_pks:
-        response_pks_filter.append(baseline_response_pk)
-
-    # df = pd.DataFrame(SimulatedDataPoint.objects.filter(
-    #     element_id=element_pk,
-    #     scenario_id__in=scenario_pks,
-    #     responseoption_id__in=response_pks_filter,
-    # ).values("responseoption_id", "scenario_id", "value",
-    #          "responseoption__name", "scenario__name", "date"))
-    # if "FCFA" in element.unit:
-    #     df["value"] /= 1000
-    #     element.unit = "1000 " + element.unit
-    # # must be sorted by date last
-    # df = df.sort_values(["scenario_id", "responseoption_id", "date"])
-    #
-    # df_agg = df.groupby([
-    #     "responseoption_id", "scenario_id", "responseoption__name", "scenario__name"
-    # ])["value"]
-    # period = (df["date"].iloc[1] - df["date"].iloc[0]).days
-    #
-    # if agg_value == "MEAN":
-    #     df_agg = df_agg.mean().reset_index()
-    #     agg_unit = element.unit
-    #     agg_text = "moyen"
-    # elif agg_value == "SUM":
-    #     agg_text = "total"
-    #     df_agg = df_agg.sum().reset_index()
-    #     df_agg["value"] *= period
-    #     if "mois" in element.unit:
-    #         df_agg["value"] /= 30.437
-    #         agg_unit = element.unit.removesuffix(" / mois")
-    #     elif "jour" in element.unit:
-    #         agg_unit = element.unit.removesuffix(" / jour")
-    #     elif "an" in element.unit:
-    #         df_agg["value"] /= 365.25
-    #         agg_unit = element.unit.removesuffix(" / an")
-    #     else:
-    #         agg_unit = "INCORRECT UNIT"
-    # elif "CHANGE" in agg_value:
-    #     agg_text = "change"
-    #     df_agg_initial = df_agg.nth(0)
-    #     df_agg_final = df_agg.nth(-1)
-    #     df_agg = df_agg_final - df_agg_initial
-    #     agg_unit = element.unit
-    #     if "%" in agg_value:
-    #         df_agg *= 100 / df_agg_initial
-    #         agg_unit = "%"
-    #         agg_text = "% change"
-    #     df_agg = df_agg.reset_index()
-    # else:
-    #     print("invalid aggregation")
-    #     agg_text = "INVALID"
-    #     agg_unit = "INVALID"
 
     # bar graph
     decimals = 2 if element.unit == "1" else 1
@@ -242,21 +188,7 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
     time_fig.update_xaxes(title_text="Date")
     time_fig.update_yaxes(title_text=f"{element.label} ({element.unit})")
 
-
     # scatter graph
-    # df_cost = pd.DataFrame(SimulatedDataPoint.objects.filter(
-    #     element_id=102,
-    #     scenario_id__in=scenario_pks,
-    #     responseoption_id__in=response_pks_filter,
-    # ).values("responseoption_id", "scenario_id", "value",
-    #          "responseoption__name", "scenario__name", "date"))
-    # df_cost = df_cost.sort_values(["scenario_id", "responseoption_id", "date"])
-    # df_cost_agg = df_cost.groupby([
-    #     "responseoption_id", "scenario_id",
-    #     "responseoption__name", "scenario__name"
-    # ]).sum().reset_index()
-    # df_cost_agg["value"] *= period / 30.437
-
     scatter_fig = go.Figure(layout=dict(template="simple_white"))
     show_response_legend = True
     for scenario_pk in scenario_pks:
@@ -296,23 +228,8 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
     scatter_fig.update_xaxes(title_text="Coûts totaux CICR (FCFA)")
     scatter_fig.update_yaxes(title_text=f"{element.label} {agg_text} ({agg_unit})")
 
-    # effciency graph
+    # efficiency graph
     eff_fig = go.Figure(layout=dict(template="simple_white"))
-    # for scenario_pk in scenario_pks:
-    #     baseline_value = df_agg.loc[(df_agg["scenario_id"] == scenario_pk) &
-    #                             (df_agg["responseoption_id"] == baseline_response_pk)]["value"]
-    #     baseline_cost = df_cost_agg.loc[(df_cost_agg["scenario_id"] == scenario_pk) &
-    #                                 (df_cost_agg["responseoption_id"] == baseline_response_pk)]["value"]
-    #     df_agg.loc[df_agg["scenario_id"] == scenario_pk, "baseline_value"] = float(baseline_value)
-    #     df_cost_agg.loc[df_cost_agg["scenario_id"] == scenario_pk, "baseline_cost"] = float(baseline_cost)
-    #
-    # divider = 1000000 if element.unit in ["1", "tête"] else 1000
-    # divider_text = f"{divider:,}".replace(",", " ")
-    # df_agg["cost_eff"] = (
-    #         (df_agg["value"] - df_agg["baseline_value"]) /
-    #         (df_cost_agg["value"] - df_cost_agg["baseline_cost"]) * divider
-    # )
-
     decimals = 1
     for response_pk in response_pks:
         if response_pk == baseline_response_pk:

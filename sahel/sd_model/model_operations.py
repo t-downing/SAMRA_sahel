@@ -380,5 +380,6 @@ def read_results(element_pk, scenario_pks, response_pks, agg_value: str = None):
             (df_agg["value"] - df_agg["baseline_value"]) /
             (df_cost_agg["value"] - df_cost_agg["baseline_cost"]) * divider
     )
+    df_agg["baseline_diff"] = df_agg["value"] - df_agg["baseline_value"]
 
     return df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text

@@ -63,7 +63,7 @@ class Element(models.Model):
     high_threshold = models.FloatField(null=True, blank=True)
     high_is_bad = models.BooleanField(default=False)
     constant_default_value = models.FloatField(null=True, blank=True, default=0.0)
-    aggregate_by = models.CharField(max_length=200, choices=(("MEAN", "MEAN"), ("SUM", "SUM")), default="MEAN")
+    aggregate_by = models.CharField(max_length=200, choices=AGG_OPTIONS, default="MEAN")
     dm_globalform_fieldgroup = models.CharField(max_length=200, null=True, blank=True)
     dm_globalform_group_highfield = models.CharField(max_length=200, null=True, blank=True)
     dm_globalform_group_midfield = models.CharField(max_length=200, null=True, blank=True)
