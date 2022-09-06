@@ -286,8 +286,7 @@ def timer(func):
     return wrapper_timer
 
 
-def read_results(element_pk, scenario_pks, response_pks, df: pd.DataFrame,
-                      df_cost: pd.DataFrame):
+def read_results(element_pk, scenario_pks, response_pks, agg_value: str = None):
     # initialize
     baseline_response_pk = 1
     response_pks_filter = response_pks.copy()
@@ -295,7 +294,8 @@ def read_results(element_pk, scenario_pks, response_pks, df: pd.DataFrame,
         response_pks_filter.append(baseline_response_pk)
 
     element = Element.objects.get(pk=element_pk)
-    agg_value = element.aggregate_by
+    if agg_value is None:
+        agg_value = element.aggregate_by
 
     # read in element df
     df = pd.DataFrame(SimulatedDataPoint.objects.filter(
@@ -365,4 +365,20 @@ def read_results(element_pk, scenario_pks, response_pks, df: pd.DataFrame,
     ]).sum().reset_index()
     df_cost_agg["value"] *= period / 30.437
 
-    return df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit
+    # calculate cost efficiency
+    for scenario_pk in scenario_pks:
+        baseline_value = df_agg.loc[(df_agg["scenario_id"] == scenario_pk) &
+                                (df_agg["responseoption_id"] == baseline_response_pk)]["value"]
+        baseline_cost = df_cost_agg.loc[(df_cost_agg["scenario_id"] == scenario_pk) &
+                                    (df_cost_agg["responseoption_id"] == baseline_response_pk)]["value"]
+        df_agg.loc[df_agg["scenario_id"] == scenario_pk, "baseline_value"] = float(baseline_value)
+        df_cost_agg.loc[df_cost_agg["scenario_id"] == scenario_pk, "baseline_cost"] = float(baseline_cost)
+
+    divider = 1000000 if element.unit in ["1", "tête"] else 1000
+    divider_text = f"{divider:,}".replace(",", " ")
+    df_agg["cost_eff"] = (
+            (df_agg["value"] - df_agg["baseline_value"]) /
+            (df_cost_agg["value"] - df_cost_agg["baseline_cost"]) * divider
+    )
+
+    return df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text
