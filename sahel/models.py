@@ -76,6 +76,7 @@ class Element(models.Model):
     kcal_per_kg = models.IntegerField(null=True, blank=True)
     model_output_variable = models.BooleanField(default=True)
     stock_initial_value = models.FloatField(null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.label}; pk: {self.pk}"
@@ -179,6 +180,7 @@ class SeasonalInputDataPoint(models.Model):
 
 class ResponseOption(models.Model):
     name = models.CharField(max_length=500)
+    description = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -186,6 +188,7 @@ class ResponseOption(models.Model):
 
 class Scenario(models.Model):
     name = models.CharField(max_length=500)
+    description = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return self.name
