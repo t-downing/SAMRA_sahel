@@ -55,14 +55,33 @@
 
             <!-- Heading -->
             <div class="sidebar-heading">
-                Modèle
+                Résultats
             </div>
 
             <li class="nav-item">
-                <a class="nav-link" href="{% url 'scenarioresponse' %}">
-                    <i class="fas fa-fw fa-tachometer-alt"></i>
-                    <span>Dashboard</span></a>
+                <a class="nav-link" href="{% url 'response_list' %}">
+                    <i class="fas fa-project-diagram"></i>
+                    <span>Liste</span></a>
             </li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'scenarioresponse' %}">
+                    <i class="fa-solid fa-chart-column"></i>
+                    <span>Résultats : graphiques</span></a>
+            </li>
+
+
+
+            <hr class="sidebar-divider">
+
+            <!-- Heading -->
+            <div class="sidebar-heading">
+                Modèle
+            </div>
+
+
+
+
 
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'model_diagram' %}">
@@ -70,11 +89,6 @@
                     <span>Schéma</span></a>
             </li>
 
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'response_list' %}">
-                    <i class="fas fa-project-diagram"></i>
-                    <span>Liste de réponses</span></a>
-            </li>
 
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'comparison' %}">
