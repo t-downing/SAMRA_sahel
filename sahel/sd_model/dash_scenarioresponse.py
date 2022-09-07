@@ -14,6 +14,8 @@ from plotly.colors import DEFAULT_PLOTLY_COLORS
 import itertools
 import pandas as pd
 
+DASHES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
+
 app = DjangoDash("scenarioresponse", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, children=[
@@ -80,10 +82,10 @@ def populate_initial(_):
     element_value = 77
     agg_options = [{"label": agg[1], "value": agg[0]} for agg in Element.AGG_OPTIONS]
     scenario_options = [{"label": scenario.get("name"), "value": scenario.get("id")}
-                        for scenario in Scenario.objects.all().values("id", "name")]
+                        for scenario in Scenario.objects.all().order_by("id").values("id", "name")]
     scenario_value = [scenario.get("value") for scenario in scenario_options]
     response_options = [{"label": obj.get("name"), "value": obj.get("id")}
-                        for obj in ResponseOption.objects.all().values("id", "name")]
+                        for obj in ResponseOption.objects.all().order_by("id").values("id", "name")]
     response_value = [obj.get("value") for obj in response_options[0:3]]
     return element_options, element_value, agg_options, scenario_options, scenario_value, response_options, response_value
 
@@ -130,11 +132,6 @@ def rerun_model(n_clicks, scenario_pks, response_pks):
 )
 @timer
 def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
-    # read results
-    df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(
-        element_pk=element_pk, scenario_pks=scenario_pks, response_pks=response_pks, agg_value=agg_value
-    )
-
     # set colors
     baseline_response_pk = 1
     scenario_pks.sort()
@@ -142,10 +139,13 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
     response2color = {response_pk: color
                       for response_pk, color in zip(response_pks[1:], itertools.cycle(DEFAULT_PLOTLY_COLORS))}
     response2color[baseline_response_pk] = "black"
-
-    DASHES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
     scenario2dash = {scenario_pk: dash for scenario_pk, dash in zip(scenario_pks, DASHES)}
     element = Element.objects.get(pk=element_pk)
+
+    # read results
+    df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(
+        element_pk=element_pk, scenario_pks=scenario_pks, response_pks=response_pks, agg_value=agg_value
+    )
 
     # bar graph
     decimals = 2 if element.unit == "1" else 1
