@@ -30,8 +30,7 @@ indiquent.
 app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, children=[
     dbc.Row([
         dbc.Col([
-            html.H4(id="title", className="mb-4", children="Liste de réponses"),
-            html.P(className="mb-4", children=page_description)
+            html.P(id="init", className="mb-4", children=page_description)
         ]),
     ]),
     dbc.Row([
@@ -76,7 +75,7 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
     Output("table", "tooltip_header"),
     Output("table", "tooltip_data"),
     Output("table", "style_data_conditional"),
-    Input("title", "children"),
+    Input("init", "children"),
     State("table", "style_data_conditional"),
 )
 def populate_initial(_, style_data_conditional):

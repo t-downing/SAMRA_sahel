@@ -2,6 +2,12 @@
 
 {% block content %}
 
+
+<h1 class="h3 mb-2 text-gray-800">Résultats : liste</h1>
+<p class="mb-4">Pour modifier les réponses ou en voir en détail la composition des réponses, naviguez à
+    <a href="{% url 'comparison' %}">Construction de réponses</a>
+</p>
+
 {% load plotly_dash %}
 {% plotly_app name="responselist" ratio=1.5 %}
 
