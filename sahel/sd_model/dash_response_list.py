@@ -35,35 +35,39 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
     ]),
     dbc.Row([
         dbc.Col(width=12, children=[
-            dcc.Loading(dash_table.DataTable(
-                id="table",
-                style_cell={
-                    'font-family': 'sans-serif',
-                    'minWidth': '50px', 'width': '50px', 'maxWidth': '50px',
-                    'height': 'auto', 'whiteSpace': 'pre-line',
-                },
-                style_header={'textAlign': 'center', 'fontWeight': 'bold', **tooltip_style},
-                style_header_conditional=[
-                    {"if": {"header_index": 1},
-                     "fontWeight": ""},
-                    {"if": {"column_id": ["responseoption__name", "total_cost"]},
-                     "fontWeight": "bold"}
-                ],
-                style_data_conditional=[
-                    {"if": {"column_id": "responseoption__name"},
-                     "textAlign": "left", 'fontStyle': 'italic', **tooltip_style}
-                ],
-                sort_action="native",
-                style_table={'overflowX': 'auto'},
-                merge_duplicate_headers=True,
-                style_as_list_view=True,
-                tooltip_delay=0,
-                tooltip_duration=None,
-                css=[
-                    {'selector': '.dash-table-tooltip',
-                     'rule': 'background-color: black; color: white; font-size: small'}
-                ],
-            )),
+            dbc.Card(className="shadow mb-4", children=[
+                dbc.CardBody(
+                    dcc.Loading(dash_table.DataTable(
+                        id="table",
+                        style_cell={
+                            'font-family': 'sans-serif',
+                            'minWidth': '50px', 'width': '50px', 'maxWidth': '50px',
+                            'height': 'auto', 'whiteSpace': 'pre-line',
+                        },
+                        style_header={'textAlign': 'center', 'fontWeight': 'bold', **tooltip_style},
+                        style_header_conditional=[
+                            {"if": {"header_index": 1},
+                             "fontWeight": ""},
+                            {"if": {"column_id": ["responseoption__name", "total_cost"]},
+                             "fontWeight": "bold"}
+                        ],
+                        style_data_conditional=[
+                            {"if": {"column_id": "responseoption__name"},
+                             "textAlign": "left", 'fontStyle': 'italic', **tooltip_style}
+                        ],
+                        sort_action="native",
+                        style_table={'overflowX': 'auto'},
+                        merge_duplicate_headers=True,
+                        style_as_list_view=True,
+                        tooltip_delay=0,
+                        tooltip_duration=None,
+                        css=[
+                            {'selector': '.dash-table-tooltip',
+                             'rule': 'background-color: black; color: white; font-size: small'}
+                        ],
+                    )),
+                )
+            ])
         ]),
     ]),
 ])

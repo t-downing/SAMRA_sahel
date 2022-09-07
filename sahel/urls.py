@@ -8,7 +8,7 @@ urlpatterns = [
     path("django_plotly_dash/", include("django_plotly_dash.urls")),
     path("equation_bank", views.EquationBankView.as_view(), name="equation_bank"),
     path("comparison", views.ComparisonView.as_view(), name="comparison"),
-    path("scenarios", views.ScenarioView.as_view(), name="scenarios"),
+    path("forecasts", views.ForecastView.as_view(), name="forecasts"),
     path("sources", views.SourceListView.as_view(), name="sources"),
     path("scenarioresponse", views.ScenarioResponseView.as_view(), name="scenarioresponse"),
     path("termsoftrade", views.TermsOfTradeView.as_view(), name="termsoftrade"),

@@ -40,6 +40,11 @@
                 <div class="sidebar-brand-text mx-3">SAMRA <sup>Sahel</sup></div>
             </a>
 
+            <div class="alert alert-warning mx-3" role="alert" style="font-size: small">
+                Site PROTOTYPE : veuillez être patient, et SVP envoyer le feedback à
+                <a href="mailto:tdowning@icrc.org">tdowning@icrc.org</a>. Merci :)
+            </div>
+
             <!-- Divider -->
             <hr class="sidebar-divider my-0">
 
@@ -60,14 +65,14 @@
 
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'response_list' %}">
-                    <i class="fas fa-project-diagram"></i>
+                    <i class="fa-solid fa-table-list"></i>
                     <span>Liste</span></a>
             </li>
 
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'scenarioresponse' %}">
                     <i class="fa-solid fa-chart-column"></i>
-                    <span>Résultats : graphiques</span></a>
+                    <span>Graphiques</span></a>
             </li>
 
 
@@ -79,26 +84,27 @@
                 Modèle
             </div>
 
-
-
-
-
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'model_diagram' %}">
                     <i class="fas fa-project-diagram"></i>
                     <span>Schéma</span></a>
             </li>
 
-
             <li class="nav-item">
                 <a class="nav-link" href="{% url 'comparison' %}">
-                    <i class="fas fa-chart-area"></i>
+                    <i class="fa-solid fa-screwdriver-wrench"></i>
                     <span>Construction de réponses</span></a>
             </li>
 
             <li class="nav-item">
-                <a class="nav-link" href="{% url 'scenarios' %}">
-                    <i class="fas fa-chart-area"></i>
+                <a class="nav-link" href="{% url 'comparison' %}">
+                    <i class="fa-solid fa-question"></i>
+                    <span>Construction de scnénarios</span></a>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'forecasts' %}">
+                    <i class="fa-solid fa-arrow-trend-up"></i>
                     <span>Prévisions</span></a>
             </li>
 
@@ -160,9 +166,6 @@
 
                 <!-- Begin Page Content -->
                 <div class="container-fluid">
-                    <div class="alert alert-warning mt-4" role="alert">
-                      Site PROTOTYPE : veuillez être patient, et SVP envoyer le feedback à <a href="mailto:tdowning@icrc.org">tdowning@icrc.org</a>. Merci :)
-                    </div>
                     {% block content %}
                     {% endblock %}
                 </div>

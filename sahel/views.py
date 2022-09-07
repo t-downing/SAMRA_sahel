@@ -22,8 +22,8 @@ class ComparisonView(LoginRequiredMixin, TemplateView):
     redirect_field_name = 'next'
 
 
-class ScenarioView(LoginRequiredMixin, TemplateView):
-    template_name = "sahel/scenarios.html"
+class ForecastView(LoginRequiredMixin, TemplateView):
+    template_name = "sahel/forecasts.html"
     login_url = '/accounts/login/'
     redirect_field_name = 'next'
 
