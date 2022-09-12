@@ -2,7 +2,7 @@
 
 {% block content %}
 
-<h1 class="h3 my-2 mt-4 text-gray-800">Accueil</h1>
+<h1 class="h1 mt-4 mb-3 text-gray-800">Accueil</h1>
 <p class="mb-4">
     Bienvenue au site SAMRA (System Awareness and Modeling for Response Analysis / <i>La connaissance et la modélisation
     des systèmes pour l’analyse des réponses</i>). Ici on peut regarder, modifier et exécuter les modèles SAMRA. Pour
@@ -12,15 +12,17 @@
     <a href="mailto:tdowning@icrc.org">tdowning@icrc.org</a>
 </p>
 
+<h3 class="h3 mb-2 text-gray-800">Résultats</h3>
+<p>Voir les résultats de la modélisation.</p>
 
 <div class="row">
-    <div class="col-xl-4 col-md-6 mb-4">
+    <div class="col-xl-6 col-md-6 mb-4">
         <div class="card border-left-primary shadow h-100 py-2">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
                     <div class="col mr-2">
                         <div class="h5 font-weight-bold text-primary text-uppercase mb-3">
-                            Résultats : tableau</div>
+                            <a href="{% url 'response_list' %}">Tableau</a></div>
                         <div class="h6 mb-3 font-weight-bold">
                             Comparer les différentes réponses dans un tableau.
                         </div>
@@ -30,7 +32,216 @@
                         </div>
                     </div>
                     <div class="col-auto">
-                        <i class="fa-solid fa-table-list fa-6x text-gray-300"></i>
+                        <a class="btn" href="{% url 'response_list' %}">
+                            <i class="fa-solid fa-table-list fa-6x text-gray-300"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-6 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 font-weight-bold text-uppercase mb-3">
+                            <a href="{% url 'scenarioresponse' %}" class="text-success">Graphiques</a></div>
+                        <div class="h6 mb-3 font-weight-bold">
+                            Comparer les différentes réponses et scénarios avec les graphiques.
+                        </div>
+                        <div class="p mb-0">
+                            Explorer en détail comment les différentes réponses du CICR peuvent influencer les aspects clés des
+                            ménages. Voir l'évolution des éléments dans le temps.
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <a class="btn" href="{% url 'scenarioresponse' %}">
+                            <i class="fa-solid fa-chart-column fa-6x text-gray-300"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h3 class="h3 mb-2 text-gray-800">Modélisation</h3>
+<p>Voir et modifier le modèle.</p>
+
+<div class="row">
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 font-weight-bold text-uppercase mb-3">
+                            <a href="{% url 'model_diagram' %}" class="text-info">Schéma</a></div>
+                        <div class="h6 mb-3 font-weight-bold">
+                            Voir et modifier la structure du modèle.
+                        </div>
+                        <div class="p mb-0">
+                            Changer les éléments, les connections, les équations. Voir l'évolution dans le temps de tous
+                            les éléments.
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <a class="btn" href="{% url 'model_diagram' %}">
+                            <i class="fa-solid fa-diagram-project fa-6x text-gray-300"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 font-weight-bold text-uppercase mb-3">
+                            <a href="{% url 'responses' %}" class="text-warning">Réponses</a></div>
+                        <div class="h6 mb-3 font-weight-bold">
+                            Voir et modifier les réponses testées dans le modèle.
+                        </div>
+                        <div class="p mb-0">
+                            Ajouter ou modifier les interventions qui font partie de chaque réponse, y compris les coûts
+                            associés.
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <a class="btn" href="{% url 'responses' %}">
+                            <i class="fa-solid fa-screwdriver-wrench fa-6x text-gray-300"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 font-weight-bold text-uppercase mb-3">
+                            <a href="{% url 'scenarios' %}" class="text-primary">Scnénarios</a></div>
+                        <div class="h6 mb-3 font-weight-bold">
+                            Voir et modifier les scnénarios testées dans le modèle.
+                        </div>
+                        <div class="p mb-0">
+                            Ajouter ou modifier les conditions pour scénario.
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <a class="btn" href="{% url 'scenarios' %}">
+                            <i class="fa-solid fa-arrows-split-up-and-left fa-flip-horizontal fa-6x text-gray-300"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h3 class="h3 mb-2 text-gray-800">Outils</h3>
+<p>Utiliser les outils liés au modèle.</p>
+
+<div class="row">
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 font-weight-bold text-uppercase mb-3">
+                            <a href="{% url 'forecasts' %}" class="text-success">Prévsions</a></div>
+                        <div class="h6 mb-3 font-weight-bold">
+                            Voir les prévisions qui informent le modèle.
+                        </div>
+                        <div class="p mb-0">
+                            Voir la prévision de tous les éléments d'entrée du modèle. Désagrégé par région, où les
+                            données désagrégées sont disponibles.
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <a class="btn" href="{% url 'forecasts' %}">
+                            <i class="fa-solid fa-arrow-trend-up fa-6x text-gray-300"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 font-weight-bold text-uppercase mb-3">
+                            <a href="{% url 'termsoftrade' %}" class="text-info">Termes d'échange</a></div>
+                        <div class="h6 mb-3 font-weight-bold">
+                            Voir les termes d'échange entre le bétail et les céréales.
+                        </div>
+                        <div class="p mb-0">
+                            Voir les termes d'échange entre les espèces de bétail et les denrées céréales, ou entre un
+                            cheptel de bétail spécifié et les besoins alimentaires d'un ménage spécifié.
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <a class="btn" href="{% url 'termsoftrade' %}">
+                            <i class="fa-solid fa-balance-scale fa-6x text-gray-300"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 font-weight-bold text-uppercase mb-3">
+                            <a href="{% url 'equation_bank' %}" class="text-warning">Banque d'équations</a></div>
+                        <div class="h6 mb-3 font-weight-bold">
+                            SOUS CONSTRUCTION
+                        </div>
+                        <div class="p mb-0">
+                            SOUS CONSTRUCTION
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <a class="btn" href="{% url 'equation_bank' %}">
+                            <i class="fa-solid fa-plus-minus fa-6x text-gray-300"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h3 class="h3 mb-2 text-gray-800">Gestion d'information</h3>
+<p>Explorer et ajouter l'information pour le modèle.</p>
+
+<div class="row">
+    <div class="col">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 font-weight-bold text-uppercase mb-3">
+                            <a href="{% url 'sources' %}" class="text-primary">Sources</a></div>
+                        <div class="h6 mb-3 font-weight-bold">
+                            SOUS CONSTRUCTION
+                        </div>
+                        <div class="p mb-0">
+                            SOUS CONSTRUCTION
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <a class="btn" href="{% url 'sources' %}">
+                            <i class="fa-solid fa-book fa-6x text-gray-300"></i>
+                        </a>
                     </div>
                 </div>
             </div>

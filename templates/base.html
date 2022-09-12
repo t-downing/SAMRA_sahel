@@ -2,6 +2,7 @@
 <html lang="en">
 
 {% load static %}
+{% load active_link_tags %}
 
 <head>
 
@@ -40,7 +41,14 @@
                 <div class="sidebar-brand-text mx-3">SAMRA <sup>Sahel</sup></div>
             </a>
 
-            <div class="alert alert-warning mx-3" role="alert" style="font-size: small">
+            <div class="mb-3">
+                <a href="https://www.icrc.org/fr" target="_blank">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/6/64/Emblem_of_the_ICRC_fr.svg"
+                         width="30%" alt="Logo CICR" class="mx-auto d-block">
+                </a>
+            </div>
+
+            <div class="alert alert-warning mx-3" role="alert" style="font-size:small; word-wrap:break-word">
                 Site PROTOTYPE : veuillez être patient, et SVP envoyer le feedback à
                 <a href="mailto:tdowning@icrc.org">tdowning@icrc.org</a>. Merci :)
             </div>
@@ -49,7 +57,7 @@
             <hr class="sidebar-divider my-0">
 
             <!-- Nav Item - Dashboard -->
-            <li class="nav-item">
+            <li class="nav-item {% active_link 'index' strict=True%}">
                 <a class="nav-link" href="{% url 'index' %}">
                     <i class="fa-solid fa-house"></i>
                     <span>Accueil</span></a>
@@ -63,13 +71,13 @@
                 Résultats
             </div>
 
-            <li class="nav-item">
+            <li class="nav-item {% active_link 'response_list' %}">
                 <a class="nav-link" href="{% url 'response_list' %}">
                     <i class="fa-solid fa-table-list"></i>
-                    <span>Liste</span></a>
+                    <span>Tableau</span></a>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item {% active_link 'scenarioresponse' %}">
                 <a class="nav-link" href="{% url 'scenarioresponse' %}">
                     <i class="fa-solid fa-chart-column"></i>
                     <span>Graphiques</span></a>
@@ -81,42 +89,48 @@
 
             <!-- Heading -->
             <div class="sidebar-heading">
-                Modèle
+                Modélisation
             </div>
 
-            <li class="nav-item">
+            <li class="nav-item {% active_link 'model_diagram' %}">
                 <a class="nav-link" href="{% url 'model_diagram' %}">
-                    <i class="fas fa-project-diagram"></i>
+                    <i class="fa-solid fa-diagram-project"></i>
                     <span>Schéma</span></a>
             </li>
 
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'comparison' %}">
+            <li class="nav-item {% active_link 'responses' %}">
+                <a class="nav-link" href="{% url 'responses' %}">
                     <i class="fa-solid fa-screwdriver-wrench"></i>
-                    <span>Construction de réponses</span></a>
+                    <span>Réponses</span></a>
             </li>
 
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'comparison' %}">
-                    <i class="fa-solid fa-question"></i>
-                    <span>Construction de scnénarios</span></a>
+            <li class="nav-item {% active_link 'scenarios' %}">
+                <a class="nav-link" href="{% url 'scenarios' %}">
+                    <i class="fa-solid fa-arrows-split-up-and-left fa-flip-horizontal"></i>
+                    <span>Scnénarios</span></a>
             </li>
 
-            <li class="nav-item">
+            <hr class="sidebar-divider">
+
+            <div class="sidebar-heading">
+                Outils
+            </div>
+
+            <li class="nav-item {% active_link 'forecasts' %}">
                 <a class="nav-link" href="{% url 'forecasts' %}">
                     <i class="fa-solid fa-arrow-trend-up"></i>
                     <span>Prévisions</span></a>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item {% active_link 'termsoftrade' %}">
                 <a class="nav-link" href="{% url 'termsoftrade' %}">
-                    <i class="fas fa-balance-scale"></i>
+                    <i class="fa-solid fa-balance-scale"></i>
                     <span>Termes d'échange</span></a>
             </li>
 
-            <li class="nav-item">
+            <li class="nav-item {% active_link 'equation_bank' %}">
                 <a class="nav-link" href="{% url 'equation_bank' %}">
-                    <i class="fas fa-equals"></i>
+                    <i class="fa-solid fa-plus-minus"></i>
                     <span>Banque d'équations</span></a>
             </li>
 
@@ -126,9 +140,9 @@
                 Gestion d'information
             </div>
 
-            <li class="nav-item">
+            <li class="nav-item {% active_link 'sources' %}">
                 <a class="nav-link" href="{% url 'sources' %}">
-                    <i class="fas fa-equals"></i>
+                    <i class="fas fa-book"></i>
                     <span>Sources</span></a>
             </li>
 

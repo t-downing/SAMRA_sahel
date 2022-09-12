@@ -2,6 +2,11 @@
 
 {% block content %}
 
+<h1 class="mb-2 mt-4 text-gray-800">Résultats : graphiques</h1>
+<p class="mb-4">Pour modifier les réponses ou en voir en détail la composition des réponses, naviguez à
+    <a href="{% url 'responses' %}">Construction de réponses</a>
+</p>
+
 {% load plotly_dash %}
 {% plotly_app name="scenarioresponse" ratio=1.2 %}
 

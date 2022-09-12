@@ -45,8 +45,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # mine
     "sahel",
+    # third party
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
+    "active_link",
 ]
 
 MIDDLEWARE = [

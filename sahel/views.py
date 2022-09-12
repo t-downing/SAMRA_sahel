@@ -6,8 +6,10 @@ from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenari
     dash_termsoftrade, dash_response_list
 
 
-class IndexView(TemplateView):
+class IndexView(LoginRequiredMixin, TemplateView):
     template_name = "sahel/index.html"
+    login_url = '/accounts/login/'
+    redirect_field_name = 'next'
 
 
 class ModelDiagramView(LoginRequiredMixin, TemplateView):
@@ -16,8 +18,14 @@ class ModelDiagramView(LoginRequiredMixin, TemplateView):
     redirect_field_name = 'next'
 
 
-class ComparisonView(LoginRequiredMixin, TemplateView):
-    template_name = "sahel/comparison.html"
+class ResponseView(LoginRequiredMixin, TemplateView):
+    template_name = "sahel/responses.html"
+    login_url = '/accounts/login/'
+    redirect_field_name = 'next'
+
+
+class ScenarioView(LoginRequiredMixin, TemplateView):
+    template_name = "sahel/responses.html"
     login_url = '/accounts/login/'
     redirect_field_name = 'next'
 
