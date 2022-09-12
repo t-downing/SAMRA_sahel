@@ -158,6 +158,12 @@
                     <span>Admin Portal</span></a>
             </li>
 
+            <li class="nav-item {% active_link 'mapping2modeling' %}">
+                <a class="nav-link" href="{% url 'mapping2modeling' %}">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>BETA mapping2modeling</span></a>
+            </li>
+
             <hr class="sidebar-divider d-none d-md-block">
 
             <!-- Sidebar Toggler (Sidebar) -->
@@ -245,15 +251,6 @@
     <!-- Page level custom scripts -->
     <script src="{% static 'js/demo/chart-area-demo.js' %}"></script>
     <script src="{% static 'js/demo/chart-pie-demo.js' %}"></script>
-
-<script>
-    $(document).ready(function(){
-      $('ul li a').click(function(){
-        $('li a').removeClass("active");
-        $(this).addClass("active");
-    });
-    });
-</script>
 
 </body>
 

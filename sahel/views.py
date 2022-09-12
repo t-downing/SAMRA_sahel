@@ -65,3 +65,9 @@ class SourceListView(LoginRequiredMixin, ListView):
     model = Source
     login_url = '/accounts/login/'
     redirect_field_name = 'next'
+
+
+class Mapping2Modeling(LoginRequiredMixin, TemplateView):
+    template_name = "sahel/mapping2modeling.html"
+    login_url = '/accounts/login/'
+    redirect_field_name = 'next'
