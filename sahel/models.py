@@ -1,7 +1,32 @@
 from django.db import models
 
 
-class Variable(models.Model):
+class Node(models.Model):
+    label = models.CharField(max_length=200)
+    date_created = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        return f"{self.label}; pk: {self.pk}"
+
+
+class Element(Node):
+    class Meta:
+        abstract = True
+
+
+class SituationalAnalysis(Element):
+    pass
+
+
+class TheoryOfChange(Element):
+    pass
+
+
+class Variable(Node):
     SD_TYPES = (
         ("Stock", "Stock"),
         ("Flow", "Flow"),
@@ -46,8 +71,8 @@ class Variable(models.Model):
         ("CHANGE", "change"),
         ("%CHANGE", "% change"),
     )
-    label = models.CharField(max_length=200)
-    date_created = models.DateTimeField(auto_now_add=True)
+    situational_analysis = models.ForeignKey("situationalanalysis", related_name="variables", null=True, blank=True,
+                                             on_delete=models.SET_NULL)
     x_pos = models.FloatField(null=True, blank=True)
     y_pos = models.FloatField(null=True, blank=True)
     equation = models.CharField(max_length=500, null=True, blank=True)
@@ -76,10 +101,6 @@ class Variable(models.Model):
     kcal_per_kg = models.IntegerField(null=True, blank=True)
     model_output_variable = models.BooleanField(default=True)
     stock_initial_value = models.FloatField(null=True, blank=True)
-    description = models.TextField(null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.label}; pk: {self.pk}"
 
     class Meta:
         ordering = ["-date_created"]

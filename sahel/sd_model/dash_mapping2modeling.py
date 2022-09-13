@@ -328,18 +328,18 @@ def right_sidebar(node):
 
     # VARIABLE
     elif "variable" in classes:
-        element = Variable.objects.get(pk=nodedata.get("id"))
-        children.append(html.H4(className="mb-2 h4", children=element.label))
-        children.append(html.H5(className="mb-2 font-italic text-secondary font-weight-light h5", children="VARIABLE"))
+        variable = Variable.objects.get(pk=nodedata.get("id"))
+        children.append(html.H4(className="mb-2 h4", children=variable.label))
+        children.append(html.H6(className="mb-2 font-italic text-secondary font-weight-light h6",
+                                children=f"VARIABLE | {variable.get_sd_type_display()}"))
 
         # graph
         fig = go.Figure(layout=go.Layout(template="simple_white", margin=go.layout.Margin(l=0, r=0, b=0, t=0)))
         fig.update_xaxes(title_text="Date")
 
         df = pd.DataFrame(SimulatedDataPoint.objects
-                          .filter(element=element, scenario_id=scenario_pk, responseoption_id=responseoption_pk)
+                          .filter(element=variable, scenario_id=scenario_pk, responseoption_id=responseoption_pk)
                           .values("date", "value"))
-        print(df)
         if not df.empty:
             fig.add_trace(go.Scatter(
                 x=df["date"],
@@ -348,9 +348,9 @@ def right_sidebar(node):
             ))
 
         if admin1 is None:
-            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element).values())
+            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable).values())
         else:
-            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element, admin1=admin1).values())
+            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable, admin1=admin1).values())
 
         if not df.empty:
             source_ids = df["source_id"].drop_duplicates()
@@ -358,7 +358,7 @@ def right_sidebar(node):
                 try:
                     source = Source.objects.get(pk=source_id)
                 except Source.DoesNotExist:
-                    print(f"no source for datapoint in {element}")
+                    print(f"no source for datapoint in {variable}")
                     continue
                 dff = df[df["source_id"] == source_id].groupby("date").mean().reset_index()
                 fig.add_trace(go.Scatter(
@@ -366,18 +366,18 @@ def right_sidebar(node):
                     y=dff["value"],
                     name=source.title,
                 ))
-        unit_append = " / mois" if element.sd_type == "Pulse Input" else ""
+        unit_append = " / mois" if variable.sd_type == "Pulse Input" else ""
         fig.update_layout(
             legend=dict(yanchor="bottom", x=0, y=1),
             showlegend=True,
-            yaxis=dict(title=element.unit + unit_append),
+            yaxis=dict(title=variable.unit + unit_append),
         )
         fig_div = dcc.Graph(figure=fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2")
         children.append(fig_div)
 
-        if element.sd_type in ["Flow", "Variable"]:
+        if variable.sd_type in ["Flow", "Variable"]:
             # connections
-            upstream_elements = Variable.objects.filter(downstream_connections__to_element=element)
+            upstream_elements = Variable.objects.filter(downstream_connections__to_element=variable)
             upstream_list = dbc.ListGroup(
                 [
                     dbc.ListGroupItem(className="p-1 justify-content-between", children=
@@ -386,7 +386,7 @@ def right_sidebar(node):
                                 html.P(style={"font-size": "small"}, children=f"{upstream_element.label} _E{upstream_element.pk}_"),
                                 dbc.Button("X",
                                            id={"type": "element-detail-conn-del",
-                                               "index": f"{upstream_element.pk}-to-{element.pk}"},
+                                               "index": f"{upstream_element.pk}-to-{variable.pk}"},
                                            size="sm",
                                            color="danger",
                                            className="p-1",
@@ -401,7 +401,7 @@ def right_sidebar(node):
                 style={"height": "150px", "overflow-y": "scroll"}
             )
 
-            dropdown_options = Variable.objects.exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
+            dropdown_options = Variable.objects.exclude(downstream_connections__to_element=variable).exclude(pk=variable.pk)
             dropdown_list = [
                 {"label": possible_element.label, "value": possible_element.label}
                 for possible_element in dropdown_options
@@ -423,7 +423,7 @@ def right_sidebar(node):
             children.append(upstream_card)
 
             # equation
-            equation_text = element.equation
+            equation_text = variable.equation
             if equation_text is not None:
                 print(f"equation is {equation_text}")
                 for key_element in Variable.objects.all():
@@ -437,7 +437,7 @@ def right_sidebar(node):
                     [
                         html.P(equation_text, id="element-detail-eq-text", style={"font-size": "small", "height": "50px", "overflow-y": "scroll"}),
                         dbc.InputGroup([
-                            dbc.Input(value=element.equation, id="element-detail-eq-input", bs_size="sm"),
+                            dbc.Input(value=variable.equation, id="element-detail-eq-input", bs_size="sm"),
                             dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-eq-submit", size="sm"), addon_type="append"),
                         ]),
 
@@ -446,7 +446,7 @@ def right_sidebar(node):
             ])
             children.append(equation_card)
 
-        elif element.sd_type == "Stock":
+        elif variable.sd_type == "Stock":
             # inflows
             inflows_card = dbc.Card(className="mb-4", children=[
                 dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux intrants"),
@@ -457,10 +457,10 @@ def right_sidebar(node):
                                 inflow.label,
                                 dbc.Button("X",
                                            id={"type": "element-detail-inflow-del",
-                                               "index": f"{element.pk}-inflow-{inflow.pk}"},
+                                               "index": f"{variable.pk}-inflow-{inflow.pk}"},
                                            size="sm", color="danger", className="p-1", outline=True)
                             ])
-                            for inflow in element.inflows.all()
+                            for inflow in variable.inflows.all()
                         ],
                         flush=True,
                         style={"height": "100px", "overflow-y": "scroll"}
@@ -470,7 +470,7 @@ def right_sidebar(node):
                                    options=[
                                         {"label": potential_inflow.label, "value": potential_inflow.pk}
                                         for potential_inflow in Variable.objects.filter(sd_type="Flow")
-                                            .exclude(sd_sink__isnull=False).exclude(sd_source=element)
+                                            .exclude(sd_sink__isnull=False).exclude(sd_source=variable)
                                     ]),
                         dbc.Button("Saisir", id="element-detail-inflow-submit", size="sm")
                     ])
@@ -487,10 +487,10 @@ def right_sidebar(node):
                                 outflow.label,
                                 dbc.Button("X",
                                            id={"type": "element-detail-outflow-del",
-                                               "index": f"{element.pk}-outflow-{outflow.pk}"},
+                                               "index": f"{variable.pk}-outflow-{outflow.pk}"},
                                            size="sm", color="danger", className="p-1", outline=True)
                             ])
-                            for outflow in element.outflows.all()
+                            for outflow in variable.outflows.all()
                         ],
                         flush=True,
                         style={"height": "100px", "overflow-y": "scroll"}
@@ -499,7 +499,7 @@ def right_sidebar(node):
                         dbc.Select(id="element-detail-outflow-input", bs_size="sm", placeholder="Ajouter un flux sortant",
                                    options=[
                                        {"label": potential_outflow.label, "value": potential_outflow.pk}
-                                       for potential_outflow in Variable.objects.filter(sd_type="Flow").exclude(sd_sink=element).exclude(sd_source=element)
+                                       for potential_outflow in Variable.objects.filter(sd_type="Flow").exclude(sd_sink=variable).exclude(sd_source=variable)
                                    ]),
                         dbc.Button("Saisir", id="element-detail-outflow-submit", size="sm")
                     ])
@@ -507,9 +507,9 @@ def right_sidebar(node):
             ])
             children.append(outflows_card)
 
-        elif element.sd_type == "Household Constant":
+        elif variable.sd_type == "Household Constant":
             try:
-                value = element.householdconstantvalues.get().value
+                value = variable.householdconstantvalues.get().value
             except HouseholdConstantValue.DoesNotExist:
                 value = None
             householdvalue_card = dbc.InputGroup([
