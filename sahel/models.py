@@ -1,4 +1,5 @@
 from django.db import models
+from model_utils.managers import InheritanceManager
 
 
 class Node(models.Model):
@@ -14,12 +15,12 @@ class Node(models.Model):
 
 
 class Element(Node):
-    class Meta:
-        abstract = True
+    objects = InheritanceManager()
 
 
 class SituationalAnalysis(Element):
-    pass
+    class Meta:
+        verbose_name = "Analyse de situation"
 
 
 class TheoryOfChange(Element):
@@ -71,8 +72,7 @@ class Variable(Node):
         ("CHANGE", "change"),
         ("%CHANGE", "% change"),
     )
-    situational_analysis = models.ForeignKey("situationalanalysis", related_name="variables", null=True, blank=True,
-                                             on_delete=models.SET_NULL)
+    element = models.ForeignKey("element", related_name="variables", null=True, blank=True, on_delete=models.SET_NULL)
     x_pos = models.FloatField(null=True, blank=True)
     y_pos = models.FloatField(null=True, blank=True)
     equation = models.CharField(max_length=500, null=True, blank=True)

@@ -5,7 +5,7 @@ from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import Variable, Connection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
-    SimulatedDataPoint, ForecastedDataPoint, Source
+    SimulatedDataPoint, ForecastedDataPoint, Source, Element
 from .model_operations import timer
 import time
 import pandas as pd
@@ -137,21 +137,43 @@ app.layout = html.Div(children=[
             "width": "100%",
             "zIndex": "-1",
         },
-        children=[
-            cyto.Cytoscape(
-                id="cyto",
-                layout={"name": "preset"},
-                style={"height": "1000px", "background-color": "#f8f9fc"},
-                stylesheet=stylesheet,
-                minZoom=0.2,
-                maxZoom=2.0,
-                boxSelectionEnabled=True,
-                autoRefreshLayout=True,
-                responsive=True
-            ),
-        ]
+        children=cyto.Cytoscape(
+            id="cyto",
+            layout={"name": "preset", "fit": True},
+            style={"height": "1000px", "background-color": "#f8f9fc"},
+            stylesheet=stylesheet,
+            minZoom=0.2,
+            maxZoom=2.0,
+            boxSelectionEnabled=True,
+            autoRefreshLayout=True,
+            responsive=True,
+        ),
     ),
+
+    html.Div(id="model-initialized", children="no", hidden=True)
 ])
+
+
+# @app.callback(
+#     Output("selected-node-id", "children"),
+#     Input("cyto", "selectedNodeData"),
+#     Input({"type": "select-variable", "index": ALL}, "n_clicks"),
+#     State({"type": "select-variable", "index": ALL}, "id"),
+# )
+# def actually_select_node(selectednodedata, n_clickss, ids):
+#     # had to actually write this because Dash Cytoscape selectednodedata doesn't work correctly
+#     if not selectednodedata:
+#         # if nothing is selected, return nothing
+#         return None
+#     if all(n_clicks is None for n_clicks in n_clickss):
+#         # if nothing has been clicked, return default selected
+#         return selectednodedata[-1].get("id")
+#     for n_clicks, id, in zip(n_clickss, ids):
+#         if n_clicks is not None:
+#             selected_pk = id.get("index")
+#             print(f"you just clicked on variable {selected_pk}")
+#             return selected_pk
+
 
 @app.callback(
     Output("cyto", "generateImage"),
@@ -218,47 +240,85 @@ def show_layers(layers):
 
 @app.callback(
     Output("cyto", "elements"),
-    Input("init", "children"),
+    Input({"type": "select-variable", "index": ALL}, "n_clicks"),
+    State({"type": "select-variable", "index": ALL}, "id"),
+    State("cyto", "elements"),
 )
 @timer
-def redraw_model(_):
+def draw_model(n_clickss, ids, cyto_elements):
+    print(n_clickss)
+    print(ids)
+    # if map has not yet been plotted, always update
+    if cyto_elements is not None:
+        # if no clicks OR nothing clickable, don't update
+        if all(n_clicks is None for n_clicks in n_clickss) or not n_clickss:
+            raise PreventUpdate
+
+    selected_pk = None
+    for n_clicks, id, in zip(n_clickss, ids):
+        if n_clicks is not None:
+            selected_pk = id.get("index")
+
     start = time.time()
-    elements = Variable.objects.all().values()
+    variables = Variable.objects.all().values()
     nodes = []
-    for element in elements:
+    for variable in variables:
         color = "white"
         usable = True
-        if element.get("sd_type") in ["Variable", "Flow"] and element.get("equation") is None:
+        if variable.get("sd_type") in ["Variable", "Flow"] and variable.get("equation") is None:
             usable = False
+
+        parent = None
+        if variable.get("element_id") is not None:
+            parent = f"element_{variable.get('element_id')}"
+        elif variable.get("element_group_id") is not None:
+            parent = f"group_{variable.get('element_group_id')}"
+
         nodes.append(
-            {"data": {"id": element.get("id"),
-                      "label": element.get("label"),
-                      "sd_type": element.get("sd_type"),
+            {"data": {"id": variable.get("id"),
+                      "label": variable.get("label"),
+                      "sd_type": variable.get("sd_type"),
                       "usable": usable,
-                      "parent": None if element.get("element_group_id") is None else f"group_{element.get('element_group_id')}",
-                      "color": color},
-             "position": {"x": element.get("x_pos"), "y": element.get("y_pos")},
+                      "parent": parent,
+                      "color": color,
+                      "hierarchy": "variable"},
+             "selected": str(variable.get("id")) == selected_pk,
+             "position": {"x": variable.get("x_pos"), "y": variable.get("y_pos")},
              "classes": "variable"}
         )
+
     print(f"elements took {time.time() - start}")
     start = time.time()
+
+    elements = Element.objects.all().values()
+    element_nodes = [
+        {"data": {"id": f"element_{element.get('id')}",
+                  "label": element.get("label"),
+                  "hierarchy": "element"},
+         "classes": "element",
+         "selected": f"element_{element.get('id')}" == selected_pk}
+        for element in elements
+    ]
+    nodes.extend(element_nodes)
 
     element_groups = ElementGroup.objects.all().values()
     group_nodes = [
         {"data": {"id": f"group_{element_group.get('id')}",
                   "label": element_group.get("label"),
-                  "hierarchy": "Group"},
+                  "hierarchy": "group"},
          "classes": "group",
+         "selected": f"group_{element_group.get('id')}" == selected_pk,
          "grabbable": False,
          "selectable": True,
          "pannable": True}
         for element_group in element_groups
     ]
+    nodes.extend(group_nodes)
     print(f"groups took {time.time() - start}")
     start = time.time()
 
     connections = Connection.objects.all().select_related("to_element")
-    edges=[]
+    edges = []
     eq_time = 0
     append_time = 0
     eq_read_time = 0
@@ -302,32 +362,58 @@ def redraw_model(_):
             )
     print(f"stocks took {time.time() - start}")
     start = time.time()
-    return nodes + group_nodes + edges + flow_edges
+    return nodes + edges + flow_edges
 
 
 @app.callback(
     Output("right-sidebar", "children"),
-    Input("cyto", "tapNode"),
+    Input("cyto", "selectedNodeData"),
+    State("cyto", "tapNode"),
 )
-def right_sidebar(node):
+def right_sidebar(selectednodedata, node):
     # INIT
+    print(f"selectednotedata={selectednodedata}")
     children = []
-    if node is None:
+    if node is None or not selectednodedata:
         return children
-    nodedata = node.get("data")
-    classes = node.get("classes")
+    nodedata = selectednodedata[-1]
     scenario_pk= "1"
     responseoption_pk = "1"
     admin1 = None
 
     # GROUP
-    if "group" in classes:
+    if nodedata.get("hierarchy") == "group":
         elementgroup = ElementGroup.objects.get(pk=nodedata.get("id").removeprefix("group_"))
         children.append(html.H4(className="mb-2 h4", children=elementgroup.label))
-        children.append(html.H5(className="mb-2 font-italic text-secondary font-weight-light h5", children="GROUPE"))
+        children.append(html.H6(className="mb-2 font-italic text-secondary font-weight-light h6", children="GROUPE"))
+
+    # ELEMENT
+    elif nodedata.get("hierarchy") == "element":
+        element = Element.objects.get_subclass(pk=nodedata.get("id").removeprefix("element_"))
+
+        # label and type
+        children.append(html.H4(className="mb-2 h4", children=element.label))
+        children.append(html.H6(className="mb-3 font-italic text-secondary font-weight-light h6",
+                                children=f"ÉLÉMENT | {element.__class__._meta.verbose_name}"))
+
+        # variables and indicators
+        children.append(html.P(className="mb-0 font-weight-bold", children="Variables / Indicateurs"))
+        children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+        children.extend([
+            dbc.Button(
+                id={"type": "select-variable", "index": str(variable.pk)},
+                className="mb-1", outline=True, color="secondary", size="sm", children=variable.label
+            )
+            for variable in element.variables.all()
+        ])
+
+        # EBs
+        children.append(html.P(className="mt-4 mb-0 font-weight-bold", children="Informations Qualitatives"))
+        children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+
 
     # VARIABLE
-    elif "variable" in classes:
+    elif nodedata.get("hierarchy") == "variable":
         variable = Variable.objects.get(pk=nodedata.get("id"))
         children.append(html.H4(className="mb-2 h4", children=variable.label))
         children.append(html.H6(className="mb-2 font-italic text-secondary font-weight-light h6",
@@ -425,10 +511,8 @@ def right_sidebar(node):
             # equation
             equation_text = variable.equation
             if equation_text is not None:
-                print(f"equation is {equation_text}")
                 for key_element in Variable.objects.all():
                     equation_text = equation_text.replace(f"_E{key_element.pk}_", key_element.label)
-                print(f"after swap equation is {equation_text}")
                 equation_text = f" = {equation_text}"
 
             equation_card = dbc.Card([
