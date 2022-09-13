@@ -2,13 +2,13 @@ import pandas as pd
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
-from ..models import Element, Source, ForecastedDataPoint
+from ..models import Variable, Source, ForecastedDataPoint
 
 
 def forecast_element(element_pk, sarima_params=None):
     use_ets = True
     forecast_years = 2
-    element = Element.objects.get(pk=element_pk)
+    element = Variable.objects.get(pk=element_pk)
     df = pd.DataFrame(element.measureddatapoints.all().values())
 
     # determine correct periodicity

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
-from ..models import Element, SimulatedDataPoint, MeasuredDataPoint, ConstantValue, ResponseOption, \
+from ..models import Variable, SimulatedDataPoint, MeasuredDataPoint, ConstantValue, ResponseOption, \
     SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue
 from datetime import datetime, date
 import time, functools, warnings
@@ -21,7 +21,7 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     zero_flow = model.flow("Zero Flow")
     zero_flow.equation = 0.0
 
-    elements = Element.objects.filter(
+    elements = Variable.objects.filter(
         Q(sd_type="Variable", equation__isnull=False) |
         Q(sd_type="Flow", equation__isnull=False) |
         Q(sd_type="Stock") |
@@ -293,7 +293,7 @@ def read_results(element_pk, scenario_pks, response_pks, agg_value: str = None):
     if baseline_response_pk not in response_pks:
         response_pks_filter.append(baseline_response_pk)
 
-    element = Element.objects.get(pk=element_pk)
+    element = Variable.objects.get(pk=element_pk)
     if agg_value is None:
         agg_value = element.aggregate_by
 

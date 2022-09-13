@@ -7,7 +7,7 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Element, Scenario, MeasuredDataPoint
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario, MeasuredDataPoint
 from sahel.sd_model.model_operations import run_model, read_results
 
 import plotly.graph_objects as go
@@ -102,7 +102,7 @@ def populate_initial(_, style_data_conditional):
     results = pd.DataFrame()
 
     # read cost value
-    element = Element.objects.get(pk=cost_element_pk)
+    element = Variable.objects.get(pk=cost_element_pk)
     df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(
         element_pk=cost_element_pk, scenario_pks=scenario_pks, response_pks=response_pks,
     )
@@ -120,7 +120,7 @@ def populate_initial(_, style_data_conditional):
 
     # read all element values
     for element_pk in element_pks:
-        element = Element.objects.get(pk=element_pk)
+        element = Variable.objects.get(pk=element_pk)
 
         # read results for element
         df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(

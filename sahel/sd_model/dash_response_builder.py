@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Element, ConstantValue, PulseValue
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, ConstantValue, PulseValue
 
 from sahel.sd_model.model_operations import run_model, timer
 
@@ -86,7 +86,7 @@ def create_response(_, value):
 def create_constantvalue(n_clicks, element_pk, value, date, response_pk):
     if None in [n_clicks, element_pk, value, response_pk]:
         raise PreventUpdate
-    element = Element.objects.get(pk=element_pk)
+    element = Variable.objects.get(pk=element_pk)
     if element.sd_type == "Constant":
         ConstantValue(responseoption_id=response_pk, element_id=element_pk, value=value).save()
     elif element.sd_type == "Pulse Input":
@@ -210,7 +210,7 @@ def build_response(response_pk, *_):
     table_rows.append(html.Tr([
         html.Td(dcc.Dropdown(id="constantvalue-element-input", placeholder="Ajouter un élément",
                              options=[{"label": element.label, "value": element.pk}
-                                      for element in Element.objects.filter(sd_type__in=["Constant", "Pulse Input"])])),
+                                      for element in Variable.objects.filter(sd_type__in=["Constant", "Pulse Input"])])),
         html.Td(dbc.Input(id="constantvalue-value-input")),
         html.Td(id="constantvalue-unit-input"),
         html.Td(dcc.DatePickerSingle(id="constantvalue-date-input")),
@@ -227,5 +227,5 @@ def build_response(response_pk, *_):
 def show_constantvalue_unit(element_pk):
     if element_pk is None:
         raise PreventUpdate
-    return Element.objects.get(pk=element_pk).unit
+    return Variable.objects.get(pk=element_pk).unit
 

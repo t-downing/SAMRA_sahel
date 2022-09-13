@@ -6,7 +6,7 @@ from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Element, Scenario
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario
 from sahel.sd_model.model_operations import run_model, timer, read_results
 
 import plotly.graph_objects as go
@@ -78,9 +78,9 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
 def populate_initial(_):
     included_types=["Stock", "Flow", "Variable"]
     element_options = [{"label": element.get("label"), "value": element.get("id")}
-                       for element in Element.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types).values("id", "label")]
+                       for element in Variable.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types).values("id", "label")]
     element_value = 77
-    agg_options = [{"label": agg[1], "value": agg[0]} for agg in Element.AGG_OPTIONS]
+    agg_options = [{"label": agg[1], "value": agg[0]} for agg in Variable.AGG_OPTIONS]
     scenario_options = [{"label": scenario.get("name"), "value": scenario.get("id")}
                         for scenario in Scenario.objects.all().order_by("id").values("id", "name")]
     scenario_value = [scenario.get("value") for scenario in scenario_options]
@@ -96,7 +96,7 @@ def populate_initial(_):
 )
 @timer
 def update_default_agg(element_pk):
-    return Element.objects.get(pk=element_pk).aggregate_by
+    return Variable.objects.get(pk=element_pk).aggregate_by
 
 
 @app.callback(
@@ -140,7 +140,7 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
                       for response_pk, color in zip(response_pks[1:], itertools.cycle(DEFAULT_PLOTLY_COLORS))}
     response2color[baseline_response_pk] = "black"
     scenario2dash = {scenario_pk: dash for scenario_pk, dash in zip(scenario_pks, DASHES)}
-    element = Element.objects.get(pk=element_pk)
+    element = Variable.objects.get(pk=element_pk)
 
     # read results
     df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(

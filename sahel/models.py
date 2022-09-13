@@ -1,7 +1,7 @@
 from django.db import models
 
 
-class Element(models.Model):
+class Variable(models.Model):
     SD_TYPES = (
         ("Stock", "Stock"),
         ("Flow", "Flow"),
@@ -86,8 +86,8 @@ class Element(models.Model):
 
 
 class Connection(models.Model):
-    from_element = models.ForeignKey("element", related_name="downstream_connections", on_delete=models.CASCADE)
-    to_element = models.ForeignKey("element", related_name="upstream_connections", on_delete=models.CASCADE)
+    from_element = models.ForeignKey("variable", related_name="downstream_connections", on_delete=models.CASCADE)
+    to_element = models.ForeignKey("variable", related_name="upstream_connections", on_delete=models.CASCADE)
     date_created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -135,7 +135,7 @@ class RegularDataset(models.Model):
 class MeasuredDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField(null=True)
-    element = models.ForeignKey("element", related_name="measureddatapoints", on_delete=models.CASCADE)
+    element = models.ForeignKey("variable", related_name="measureddatapoints", on_delete=models.CASCADE)
     source = models.ForeignKey("source", related_name="measureddatapoints", null=True, on_delete=models.SET_NULL)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
@@ -148,7 +148,7 @@ class MeasuredDataPoint(models.Model):
 class SimulatedDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField(null=True)
-    element = models.ForeignKey("element", related_name="simulateddatapoints", on_delete=models.CASCADE)
+    element = models.ForeignKey("variable", related_name="simulateddatapoints", on_delete=models.CASCADE)
     scenario = models.ForeignKey("scenario", related_name="simulateddatapoints", null=True, on_delete=models.CASCADE)
     responseoption = models.ForeignKey("responseoption", related_name="simulateddatapoints", null=True, on_delete=models.CASCADE)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
@@ -161,7 +161,7 @@ class SimulatedDataPoint(models.Model):
 class ForecastedDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField()
-    element = models.ForeignKey("element", related_name="forecasteddatapoints", on_delete=models.CASCADE)
+    element = models.ForeignKey("variable", related_name="forecasteddatapoints", on_delete=models.CASCADE)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
 
@@ -172,7 +172,7 @@ class ForecastedDataPoint(models.Model):
 class SeasonalInputDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField()
-    element = models.ForeignKey("element", related_name="seasonalinputdatapoints", on_delete=models.CASCADE)
+    element = models.ForeignKey("variable", related_name="seasonalinputdatapoints", on_delete=models.CASCADE)
 
     def __str__(self):
         return f"Element: {self.element}; Date: {self.date}; Seasonal Value: {self.value}"
@@ -195,7 +195,7 @@ class Scenario(models.Model):
 
 
 class ConstantValue(models.Model):
-    element = models.ForeignKey("element", related_name="constantvalues", on_delete=models.CASCADE)
+    element = models.ForeignKey("variable", related_name="constantvalues", on_delete=models.CASCADE)
     responseoption = models.ForeignKey("responseoption", related_name="constantvalues", on_delete=models.CASCADE)
     value = models.FloatField()
 
@@ -204,7 +204,7 @@ class ConstantValue(models.Model):
 
 
 class ScenarioConstantValue(models.Model):
-    element = models.ForeignKey("element", related_name="scenarioconstantvalues", on_delete=models.CASCADE)
+    element = models.ForeignKey("variable", related_name="scenarioconstantvalues", on_delete=models.CASCADE)
     scenario = models.ForeignKey("scenario", related_name="scenarioconstantvalues", on_delete=models.CASCADE)
     value = models.FloatField()
 
@@ -213,7 +213,7 @@ class ScenarioConstantValue(models.Model):
 
 
 class HouseholdConstantValue(models.Model):
-    element = models.ForeignKey("element", related_name="householdconstantvalues", on_delete=models.CASCADE)
+    element = models.ForeignKey("variable", related_name="householdconstantvalues", on_delete=models.CASCADE)
     value = models.FloatField(null=True)
 
     def __str__(self):
@@ -221,7 +221,7 @@ class HouseholdConstantValue(models.Model):
 
 
 class PulseValue(models.Model):
-    element = models.ForeignKey("element", related_name="pulsevalues", on_delete=models.CASCADE)
+    element = models.ForeignKey("variable", related_name="pulsevalues", on_delete=models.CASCADE)
     responseoption = models.ForeignKey("responseoption", related_name="pulsevalues", on_delete=models.CASCADE)
     value = models.FloatField()
     startdate = models.DateField()

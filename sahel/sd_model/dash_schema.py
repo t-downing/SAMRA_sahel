@@ -7,7 +7,7 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_cytoscape as cyto
-from sahel.models import Element, SimulatedDataPoint, Connection, ElementGroup, \
+from sahel.models import Variable, SimulatedDataPoint, Connection, ElementGroup, \
     MeasuredDataPoint, Source, ResponseOption, ConstantValue, HouseholdConstantValue, Scenario
 import plotly.graph_objects as go
 from sahel.sd_model.model_operations import run_model, timer
@@ -245,12 +245,11 @@ def populate_initial(_):
     response_options = [{"label": responseoption.name, "value": responseoption.pk}
                         for responseoption in ResponseOption.objects.all()]
     response_value = 1
-    sdtype_options = [{"label": sd_type[1], "value": sd_type[0]} for sd_type in Element.SD_TYPES]
-    unit_options = [{"label": unit[1], "value": unit[0]} for unit in Element.UNIT_OPTIONS]
+    sdtype_options = [{"label": sd_type[1], "value": sd_type[0]} for sd_type in Variable.SD_TYPES]
+    unit_options = [{"label": unit[1], "value": unit[0]} for unit in Variable.UNIT_OPTIONS]
     group_options = [{"label": group.label, "value": group.pk} for group in ElementGroup.objects.all()]
     return scenario_options, scenario_value, response_options, response_value, sdtype_options, unit_options, \
            sdtype_options, group_options
-
 
 
 @app.callback(
@@ -333,7 +332,7 @@ def create_element(_, label, sd_type, unit):
         return "need type", label, sd_type, unit
     if unit =="":
         return "need unit", label, sd_type, unit
-    Element(label=label, sd_type=sd_type, unit=unit).save()
+    Variable(label=label, sd_type=sd_type, unit=unit).save()
     return f"created element '{label}'", "", "", ""
 
 
@@ -362,7 +361,7 @@ def delete_inflow(n_clicks, ids):
         if n_click is not None:
             print(id)
             pks = id.get("index").split("-inflow-")
-            flow = Element.objects.get(pk=pks[1])
+            flow = Variable.objects.get(pk=pks[1])
             flow.sd_sink = None
             flow.save()
             return f"deleted sink of {flow}"
@@ -379,7 +378,7 @@ def delete_outflow(n_clicks, ids):
         if n_click is not None:
             print(id)
             pks = id.get("index").split("-outflow-")
-            flow = Element.objects.get(pk=pks[1])
+            flow = Variable.objects.get(pk=pks[1])
             flow.sd_source = None
             flow.save()
             return f"deleted sink of {flow}"
@@ -397,12 +396,12 @@ def delete_outflow(n_clicks, ids):
 def submit_equation(n_clicks, nodedata, value):
     if nodedata is None or value is None or n_clicks is None:
         raise PreventUpdate
-    element = Element.objects.get(pk=nodedata.get("id"))
+    element = Variable.objects.get(pk=nodedata.get("id"))
     equation_text = value
     element.equation = value
     element_pks = re.findall(r"_E(.*?)_", equation_text)
     for element_pk in element_pks:
-        upstream_element = Element.objects.get(pk=element_pk)
+        upstream_element = Variable.objects.get(pk=element_pk)
         # if not upstream_element.equation_valid or upstream_element.equation is None:
         #     print(f"problem with {upstream_element}")
         equation_text = equation_text.replace(f"_E{element_pk}_", upstream_element.label)
@@ -436,8 +435,8 @@ def submit_householdconstantvalue(n_clicks, value, nodedata):
 def submit_connection(n_clicks, nodedata, value):
     if value is None:
         return "nothing selected"
-    element = Element.objects.get(pk=nodedata.get("id"))
-    upstream_element = Element.objects.get(label=value)
+    element = Variable.objects.get(pk=nodedata.get("id"))
+    upstream_element = Variable.objects.get(label=value)
     try:
         Connection(from_element=upstream_element, to_element=element).save()
     except:
@@ -454,8 +453,8 @@ def submit_connection(n_clicks, nodedata, value):
 def submit_inflow(_, nodedata, value):
     if value is None:
         return "no inflow selected"
-    element = Element.objects.get(pk=nodedata.get("id"))
-    inflow = Element.objects.get(pk=value)
+    element = Variable.objects.get(pk=nodedata.get("id"))
+    inflow = Variable.objects.get(pk=value)
     inflow.sd_sink = element
     inflow.save()
     return f"added {inflow} as inflow to {element}"
@@ -470,8 +469,8 @@ def submit_inflow(_, nodedata, value):
 def submit_outflow(_, nodedata, value):
     if value is None:
         return "no outflow selected"
-    element = Element.objects.get(pk=nodedata.get("id"))
-    outflow = Element.objects.get(pk=value)
+    element = Variable.objects.get(pk=nodedata.get("id"))
+    outflow = Variable.objects.get(pk=value)
     outflow.sd_source = element
     outflow.save()
     return f"added {outflow} as inflow to {element}"
@@ -506,7 +505,7 @@ def element_detail_title(nodedata, layout):
         raise PreventUpdate
     if nodedata.get("hierarchy") == "Group":
         return None, None, None
-    element = Element.objects.get(pk=nodedata.get("id"))
+    element = Variable.objects.get(pk=nodedata.get("id"))
     group = None if element.element_group is None else element.element_group.pk
     return element.label, element.sd_type, group
 
@@ -520,7 +519,7 @@ def element_detail_title(nodedata, layout):
 def element_label_submit(_, label, nodedata):
     if None in [label, nodedata]:
         raise PreventUpdate
-    element = Element.objects.get(pk=nodedata.get("id"))
+    element = Variable.objects.get(pk=nodedata.get("id"))
     element.label = label
     element.save()
     return f"{element} label updated"
@@ -535,7 +534,7 @@ def element_label_submit(_, label, nodedata):
 def elementgroup_submit(_, group_pk, nodedata):
     if None in [group_pk, nodedata]:
         raise PreventUpdate
-    element = Element.objects.get(pk=nodedata.get("id"))
+    element = Variable.objects.get(pk=nodedata.get("id"))
     element.element_group_id = group_pk
     element.save()
     return f"{element} is now part of {element.element_group}"
@@ -550,7 +549,7 @@ def elementgroup_submit(_, group_pk, nodedata):
 def submit_type(_, sd_type, nodedata):
     if None in [sd_type, nodedata]:
         raise PreventUpdate
-    element = Element.objects.get(pk=nodedata.get("id"))
+    element = Variable.objects.get(pk=nodedata.get("id"))
     element.sd_type = sd_type
     element.save()
     return f"changed {element} to {sd_type}"
@@ -571,7 +570,7 @@ def element_detail_graph(nodedata, admin1, scenario_pk, responseoption_pk, *_):
     if nodedata is None or nodedata.get("hierarchy") == "Group":
         return fig
 
-    element = Element.objects.get(pk=nodedata.get("id"))
+    element = Variable.objects.get(pk=nodedata.get("id"))
 
     df = pd.DataFrame(SimulatedDataPoint.objects
                       .filter(element=element, scenario_id=scenario_pk, responseoption_id=responseoption_pk)
@@ -623,9 +622,9 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
     if nodedata is None or nodedata.get("hierarchy") == "Group":
         return None
 
-    element = Element.objects.get(pk=nodedata.get("id"))
+    element = Variable.objects.get(pk=nodedata.get("id"))
     if element.sd_type in ["Flow", "Variable"]:
-        upstream_elements = Element.objects.filter(downstream_connections__to_element=element)
+        upstream_elements = Variable.objects.filter(downstream_connections__to_element=element)
         upstream_list = dbc.ListGroup(
             [
                 dbc.ListGroupItem(className="p-1 justify-content-between", children=
@@ -649,7 +648,7 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
             style={"height": "150px", "overflow-y": "scroll"}
         )
 
-        dropdown_options = Element.objects.exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
+        dropdown_options = Variable.objects.exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
         dropdown_list = [
             {"label": possible_element.label, "value": possible_element.label}
             for possible_element in dropdown_options
@@ -672,7 +671,7 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
         equation_text = element.equation
         if equation_text is not None:
             print(f"equation is {equation_text}")
-            for key_element in Element.objects.all():
+            for key_element in Variable.objects.all():
                 equation_text = equation_text.replace(f"_E{key_element.pk}_", key_element.label)
             print(f"after swap equation is {equation_text}")
             equation_text = f" = {equation_text}"
@@ -717,7 +716,7 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                     dbc.Select(id="element-detail-inflow-input", bs_size="sm", placeholder="Ajouter un flux entrant",
                                options=[
                                     {"label": potential_inflow.label, "value": potential_inflow.pk}
-                                    for potential_inflow in Element.objects.filter(sd_type="Flow")
+                                    for potential_inflow in Variable.objects.filter(sd_type="Flow")
                                         .exclude(sd_sink__isnull=False).exclude(sd_source=element)
                                 ]),
                     dbc.Button("Saisir", id="element-detail-inflow-submit", size="sm")
@@ -746,7 +745,7 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                     dbc.Select(id="element-detail-outflow-input", bs_size="sm", placeholder="Ajouter un flux sortant",
                                options=[
                                    {"label": potential_outflow.label, "value": potential_outflow.pk}
-                                   for potential_outflow in Element.objects.filter(sd_type="Flow").exclude(sd_sink=element).exclude(sd_source=element)
+                                   for potential_outflow in Variable.objects.filter(sd_type="Flow").exclude(sd_sink=element).exclude(sd_source=element)
                                ]),
                     dbc.Button("Saisir", id="element-detail-outflow-submit", size="sm")
                 ])
@@ -784,11 +783,11 @@ def save_element_positions(n_clicks, cyto_elements, layout):
     for cyto_element in cyto_elements:
         # print(f"found for {cyto_element}")
         if "position" in cyto_element:
-            element = Element.objects.get(pk=cyto_element.get("data").get("id"))
+            element = Variable.objects.get(pk=cyto_element.get("data").get("id"))
             element.x_pos, element.y_pos = cyto_element.get("position").get("x"), cyto_element.get("position").get("y")
             # print(f"saving position for {element}")
             elements.append(element)
-    Element.objects.bulk_update(elements, ["x_pos", "y_pos"])
+    Variable.objects.bulk_update(elements, ["x_pos", "y_pos"])
     return f"saved {n_clicks} times"
 
 
@@ -801,7 +800,7 @@ def save_element_positions(n_clicks, cyto_elements, layout):
 @timer
 def redraw_model(date_ord, *_):
     start = time.time()
-    elements = Element.objects.all().values()
+    elements = Variable.objects.all().values()
     nodes = []
     for element in elements:
         color = "white"
@@ -869,7 +868,7 @@ def redraw_model(date_ord, *_):
     start = time.time()
 
     flow_edges = []
-    stocks = Element.objects.filter(sd_type="Stock").prefetch_related("inflows", "outflows")
+    stocks = Variable.objects.filter(sd_type="Stock").prefetch_related("inflows", "outflows")
     for stock in stocks:
         for inflow in stock.inflows.all():
             has_equation = "no" if inflow.equation is None else "yes"

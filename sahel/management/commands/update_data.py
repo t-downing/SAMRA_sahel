@@ -7,7 +7,7 @@ from hdx.data.dataset import Dataset
 from dateutil import parser
 import pandas as pd
 import numpy as np
-from ...models import RegularDataset, Element, MeasuredDataPoint, Source
+from ...models import RegularDataset, Variable, MeasuredDataPoint, Source
 from datetime import datetime, timezone, date
 import time
 from pathlib import Path
@@ -49,7 +49,7 @@ def update_wfp_price_data():
     df = df[df["admin1"].isin(admin1s)]
     df["price"] = df["price"].replace({0: np.nan})
 
-    elements = Element.objects.filter(vam_commodity__isnull=False)
+    elements = Variable.objects.filter(vam_commodity__isnull=False)
 
     objs = []
     for element in elements:
@@ -102,7 +102,7 @@ def update_dm_suividesprix():
     df["date"] = df["Date de collecte"].apply(lambda value: value + pd.DateOffset(months=2, days=14))
 
     # prix de bovin
-    element = Element.objects.get(pk=42)
+    element = Variable.objects.get(pk=42)
     include_substrings = [
         "Taurillon moins de 2 ans",
         "Taureau de + 2 ans",
@@ -124,7 +124,7 @@ def update_dm_suividesprix():
         ))
 
     # prix alimentation
-    element = Element.objects.get(pk=37)
+    element = Variable.objects.get(pk=37)
     include_substrings = [
         "Tourteau de coton (sac de 50kg)",
         "Aliment industriel (Buna Fama, etc..) sac 50kg",
@@ -147,7 +147,7 @@ def update_dm_suividesprix():
         ))
 
     # disponibilité alimentation
-    element = Element.objects.get(pk=125)
+    element = Variable.objects.get(pk=125)
     substring = "Disponibilité des aliments sur le marché"
     avg_cols = [col for col in df.columns if substring in col]
     for _, row in df.iterrows():
@@ -175,14 +175,14 @@ def update_dm_globallivestock():
     df["date"] = pd.to_datetime(df["Introduction : Which period are you reporting for (choose any date from the relevant quarter)"])
     df["admin2"] = df["Introduction : Admin Level 2"]
 
-    multicol_elements = Element.objects.filter(dm_globalform_fieldgroup__isnull=False)
+    multicol_elements = Variable.objects.filter(dm_globalform_fieldgroup__isnull=False)
     for element in multicol_elements:
         high_field = f"{element.dm_globalform_fieldgroup} : {element.dm_globalform_group_highfield}"
         mid_field = f"{element.dm_globalform_fieldgroup} : {element.dm_globalform_group_midfield}"
         low_field = f"{element.dm_globalform_fieldgroup} : {element.dm_globalform_group_lowfield}"
         df[element.pk] = (df[high_field].fillna(0) + df[mid_field].fillna(0) * 0.5 + df[low_field].fillna(0) * 0.0) / 100
 
-    singlecol_elements = Element.objects.filter(dm_globalform_field__isnull=False)
+    singlecol_elements = Variable.objects.filter(dm_globalform_field__isnull=False)
     for element in singlecol_elements:
         qual2quant = {element.dm_globalform_field_highvalue: 1.0,
                       element.dm_globalform_field_midvalue: 0.5,

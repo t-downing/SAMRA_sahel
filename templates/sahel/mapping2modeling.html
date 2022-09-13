@@ -2,8 +2,9 @@
 
 {% block content %}
 
-<div class="mx-n4">
-
+<div class="mx-n4 p-0">
+  {% load plotly_dash %}
+  {% plotly_app name="mapping2modeling" ratio=1.5 %}
 </div>
 
 {% endblock %}

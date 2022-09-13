@@ -6,7 +6,7 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Element, Scenario, MeasuredDataPoint
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario, MeasuredDataPoint
 from sahel.sd_model.model_operations import run_model
 
 import plotly.graph_objects as go
@@ -108,14 +108,14 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
 )
 def populate_initial(_):
     livestock_pks = [62, 63, 42]
-    livestock_elements = Element.objects.filter(pk__in=livestock_pks)
+    livestock_elements = Variable.objects.filter(pk__in=livestock_pks)
     livestock_options = [{"value": element.pk,
                           "label": element.label.removeprefix("Prix de ")
                               .capitalize()}
                          for element in livestock_elements]
 
     cereal_pks = [53, 54, 55, 56, 57, 58, 59, 60, 61, 70, 130, 131]
-    cereal_elements = Element.objects.filter(pk__in=cereal_pks)
+    cereal_elements = Variable.objects.filter(pk__in=cereal_pks)
     cereal_options = [{"value": element.pk,
                        "label": element.label.removeprefix("Prix de ").removeprefix("Prix du ")
                            .removeprefix("Prix d'").capitalize()}
@@ -183,7 +183,7 @@ def update_complex_graph(headcount, cereal_values, cereal_ids, livestock_values,
 
     df["meb_cost"] = 0
     for cereal_pk_value in cereal_pk_values:
-        element = Element.objects.get(pk=cereal_pk_value[0])
+        element = Variable.objects.get(pk=cereal_pk_value[0])
         df["meb_cost"] += df[int(cereal_pk_value[0])] * cereal_pk_value[1] / element.kcal_per_kg / 100 * headcount * kcal_total
 
     df["herd_value"] = 0
@@ -227,7 +227,7 @@ def update_complex_graph(headcount, cereal_values, cereal_ids, livestock_values,
 def calculate_kgs(frac_kcal, headcount, id):
     if frac_kcal is None:
         return None
-    element = Element.objects.get(pk=id.get("index"))
+    element = Variable.objects.get(pk=id.get("index"))
     return round(frac_kcal * headcount * 2100 / element.kcal_per_kg / 100, 2)
 
 
@@ -244,11 +244,11 @@ def update_simple_graph(livestock_pk, cereal_pk):
     df["terms"] = df_m[int(livestock_pk)] / df_m[int(cereal_pk)]
     df = df.dropna()
 
-    cereal_element = Element.objects.get(pk=cereal_pk)
+    cereal_element = Variable.objects.get(pk=cereal_pk)
     cereal_name = cereal_element.label.removeprefix("Prix de ").removeprefix("Prix du ").removeprefix("Prix d'")
     cereal_unit = cereal_element.unit.removeprefix("FCFA / ")
 
-    livestock_element = Element.objects.get(pk=livestock_pk)
+    livestock_element = Variable.objects.get(pk=livestock_pk)
     livestock_name = livestock_element.label.removeprefix("Prix de ")
 
     fig = go.Figure(layout=dict(template="simple_white"))
