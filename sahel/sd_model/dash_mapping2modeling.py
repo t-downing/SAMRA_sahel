@@ -1,5 +1,5 @@
 from django_plotly_dash import DjangoDash
-from dash import html, dcc
+from dash import html, dcc, ctx
 from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
@@ -10,7 +10,6 @@ from .model_operations import timer
 import time
 import pandas as pd
 import plotly.graph_objects as go
-
 
 stylesheet = [
     {"selector": "node",
@@ -139,7 +138,7 @@ app.layout = html.Div(children=[
         },
         children=cyto.Cytoscape(
             id="cyto",
-            layout={"name": "preset", "fit": True},
+            layout={"name": "preset", "fit": False},
             style={"height": "1000px", "background-color": "#f8f9fc"},
             stylesheet=stylesheet,
             minZoom=0.2,
@@ -147,10 +146,9 @@ app.layout = html.Div(children=[
             boxSelectionEnabled=True,
             autoRefreshLayout=True,
             responsive=True,
+            zoom=0.5,
         ),
     ),
-
-    html.Div(id="model-initialized", children="no", hidden=True)
 ])
 
 
@@ -219,28 +217,87 @@ def show_layers(layers):
 
 @app.callback(
     Output("cyto", "elements"),
-    Input({"type": "select-variable", "index": ALL}, "n_clicks"),
-    State({"type": "select-variable", "index": ALL}, "id"),
+    Input({"type": "select-node", "index": ALL}, "n_clicks"),
+    Input({"type": "delete-node", "index": ALL}, "n_clicks"),
+    Input({"type": "remove-node", "index": ALL}, "n_clicks"),
+    State({"type": "select-node", "index": ALL}, "id"),
+    State({"type": "delete-node", "index": ALL}, "id"),
+    State({"type": "remove-node", "index": ALL}, "id"),
     State("cyto", "elements"),
 )
 @timer
-def draw_model(n_clickss, ids, cyto_elements):
-    print(n_clickss)
-    print(ids)
-    # if map has not yet been plotted, always update
-    if cyto_elements is not None:
-        # if no clicks OR nothing clickable, don't update
-        if all(n_clicks is None for n_clicks in n_clickss) or not n_clickss:
-            raise PreventUpdate
-
-    selected_pk = None
-    for n_clicks, id, in zip(n_clickss, ids):
+def draw_model(
+        select_clicks,
+        delete_clicks,
+        remove_clicks,
+        select_ids,
+        delete_ids,
+        remove_ids,
+        cyto_elements: list[dict],
+):
+    # SELECT NODE
+    for n_clicks, id in zip(select_clicks, select_ids):
         if n_clicks is not None:
-            selected_pk = id.get("index")
+            selected_id = id.get("index")
+            print(f"selected_id is {selected_id}")
+            for cyto_element in cyto_elements:
+                if cyto_element.get("data").get("id") == selected_id:
+                    cyto_element.update({"selected": True})
+                    print(f"updated {cyto_element}")
+                    selected_by_click = True
+                else:
+                    cyto_element.update({"selected": False})
+            return cyto_elements
 
+    # DELETE NODE
+    # there is a Dash Cytoscape bug where the child nodes also get removed when the parent is removed
+    for n_clicks, id in zip(delete_clicks, delete_ids):
+        if n_clicks is not None:
+            deleted_id = id.get("index")
+            print(f"deleted_id is {deleted_id}")
+            if "element" in deleted_id:
+                Element.objects.get(pk=deleted_id.removeprefix("element_")).delete()
+            elif "group" in deleted_id:
+                ElementGroup.objects.get(pk=deleted_id.removeprefix("group_")).delete()
+            print(len(cyto_elements))
+            updated_cyto_elements = []
+            for cyto_element in cyto_elements:
+                if cyto_element.get("data").get("parent") == deleted_id:
+                    print(cyto_element)
+                    print(f"removing parent {deleted_id} for {cyto_element.get('data').get('id')}")
+                    cyto_element.get("data").update({"parent": None})
+                if cyto_element.get("data").get("id") != deleted_id:
+                    updated_cyto_elements.append(cyto_element)
+            return updated_cyto_elements
+
+    # REMOVE NODE
+    for n_clicks, id in zip(remove_clicks, remove_ids):
+        if n_clicks is not None:
+            parent_child_ids = id.get("index").split("-from-")
+            parent_id, child_id = parent_child_ids[0], parent_child_ids[1]
+            if "element" in child_id:
+                element = Element.objects.get(pk=child_id.removeprefix("element_"))
+                element.element_group = None
+                element.save()
+            elif "variable" in child_id:
+                variable = Variable.objects.get(pk=child_id.removeprefix("variable_"))
+                variable.element = None
+                variable.save()
+            for cyto_element in cyto_elements:
+                if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
+                    cyto_element.get("data").update({"parent": None})
+            return cyto_elements
+
+    if cyto_elements is not None:
+        raise PreventUpdate
+
+    # INITIAL RUN
+    # init
     start = time.time()
     variables = Variable.objects.all().values()
-    nodes = []
+    cyto_elements = []
+
+    # variables
     for variable in variables:
         color = "white"
         usable = True
@@ -253,7 +310,7 @@ def draw_model(n_clickss, ids, cyto_elements):
         elif variable.get("element_group_id") is not None:
             parent = f"group_{variable.get('element_group_id')}"
 
-        nodes.append(
+        cyto_elements.append(
             {"data": {"id": variable.get("id"),
                       "label": variable.get("label"),
                       "sd_type": variable.get("sd_type"),
@@ -261,7 +318,6 @@ def draw_model(n_clickss, ids, cyto_elements):
                       "parent": parent,
                       "color": color,
                       "hierarchy": "variable"},
-             "selected": str(variable.get("id")) == selected_pk,
              "position": {"x": variable.get("x_pos"), "y": variable.get("y_pos")},
              "classes": "variable"}
         )
@@ -269,36 +325,36 @@ def draw_model(n_clickss, ids, cyto_elements):
     print(f"elements took {time.time() - start}")
     start = time.time()
 
+    # elements
     elements = Element.objects.all().values()
     element_nodes = [
         {"data": {"id": f"element_{element.get('id')}",
                   "label": element.get("label"),
                   "hierarchy": "element",
                   "parent": f"group_{element.get('element_group_id')}"},
-         "classes": "element",
-         "selected": f"element_{element.get('id')}" == selected_pk}
+         "classes": "element",}
         for element in elements
     ]
-    nodes.extend(element_nodes)
+    cyto_elements.extend(element_nodes)
 
+    # element groups
     element_groups = ElementGroup.objects.all().values()
     group_nodes = [
         {"data": {"id": f"group_{element_group.get('id')}",
                   "label": element_group.get("label"),
                   "hierarchy": "group"},
          "classes": "group",
-         "selected": f"group_{element_group.get('id')}" == selected_pk,
          "grabbable": False,
          "selectable": True,
          "pannable": True}
         for element_group in element_groups
     ]
-    nodes.extend(group_nodes)
+    cyto_elements.extend(group_nodes)
     print(f"groups took {time.time() - start}")
     start = time.time()
 
+    # variable connections
     connections = Connection.objects.all().select_related("to_element")
-    edges = []
     eq_time = 0
     append_time = 0
     eq_read_time = 0
@@ -313,20 +369,20 @@ def draw_model(n_clickss, ids, cyto_elements):
 
         eq_time += time.time() - eq_start
         append_start = time.time()
-        edges.append({"data": {"source": connection.from_element_id,
-                                "target": connection.to_element_id,
-                                "has_equation": has_equation}})
+        cyto_elements.append({"data": {"source": connection.from_element_id,
+                               "target": connection.to_element_id,
+                               "has_equation": has_equation}})
         append_time += time.time() - append_start
     print(f"eq took {eq_time}, eq_read took {eq_read_time}, append took {append_time}")
     print(f"connections took {time.time() - start}")
     start = time.time()
 
-    flow_edges = []
+    # variable flows
     stocks = Variable.objects.filter(sd_type="Stock").prefetch_related("inflows", "outflows")
     for stock in stocks:
         for inflow in stock.inflows.all():
             has_equation = "no" if inflow.equation is None else "yes"
-            flow_edges.append(
+            cyto_elements.append(
                 {"data": {"source": inflow.pk,
                           "target": stock.pk,
                           "has_equation": has_equation,
@@ -334,7 +390,7 @@ def draw_model(n_clickss, ids, cyto_elements):
             )
         for outflow in stock.outflows.all():
             has_equation = "no" if outflow.equation is None else "yes"
-            flow_edges.append(
+            cyto_elements.append(
                 {"data": {"source": stock.pk,
                           "target": outflow.pk,
                           "has_equation": has_equation,
@@ -342,30 +398,45 @@ def draw_model(n_clickss, ids, cyto_elements):
             )
     print(f"stocks took {time.time() - start}")
     start = time.time()
-    return nodes + edges + flow_edges
+
+    return cyto_elements
 
 
 @app.callback(
     Output("right-sidebar", "children"),
     Input("cyto", "selectedNodeData"),
-    State("cyto", "tapNode"),
+    Input("cyto", "elements"),
 )
-def right_sidebar(selectednodedata, node):
+@timer
+def right_sidebar(selectednodedata, _):
     # INIT
     print(f"selectednotedata={selectednodedata}")
     children = []
-    if node is None or not selectednodedata:
+    if not selectednodedata:
         return children
     nodedata = selectednodedata[-1]
-    scenario_pk= "1"
+    scenario_pk = "1"
     responseoption_pk = "1"
     admin1 = None
 
     # GROUP
-    if nodedata.get("hierarchy") == "group":
+    if "group" in nodedata.get("id"):
         elementgroup = ElementGroup.objects.get(pk=nodedata.get("id").removeprefix("group_"))
+
+        # label and type
         children.append(html.H4(className="mb-2 h4", children=elementgroup.label))
         children.append(html.H6(className="mb-2 font-italic text-secondary font-weight-light h6", children="GROUPE"))
+
+        # children
+        children.append(html.P(className="mb-0 font-weight-bold", children="Éléments"))
+        children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+        children.extend([
+            dbc.Button(
+                id={"type": "select-node", "index": f"element_{element.pk}"},
+                className="mb-1 mr-1", outline=True, color="secondary", size="sm", children=element.label
+            )
+            for element in elementgroup.elements.all()
+        ])
 
     # ELEMENT
     elif nodedata.get("hierarchy") == "element":
@@ -374,33 +445,78 @@ def right_sidebar(selectednodedata, node):
         # label and type
         children.append(html.H4(className="mb-2 h4", children=element.label))
         children.append(html.H6(className="mb-3 font-italic text-secondary font-weight-light h6",
-                                children=f"ÉLÉMENT | {element.__class__._meta.verbose_name}"))
+                                children=f"ÉLÉMENT | {element.__class__._meta.verbose_name} | "
+                                         f"{element.get_element_type_display()}"))
 
         # parent
+        children.append(
+            html.Div(className="mb-3", children=[
+                html.P(className="mb-1 mr-1 font-weight-bold d-inline", children="Groupe:"),
+                dbc.ButtonGroup(className="mb-1", size="sm", children=[
+                    dbc.Button(
+                        id={"type": "select-node", "index": f"group_{element.element_group_id}"},
+                        outline=True, color="secondary", children=element.element_group.label,
+                    ),
+                    dbc.Button(
+                        id={"type": "remove-node", "index": f"group_{element.element_group_id}-from-element_{element.pk}"},
+                        outline=True, color="danger", children="x"
+                    )
+                ]) if element.element_group is not None else "Pas de groupe",
+            ])
+        )
 
-
-        # variables and indicators
+        # children
         children.append(html.P(className="mb-0 font-weight-bold", children="Variables / Indicateurs"))
         children.append(html.Hr(className="mb-2 mt-1 mx-0"))
         children.extend([
             dbc.Button(
-                id={"type": "select-variable", "index": str(variable.pk)},
-                className="mb-1", outline=True, color="secondary", size="sm", children=variable.label
+                id={"type": "select-node", "index": str(variable.pk)},
+                className="mb-1 mr-1", outline=True, color="secondary", size="sm", children=variable.label
             )
             for variable in element.variables.all()
         ])
 
         # EBs
         children.append(html.P(className="mt-4 mb-0 font-weight-bold", children="Informations Qualitatives"))
-        children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+        children.append(html.Hr(className="mb-4 mt-1 mx-0"))
 
+        # delete
+        children.append(
+            dbc.Button(
+                id={"type": "delete-node", "index": nodedata.get("id")},
+                className="mb-2 font-italic", size="sm", outline=True, color="danger", children="Supprimer élément"
+            )
+        )
 
     # VARIABLE
     elif nodedata.get("hierarchy") == "variable":
         variable = Variable.objects.get(pk=nodedata.get("id"))
+
+        # label and type
         children.append(html.H4(className="mb-2 h4", children=variable.label))
         children.append(html.H6(className="mb-2 font-italic text-secondary font-weight-light h6",
                                 children=f"VARIABLE | {variable.get_sd_type_display()}"))
+
+        # parent
+        children.append(
+            html.Div(className="mb-3", children=[
+                html.P(className="mb-1 mr-1 font-weight-bold d-inline", children="Élément:"),
+                dbc.ButtonGroup(className="mb-1", size="sm", children=[
+                    dbc.Button(
+                        id={"type": "select-node", "index": f"element_{variable.element_id}"},
+                        outline=True, color="secondary", children=variable.element.label,
+                    ),
+                    dbc.Button(
+                        id={"type": "remove-node",
+                            "index": f"element_{variable.element_id}-from-variable_{variable.pk}"},
+                        outline=True, color="danger", children="x"
+                    )
+                ])
+                if variable.element is not None
+                else
+                "Pas d'élément"
+            ])
+        )
 
         # graph
         fig = go.Figure(layout=go.Layout(template="simple_white", margin=go.layout.Margin(l=0, r=0, b=0, t=0)))
@@ -450,27 +566,29 @@ def right_sidebar(selectednodedata, node):
             upstream_list = dbc.ListGroup(
                 [
                     dbc.ListGroupItem(className="p-1 justify-content-between", children=
-                        html.Div(className="d-flex justify-content-between", children=
-                            [
-                                html.P(style={"font-size": "small"}, children=f"{upstream_element.label} _E{upstream_element.pk}_"),
-                                dbc.Button("X",
-                                           id={"type": "element-detail-conn-del",
-                                               "index": f"{upstream_element.pk}-to-{variable.pk}"},
-                                           size="sm",
-                                           color="danger",
-                                           className="p-1",
-                                           outline=True)
-                            ],
+                    html.Div(className="d-flex justify-content-between", children=
+                    [
+                        html.P(style={"font-size": "small"},
+                               children=f"{upstream_element.label} _E{upstream_element.pk}_"),
+                        dbc.Button("X",
+                                   id={"type": "element-detail-conn-del",
+                                       "index": f"{upstream_element.pk}-to-{variable.pk}"},
+                                   size="sm",
+                                   color="danger",
+                                   className="p-1",
+                                   outline=True)
+                    ],
 
-                        )
-                    )
+                             )
+                                      )
                     for upstream_element in upstream_elements
                 ],
                 flush=True,
                 style={"height": "150px", "overflow-y": "scroll"}
             )
 
-            dropdown_options = Variable.objects.exclude(downstream_connections__to_element=variable).exclude(pk=variable.pk)
+            dropdown_options = Variable.objects.exclude(downstream_connections__to_element=variable).exclude(
+                pk=variable.pk)
             dropdown_list = [
                 {"label": possible_element.label, "value": possible_element.label}
                 for possible_element in dropdown_options
@@ -482,8 +600,10 @@ def right_sidebar(selectednodedata, node):
                     [
                         upstream_list,
                         dbc.InputGroup(children=[
-                            dbc.Select(options=dropdown_list, id="element-detail-conn-input", placeholder="Ajouter une influence", bs_size="sm"),
-                            dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-conn-submit", size="sm"), addon_type="append")
+                            dbc.Select(options=dropdown_list, id="element-detail-conn-input",
+                                       placeholder="Ajouter une influence", bs_size="sm"),
+                            dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-conn-submit", size="sm"),
+                                                addon_type="append")
                         ]),
                     ],
                     style={"padding": "0px"},
@@ -501,15 +621,17 @@ def right_sidebar(selectednodedata, node):
             equation_card = dbc.Card([
                 dbc.CardHeader("Équation", className="p-1", style={"font-size": "small"}),
                 dbc.CardBody(className="p-2", children=
-                    [
-                        html.P(equation_text, id="element-detail-eq-text", style={"font-size": "small", "height": "50px", "overflow-y": "scroll"}),
-                        dbc.InputGroup([
-                            dbc.Input(value=variable.equation, id="element-detail-eq-input", bs_size="sm"),
-                            dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-eq-submit", size="sm"), addon_type="append"),
-                        ]),
+                [
+                    html.P(equation_text, id="element-detail-eq-text",
+                           style={"font-size": "small", "height": "50px", "overflow-y": "scroll"}),
+                    dbc.InputGroup([
+                        dbc.Input(value=variable.equation, id="element-detail-eq-input", bs_size="sm"),
+                        dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-eq-submit", size="sm"),
+                                            addon_type="append"),
+                    ]),
 
-                    ]
-                )
+                ]
+                             )
             ])
             children.append(equation_card)
 
@@ -520,25 +642,27 @@ def right_sidebar(selectednodedata, node):
                 dbc.CardBody(style={"padding": "0px"}, children=[
                     dbc.ListGroup(
                         [
-                            dbc.ListGroupItem(className="p-1 d-flex justify-content-between", style={"font-size": "small"}, children=[
-                                inflow.label,
-                                dbc.Button("X",
-                                           id={"type": "element-detail-inflow-del",
-                                               "index": f"{variable.pk}-inflow-{inflow.pk}"},
-                                           size="sm", color="danger", className="p-1", outline=True)
-                            ])
+                            dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
+                                              style={"font-size": "small"}, children=[
+                                    inflow.label,
+                                    dbc.Button("X",
+                                               id={"type": "element-detail-inflow-del",
+                                                   "index": f"{variable.pk}-inflow-{inflow.pk}"},
+                                               size="sm", color="danger", className="p-1", outline=True)
+                                ])
                             for inflow in variable.inflows.all()
                         ],
                         flush=True,
                         style={"height": "100px", "overflow-y": "scroll"}
                     ),
                     dbc.InputGroup([
-                        dbc.Select(id="element-detail-inflow-input", bs_size="sm", placeholder="Ajouter un flux entrant",
+                        dbc.Select(id="element-detail-inflow-input", bs_size="sm",
+                                   placeholder="Ajouter un flux entrant",
                                    options=[
-                                        {"label": potential_inflow.label, "value": potential_inflow.pk}
-                                        for potential_inflow in Variable.objects.filter(sd_type="Flow")
-                                            .exclude(sd_sink__isnull=False).exclude(sd_source=variable)
-                                    ]),
+                                       {"label": potential_inflow.label, "value": potential_inflow.pk}
+                                       for potential_inflow in Variable.objects.filter(sd_type="Flow")
+                                   .exclude(sd_sink__isnull=False).exclude(sd_source=variable)
+                                   ]),
                         dbc.Button("Saisir", id="element-detail-inflow-submit", size="sm")
                     ])
                 ])
@@ -550,23 +674,27 @@ def right_sidebar(selectednodedata, node):
                 dbc.CardBody(style={"padding": "0px"}, children=[
                     dbc.ListGroup(
                         [
-                            dbc.ListGroupItem(className="p-1 d-flex justify-content-between", style={"font-size": "small"}, children=[
-                                outflow.label,
-                                dbc.Button("X",
-                                           id={"type": "element-detail-outflow-del",
-                                               "index": f"{variable.pk}-outflow-{outflow.pk}"},
-                                           size="sm", color="danger", className="p-1", outline=True)
-                            ])
+                            dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
+                                              style={"font-size": "small"}, children=[
+                                    outflow.label,
+                                    dbc.Button("X",
+                                               id={"type": "element-detail-outflow-del",
+                                                   "index": f"{variable.pk}-outflow-{outflow.pk}"},
+                                               size="sm", color="danger", className="p-1", outline=True)
+                                ])
                             for outflow in variable.outflows.all()
                         ],
                         flush=True,
                         style={"height": "100px", "overflow-y": "scroll"}
                     ),
                     dbc.InputGroup([
-                        dbc.Select(id="element-detail-outflow-input", bs_size="sm", placeholder="Ajouter un flux sortant",
+                        dbc.Select(id="element-detail-outflow-input", bs_size="sm",
+                                   placeholder="Ajouter un flux sortant",
                                    options=[
                                        {"label": potential_outflow.label, "value": potential_outflow.pk}
-                                       for potential_outflow in Variable.objects.filter(sd_type="Flow").exclude(sd_sink=variable).exclude(sd_source=variable)
+                                       for potential_outflow in
+                                       Variable.objects.filter(sd_type="Flow").exclude(sd_sink=variable).exclude(
+                                           sd_source=variable)
                                    ]),
                         dbc.Button("Saisir", id="element-detail-outflow-submit", size="sm")
                     ])

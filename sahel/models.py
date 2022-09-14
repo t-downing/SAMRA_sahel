@@ -22,6 +22,13 @@ class Element(Node):
 
 
 class SituationalAnalysis(Element):
+    SITUATIONAL_ANALYSIS = "SA"
+    SA_TYPES = (
+        (SITUATIONAL_ANALYSIS, "Analyse de situation"),
+    )
+
+    element_type = models.CharField(choices=SA_TYPES, max_length=2, default=SITUATIONAL_ANALYSIS)
+
     class Meta:
         verbose_name = "Analyse de situation"
 
@@ -41,7 +48,10 @@ class TheoryOfChange(Element):
         (SECTOR_GOAL, "But du secteur"),
         (PROGRAMME_GOAL, "But du programme"),
     )
-    toc_type = models.CharField(choices=TOC_TYPES, max_length=2, default=INTERVENTION)
+    element_type = models.CharField(choices=TOC_TYPES, max_length=2, default=INTERVENTION)
+
+    class Meta:
+        verbose_name = "Théorie du changement"
 
 
 class Variable(Node):
