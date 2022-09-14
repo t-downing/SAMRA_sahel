@@ -9,6 +9,7 @@ class Node(models.Model):
 
     class Meta:
         abstract = True
+        ordering = ["label"]
 
     def __str__(self):
         return f"{self.label}; pk: {self.pk}"
@@ -128,9 +129,6 @@ class Variable(Node):
     kcal_per_kg = models.IntegerField(null=True, blank=True)
     model_output_variable = models.BooleanField(default=True)
     stock_initial_value = models.FloatField(null=True, blank=True)
-
-    class Meta:
-        ordering = ["-date_created"]
 
 
 class Connection(models.Model):

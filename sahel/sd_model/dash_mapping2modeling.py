@@ -220,9 +220,12 @@ def show_layers(layers):
     Input({"type": "select-node", "index": ALL}, "n_clicks"),
     Input({"type": "delete-node", "index": ALL}, "n_clicks"),
     Input({"type": "remove-node", "index": ALL}, "n_clicks"),
+    Input({"type": "parentchild-submit", "index": ALL}, "n_clicks"),
     State({"type": "select-node", "index": ALL}, "id"),
     State({"type": "delete-node", "index": ALL}, "id"),
     State({"type": "remove-node", "index": ALL}, "id"),
+    State({"type": "parentchild-submit", "index": ALL}, "id"),
+    State({"type": "parentchild-input", "index": ALL}, "value"),
     State("cyto", "elements"),
 )
 @timer
@@ -230,9 +233,12 @@ def draw_model(
         select_clicks,
         delete_clicks,
         remove_clicks,
+        parentchild_clicks,
         select_ids,
         delete_ids,
         remove_ids,
+        parentchild_ids,
+        parentchild_input,
         cyto_elements: list[dict],
 ):
     # SELECT NODE
@@ -273,7 +279,7 @@ def draw_model(
     # REMOVE NODE
     for n_clicks, id in zip(remove_clicks, remove_ids):
         if n_clicks is not None:
-            parent_child_ids = id.get("index").split("-from-")
+            parent_child_ids = id.get("index").split("-contains-")
             parent_id, child_id = parent_child_ids[0], parent_child_ids[1]
             if "element" in child_id:
                 element = Element.objects.get(pk=child_id.removeprefix("element_"))
@@ -286,6 +292,28 @@ def draw_model(
             for cyto_element in cyto_elements:
                 if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
                     cyto_element.get("data").update({"parent": None})
+            return cyto_elements
+
+    # CONNECT PARENT
+    for n_clicks, id in zip(parentchild_clicks, parentchild_ids):
+        if n_clicks is not None:
+            if id.get("index").startswith("child-"):
+                child_id = id.get("index").removeprefix("child-")
+                parent_class_str = "group"
+                if child_id.startswith("element_"):
+                    element = Element.objects.get(pk=child_id.removeprefix("element_"))
+                    print(parentchild_input)
+                    element.element_group_id = parentchild_input[0]
+                    element.save()
+                    parent_class_str = "group"
+                elif child_id.startswith("variable_"):
+                    variable = Variable.objects.get(pk=child_id.removeprefix("variable_"))
+                    variable.element_id = parentchild_input[0]
+                    variable.save()
+                    parent_class_str = "element"
+                for cyto_element in cyto_elements:
+                    if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
+                        cyto_element.get("data").update({"parent": f"{parent_class_str}_{parentchild_input[0]}"})
             return cyto_elements
 
     if cyto_elements is not None:
@@ -458,10 +486,21 @@ def right_sidebar(selectednodedata, _):
                         outline=True, color="secondary", children=element.element_group.label,
                     ),
                     dbc.Button(
-                        id={"type": "remove-node", "index": f"group_{element.element_group_id}-from-element_{element.pk}"},
+                        id={"type": "remove-node", "index": f"group_{element.element_group_id}-contains-element_{element.pk}"},
                         outline=True, color="danger", children="x"
                     )
-                ]) if element.element_group is not None else "Pas de groupe",
+                ])
+                if element.element_group is not None else
+                dbc.InputGroup(size="sm", children=[
+                    dbc.Select(
+                        id={"type": "parentchild-input",  "index": "only_one"}, bs_size="sm",
+                        options=[{"label": elementgroup.label, "value": elementgroup.pk}
+                                 for elementgroup in ElementGroup.objects.all()],
+                    ),
+                    dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
+                        id={"type": "parentchild-submit",  "index": f"child-element_{element.pk}"}, children="Saisir"
+                    ))
+                ]),
             ])
         )
 
@@ -508,13 +547,21 @@ def right_sidebar(selectednodedata, _):
                     ),
                     dbc.Button(
                         id={"type": "remove-node",
-                            "index": f"element_{variable.element_id}-from-variable_{variable.pk}"},
+                            "index": f"element_{variable.element_id}-contains-variable_{variable.pk}"},
                         outline=True, color="danger", children="x"
                     )
                 ])
-                if variable.element is not None
-                else
-                "Pas d'élément"
+                if variable.element is not None else
+                dbc.InputGroup(size="sm", children=[
+                    dbc.Select(
+                        id={"type": "parentchild-input",  "index": "only_one"}, bs_size="sm",
+                        options=[{"label": element.label, "value": element.pk}
+                                 for element in Element.objects.all()],
+                    ),
+                    dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
+                        id={"type": "parentchild-submit",  "index": f"child-variable_{variable.pk}"}, children="Saisir"
+                    ))
+                ]),
             ])
         )
 
