@@ -154,27 +154,6 @@ app.layout = html.Div(children=[
 ])
 
 
-# @app.callback(
-#     Output("selected-node-id", "children"),
-#     Input("cyto", "selectedNodeData"),
-#     Input({"type": "select-variable", "index": ALL}, "n_clicks"),
-#     State({"type": "select-variable", "index": ALL}, "id"),
-# )
-# def actually_select_node(selectednodedata, n_clickss, ids):
-#     # had to actually write this because Dash Cytoscape selectednodedata doesn't work correctly
-#     if not selectednodedata:
-#         # if nothing is selected, return nothing
-#         return None
-#     if all(n_clicks is None for n_clicks in n_clickss):
-#         # if nothing has been clicked, return default selected
-#         return selectednodedata[-1].get("id")
-#     for n_clicks, id, in zip(n_clickss, ids):
-#         if n_clicks is not None:
-#             selected_pk = id.get("index")
-#             print(f"you just clicked on variable {selected_pk}")
-#             return selected_pk
-
-
 @app.callback(
     Output("cyto", "generateImage"),
     Input("download-submit", "n_clicks"),
@@ -294,7 +273,8 @@ def draw_model(n_clickss, ids, cyto_elements):
     element_nodes = [
         {"data": {"id": f"element_{element.get('id')}",
                   "label": element.get("label"),
-                  "hierarchy": "element"},
+                  "hierarchy": "element",
+                  "parent": f"group_{element.get('element_group_id')}"},
          "classes": "element",
          "selected": f"element_{element.get('id')}" == selected_pk}
         for element in elements
@@ -395,6 +375,9 @@ def right_sidebar(selectednodedata, node):
         children.append(html.H4(className="mb-2 h4", children=element.label))
         children.append(html.H6(className="mb-3 font-italic text-secondary font-weight-light h6",
                                 children=f"ÉLÉMENT | {element.__class__._meta.verbose_name}"))
+
+        # parent
+
 
         # variables and indicators
         children.append(html.P(className="mb-0 font-weight-bold", children="Variables / Indicateurs"))

@@ -16,6 +16,9 @@ class Node(models.Model):
 
 class Element(Node):
     objects = InheritanceManager()
+    element_group = models.ForeignKey("elementgroup", related_name="elements", null=True, blank=True,
+                                      on_delete=models.SET_NULL)
+    # element_group_integer = models.IntegerField(null=True, blank=True)
 
 
 class SituationalAnalysis(Element):
@@ -24,7 +27,21 @@ class SituationalAnalysis(Element):
 
 
 class TheoryOfChange(Element):
-    pass
+    INTERVENTION = "IV"
+    INTERVENTION_CLUSTER = "IC"
+    SUB_OUTCOME = "SO"
+    PRIMARY_OUTCOME = "PO"
+    SECTOR_GOAL = "SG"
+    PROGRAMME_GOAL = "PG"
+    TOC_TYPES = (
+        (INTERVENTION, "Intervention"),
+        (INTERVENTION_CLUSTER, "Groupe d'interventions"),
+        (SUB_OUTCOME, "Sous-résultat"),
+        (PRIMARY_OUTCOME, "Résultat primaire"),
+        (SECTOR_GOAL, "But du secteur"),
+        (PROGRAMME_GOAL, "But du programme"),
+    )
+    toc_type = models.CharField(choices=TOC_TYPES, max_length=2, default=INTERVENTION)
 
 
 class Variable(Node):
@@ -81,8 +98,8 @@ class Variable(Node):
     sd_type = models.CharField(max_length=100, choices=SD_TYPES, null=True, blank=True)
     sd_source = models.ForeignKey("self", related_name="outflows", null=True, blank=True, on_delete=models.SET_NULL)
     sd_sink = models.ForeignKey("self", related_name="inflows", null=True, blank=True, on_delete=models.SET_NULL)
-    element_group = models.ForeignKey("elementgroup", related_name="elements", null=True, blank=True,
-                                      on_delete=models.SET_NULL)
+    # element_group = models.ForeignKey("elementgroup", related_name="variables", null=True, blank=True,
+    #                                   on_delete=models.SET_NULL)
     vam_commodity = models.CharField(max_length=200, null=True, blank=True)
     mid_threshold = models.FloatField(null=True, blank=True)
     high_threshold = models.FloatField(null=True, blank=True)
