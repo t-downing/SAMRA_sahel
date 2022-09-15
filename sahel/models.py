@@ -20,6 +20,8 @@ class Element(Node):
     element_group = models.ForeignKey("elementgroup", related_name="elements", null=True, blank=True,
                                       on_delete=models.SET_NULL)
     # element_group_integer = models.IntegerField(null=True, blank=True)
+    x_pos = models.FloatField(null=True, blank=True)
+    y_pos = models.FloatField(null=True, blank=True)
 
 
 class SituationalAnalysis(Element):

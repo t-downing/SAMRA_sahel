@@ -10,8 +10,10 @@ from .model_operations import timer
 import time
 import pandas as pd
 import plotly.graph_objects as go
+from pprint import pprint
 
 stylesheet = [
+    ## NODES
     {"selector": "node",
      "style": {
          "content": "data(label)",
@@ -24,6 +26,46 @@ stylesheet = [
          "text-wrap": "wrap",
          "text-max-width": 100,
          "background-opacity": 0.7,
+     }},
+
+
+    # GROUPS
+    {"selector": ".group",
+     "style": {
+         "text-valign": "top",
+         "color": "lightgrey",
+         "font-size": 40,
+         "border-width": 3,
+         "border-color": "lightgrey",
+         "background-color": "white",
+         "z-index": 1,
+     }},
+
+    # ELEMENTS
+    {"selector": ".element",
+     "style": {
+         "font-size": 20,
+         "border-width": 2,
+         "z-index": 2,
+     }},
+    {"selector": ".IV",
+     "style": {
+         "background-color": "#d7c4ed",
+         "border-color": "#5f2f9d",
+         "color": "#5f2f9d",
+     }},
+    {"selector": ".SA",
+     "style": {
+         "background-color": "#FFF8DC",
+         "border-color": "#DEB887",
+         "color": "#DEB887",
+     }},
+
+    # VARIABLES
+    {"selector": ".variable",
+     "style": {
+         "z-index": 3,
+
      }},
     {"selector": "[sd_type = 'Stock']",
      "style": {
@@ -48,6 +90,16 @@ stylesheet = [
          "shape": "triangle",
          "text-valign": "bottom",
      }},
+    {"selector": "[!usable].variable",
+     "style": {
+         "background-color": "whitesmoke",
+         "color": "grey",
+         "border-color": "grey",
+     }},
+
+    ## EDGES
+
+    # VARIABLE EDGES
     {"selector": "edge",
      "style": {
          "target-arrow-color": "grey",
@@ -70,25 +122,12 @@ stylesheet = [
          "curve-style": "straight",
          "z-index": 1,
      }},
-    {"selector": "[!usable]",
-     "style": {
-         "background-color": "whitesmoke",
-         "color": "grey",
-         "border-color": "grey",
-     }},
     {"selector": "[has_equation = 'no']",
      "style": {
          "line-style": "dashed"
      }},
-    {"selector": ".group",
-     "style": {
-         "text-valign": "top",
-         "color": "lightgrey",
-         "font-size": 40,
-         "border-width": 3,
-         "border-color": "lightgrey",
-         "background-color": "white",
-     }},
+
+    ## SELECTED
     {"selector": ":selected",
      "style": {
          "border-color": "blue",
@@ -311,6 +350,8 @@ def draw_model(
                     variable.element_id = parentchild_input[0]
                     variable.save()
                     parent_class_str = "element"
+                print(f"parent_class_str is {parent_class_str}")
+                print(f"child_id is {child_id}, parentchild_input[0] is {parentchild_input[0]}")
                 for cyto_element in cyto_elements:
                     if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
                         cyto_element.get("data").update({"parent": f"{parent_class_str}_{parentchild_input[0]}"})
@@ -354,13 +395,13 @@ def draw_model(
     start = time.time()
 
     # elements
-    elements = Element.objects.all().values()
+    elements = Element.objects.all().select_subclasses()
     element_nodes = [
-        {"data": {"id": f"element_{element.get('id')}",
-                  "label": element.get("label"),
+        {"data": {"id": f"element_{element.pk}",
+                  "label": element.label,
                   "hierarchy": "element",
-                  "parent": f"group_{element.get('element_group_id')}"},
-         "classes": "element",}
+                  "parent": f"group_{element.element_group_id}"},
+         "classes": f"element {element.element_type}"}
         for element in elements
     ]
     cyto_elements.extend(element_nodes)
@@ -465,6 +506,15 @@ def right_sidebar(selectednodedata, _):
             )
             for element in elementgroup.elements.all()
         ])
+
+        # delete
+        children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+        children.append(
+            dbc.Button(
+                id={"type": "delete-node", "index": nodedata.get("id")},
+                className="mb-2 font-italic", size="sm", outline=True, color="danger", children="Supprimer groupe"
+            )
+        )
 
     # ELEMENT
     elif nodedata.get("hierarchy") == "element":
