@@ -16,8 +16,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('date_created', models.DateTimeField(auto_now_add=True)),
-                ('from_element', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='downstream_connections', to='sahel.element')),
-                ('to_element', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='upstream_connections', to='sahel.element')),
+                ('from_variable', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='downstream_connections', to='sahel.element')),
+                ('to_variable', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='upstream_connections', to='sahel.element')),
             ],
             options={
                 'ordering': ['-date_created'],

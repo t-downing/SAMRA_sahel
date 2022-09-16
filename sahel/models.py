@@ -57,6 +57,19 @@ class TheoryOfChange(Element):
         verbose_name = "Théorie du changement"
 
 
+class ShockStructure(Element):
+    SHOCK_EFFECT = "SE"
+    SHOCK = "SH"
+    SHOCKSTRUCTURE_TYPES = (
+        (SHOCK_EFFECT, "Effet de choc"),
+        (SHOCK, "Choc"),
+    )
+    element_type = models.CharField(choices=SHOCKSTRUCTURE_TYPES, max_length=2, default=SHOCK_EFFECT)
+
+    class Meta:
+        verbose_name = "Choc"
+
+
 class Variable(Node):
     SD_TYPES = (
         ("Stock", "Stock"),
@@ -133,9 +146,22 @@ class Variable(Node):
     stock_initial_value = models.FloatField(null=True, blank=True)
 
 
-class Connection(models.Model):
-    from_element = models.ForeignKey("variable", related_name="downstream_connections", on_delete=models.CASCADE)
-    to_element = models.ForeignKey("variable", related_name="upstream_connections", on_delete=models.CASCADE)
+class VariableConnection(models.Model):
+    from_variable = models.ForeignKey("variable", related_name="downstream_connections", on_delete=models.CASCADE)
+    to_variable = models.ForeignKey("variable", related_name="upstream_connections", on_delete=models.CASCADE)
+    date_created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.from_variable} to {self.to_variable}"
+
+    class Meta:
+        ordering = ["-date_created"]
+        unique_together = ("from_variable", "to_variable")
+
+
+class ElementConnection(models.Model):
+    from_element = models.ForeignKey("element", related_name="downstream_connections", on_delete=models.CASCADE)
+    to_element = models.ForeignKey("element", related_name="upstream_connections", on_delete=models.CASCADE)
     date_created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

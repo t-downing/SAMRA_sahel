@@ -4,8 +4,8 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
-from sahel.models import Variable, Connection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
-    SimulatedDataPoint, ForecastedDataPoint, Source, Element
+from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
+    SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection
 from .model_operations import timer
 import time
 import pandas as pd
@@ -13,26 +13,38 @@ import plotly.graph_objects as go
 from pprint import pprint
 
 stylesheet = [
-    ## NODES
-    {"selector": "node",
-     "style": {
-         "content": "data(label)",
-         "background-color": "data(color)",
-         "width": 100,
-         "height": 100,
-         "border-width": 1,
-         "text-valign": "center",
-         "text-halign": "center",
-         "text-wrap": "wrap",
-         "text-max-width": 100,
-         "background-opacity": 0.7,
-     }},
-
+    # ALL
+    # nodes
+    {
+        "selector": "node",
+        "style": {
+            "content": "data(label)",
+            "background-color": "data(color)",
+            "width": 100,
+            "height": 100,
+            "border-width": 1,
+            "text-valign": "top",
+            "text-halign": "center",
+            "text-wrap": "wrap",
+            "text-max-width": 100,
+            "background-opacity": 0.7,
+        }
+    },
+    # edges
+    {
+        "selector": "edge",
+        "style": {
+            "curve-style": "unbundled-bezier",
+            "control-point-distance": "50px",
+            "arrow-scale": 1,
+            "target-arrow-shape": "triangle",
+        }
+    },
 
     # GROUPS
+    # nodes
     {"selector": ".group",
      "style": {
-         "text-valign": "top",
          "color": "lightgrey",
          "font-size": 40,
          "border-width": 3,
@@ -42,6 +54,7 @@ stylesheet = [
      }},
 
     # ELEMENTS
+    # nodes
     {"selector": ".element",
      "style": {
          "font-size": 20,
@@ -53,19 +66,32 @@ stylesheet = [
          "background-color": "#d7c4ed",
          "border-color": "#5f2f9d",
          "color": "#5f2f9d",
+         "line-color": "#9966cc",
+         "target-arrow-color": "#9966cc",
      }},
     {"selector": ".SA",
      "style": {
          "background-color": "#FFF8DC",
-         "border-color": "#DEB887",
-         "color": "#DEB887",
+         "border-color": "#CD853F",
+         "color": "#CD853F",
+     }},
+    {"selector": ".SE",
+     "style": {
+         "background-color": "#F08080",
+         "border-color": "crimson",
+         "color": "crimson",
      }},
 
-    # VARIABLES
-    {"selector": ".variable",
-     "style": {
-         "z-index": 3,
+    # edges
 
+    # VARIABLES
+    # nodes
+    {"selector": "node.variable",
+     "style": {
+         "color": "#505050",
+         "border-color": "#505050",
+         "text-valign": "center",
+         "z-index": 3,
      }},
     {"selector": "[sd_type = 'Stock']",
      "style": {
@@ -97,37 +123,29 @@ stylesheet = [
          "border-color": "grey",
      }},
 
-    ## EDGES
-
-    # VARIABLE EDGES
-    {"selector": "edge",
+    # edges
+    {"selector": "edge.variable",
      "style": {
-         "target-arrow-color": "grey",
-         "target-arrow-shape": "triangle",
-         "line-color": "grey",
-         "arrow-scale": 2,
-         "width": 2,
-         "curve-style": "unbundled-bezier",
-         "control-point-distance": "50px",
-         "z-index": 2,
+         "target-arrow-color": "#808080",
+         "line-color": "#808080",
+         "width": 1,
      }},
     {"selector": "[edge_type = 'Flow']",
      "style": {
-         "line-color": "lightgrey",
+         "line-color": "#DCDCDC",
          "target-arrow-shape": "none",
          "mid-target-arrow-shape": "triangle",
          "mid-target-arrow-color": "grey",
          "width": 20,
          "arrow-scale": 0.4,
          "curve-style": "straight",
-         "z-index": 1,
      }},
     {"selector": "[has_equation = 'no']",
      "style": {
          "line-style": "dashed"
      }},
 
-    ## SELECTED
+    # SELECTED
     {"selector": ":selected",
      "style": {
          "border-color": "blue",
@@ -144,7 +162,7 @@ app.layout = html.Div(children=[
     # overlay stuff, all with position:absolute (cannot click through divs in Dash for some reason, z-index not working either)
     html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute"}, children=[
         html.H2(className="mb-4 h2", children="Schéma"),
-        dbc.Card(className="mb-4", children=[
+        dbc.Card(className="mb-3", children=[
             dbc.CardBody(className="p-2", children=[
                 dbc.FormGroup(className="m-0", children=[
                     dbc.Label("Couches"),
@@ -162,7 +180,44 @@ app.layout = html.Div(children=[
                 ])
             ])
         ]),
-        dbc.Button(className="mb-4", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
+        dbc.Button(className="mb-3", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
+        html.Br(),
+        dbc.Button(className="mb-3", id="add-node-open", children="Ajouter", size="sm", color="primary"),
+    ]),
+
+    # modals
+    dbc.Modal(id="add-node-modal", is_open=False, children=[
+        dbc.ModalHeader("Ajouter un objet"),
+        dbc.ModalBody(children=[
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Classe", addon_type="prepend"),
+                dbc.Select(id="add-node-class-input", options=[
+                    {"label": "Groupe", "value": "group"},
+                    {"label": "Élément", "value": "element"},
+                    {"label": "Variable", "value": "variable"},
+                ]),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Sous-classe", addon_type="prepend"),
+                dbc.Select(id="add-node-subclass-input"),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Type", addon_type="prepend"),
+                dbc.Select(id="add-node-type-input"),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Label", addon_type="prepend"),
+                dbc.Input(id="add-node-label-input"),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Unité", addon_type="prepend"),
+                dbc.Select(id="add-node-unit-input", disabled=True),
+            ]),
+        ]),
+        dbc.ModalFooter(className="d-flex justify-content-end", children=[
+            dbc.Button(id="add-node-close", className="ml-2", n_clicks=0, children="Annuler"),
+            dbc.Button(id="add-node-submit", className="ml-2", n_clicks=0, color="primary", children="Saisir"),
+        ]),
     ]),
 
     html.Div(id="right-sidebar", className="mt-4 mr-4", style={"position": "absolute", "right": 0, "width": "300px"}),
@@ -192,6 +247,18 @@ app.layout = html.Div(children=[
 
 
 @app.callback(
+    Output("add-node-modal", "is_open"),
+    Input("add-node-open", "n_clicks"),
+    Input("add-node-close", "n_clicks"),
+    State("add-node-modal", "is_open")
+)
+def add_node_modal(open_clicks, close_clicks, is_open):
+    if open_clicks or close_clicks:
+        return not is_open
+    return is_open
+
+
+@app.callback(
     Output("cyto", "generateImage"),
     Input("download-submit", "n_clicks"),
 )
@@ -210,6 +277,7 @@ def show_layers(layers):
     layers.sort()
     print(layers)
     added_stylesheet = []
+
     if "group" not in layers:
         added_stylesheet.extend([
             {"selector": ".group",
@@ -221,75 +289,75 @@ def show_layers(layers):
         ])
     if "element" not in layers:
         added_stylesheet.extend([
+            {"selector": ".element",
+             "style": {
+                 "background-opacity": "0",
+                 "border-width": "0",
+                 "text-opacity": "0",
+             }},
+        ])
+    if "variable" not in layers:
+        added_stylesheet.extend([
             {"selector": ".variable",
              "style": {
                  "visibility": "hidden",
              }},
-            {"selector": "edge",
+            {"selector": ".element",
              "style": {
-                 "visibility": "hidden",
-             }},
-        ])
-    if layers == ["group"]:
-        added_stylesheet = [
-            {"selector": "node",
-             "style": {
-                 "visibility": "hidden",
-             }},
-            {"selector": "edge",
-             "style": {
-                 "visibility": "hidden",
-             }},
-            {"selector": "[hierarchy = 'Group']",
-             "style": {
-                 "visibility": "visible",
-                 "background-color": "lightgray",
-                 "border-color": "gray",
-                 "color": "black",
                  "text-valign": "center",
-                 "font-size": 80,
-             }},
-        ]
+             }}
+
+        ])
 
     return stylesheet + added_stylesheet
 
 
 @app.callback(
     Output("cyto", "elements"),
+
+    # INPUTS
+    # relationship modification
     Input({"type": "select-node", "index": ALL}, "n_clicks"),
     Input({"type": "delete-node", "index": ALL}, "n_clicks"),
     Input({"type": "remove-node", "index": ALL}, "n_clicks"),
     Input({"type": "parentchild-submit", "index": ALL}, "n_clicks"),
+
+    # STATES
+    # relationship modification
     State({"type": "select-node", "index": ALL}, "id"),
     State({"type": "delete-node", "index": ALL}, "id"),
     State({"type": "remove-node", "index": ALL}, "id"),
     State({"type": "parentchild-submit", "index": ALL}, "id"),
     State({"type": "parentchild-input", "index": ALL}, "value"),
+    # current elements read
     State("cyto", "elements"),
 )
 @timer
 def draw_model(
+        # INPUTS
+        # relationship modification
         select_clicks,
         delete_clicks,
         remove_clicks,
         parentchild_clicks,
+
+        # STATES
+        # relationship modification
         select_ids,
         delete_ids,
         remove_ids,
         parentchild_ids,
         parentchild_input,
+        # current elements read
         cyto_elements: list[dict],
 ):
     # SELECT NODE
     for n_clicks, id in zip(select_clicks, select_ids):
         if n_clicks is not None:
             selected_id = id.get("index")
-            print(f"selected_id is {selected_id}")
             for cyto_element in cyto_elements:
                 if cyto_element.get("data").get("id") == selected_id:
                     cyto_element.update({"selected": True})
-                    print(f"updated {cyto_element}")
-                    selected_by_click = True
                 else:
                     cyto_element.update({"selected": False})
             return cyto_elements
@@ -299,17 +367,13 @@ def draw_model(
     for n_clicks, id in zip(delete_clicks, delete_ids):
         if n_clicks is not None:
             deleted_id = id.get("index")
-            print(f"deleted_id is {deleted_id}")
             if "element" in deleted_id:
                 Element.objects.get(pk=deleted_id.removeprefix("element_")).delete()
             elif "group" in deleted_id:
                 ElementGroup.objects.get(pk=deleted_id.removeprefix("group_")).delete()
-            print(len(cyto_elements))
             updated_cyto_elements = []
             for cyto_element in cyto_elements:
                 if cyto_element.get("data").get("parent") == deleted_id:
-                    print(cyto_element)
-                    print(f"removing parent {deleted_id} for {cyto_element.get('data').get('id')}")
                     cyto_element.get("data").update({"parent": None})
                 if cyto_element.get("data").get("id") != deleted_id:
                     updated_cyto_elements.append(cyto_element)
@@ -341,7 +405,6 @@ def draw_model(
                 parent_class_str = "group"
                 if child_id.startswith("element_"):
                     element = Element.objects.get(pk=child_id.removeprefix("element_"))
-                    print(parentchild_input)
                     element.element_group_id = parentchild_input[0]
                     element.save()
                     parent_class_str = "group"
@@ -350,8 +413,6 @@ def draw_model(
                     variable.element_id = parentchild_input[0]
                     variable.save()
                     parent_class_str = "element"
-                print(f"parent_class_str is {parent_class_str}")
-                print(f"child_id is {child_id}, parentchild_input[0] is {parentchild_input[0]}")
                 for cyto_element in cyto_elements:
                     if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
                         cyto_element.get("data").update({"parent": f"{parent_class_str}_{parentchild_input[0]}"})
@@ -360,13 +421,14 @@ def draw_model(
     if cyto_elements is not None:
         raise PreventUpdate
 
-    # INITIAL RUN
+    ## INITIAL RUN
     # init
     start = time.time()
     variables = Variable.objects.all().values()
     cyto_elements = []
 
-    # variables
+    # VARIABLES
+    # nodes
     for variable in variables:
         color = "white"
         usable = True
@@ -391,10 +453,47 @@ def draw_model(
              "classes": "variable"}
         )
 
-    print(f"elements took {time.time() - start}")
-    start = time.time()
+    # connections
+    connections = VariableConnection.objects.all().select_related("to_variable")
+    for connection in connections:
+        has_equation = "no"
+        if connection.to_variable is not None:
+            if connection.to_variable.equation is not None:
+                has_equation = "yes" if f"_E{connection.from_variable_id}_" in connection.to_variable.equation else "no"
 
-    # elements
+        cyto_elements.append({
+            "data": {
+                "source": connection.from_variable_id,
+                "target": connection.to_variable_id,
+                "has_equation": has_equation
+            },
+            "classes": "variable"
+        })
+
+    # variable flows
+    stocks = Variable.objects.filter(sd_type="Stock").prefetch_related("inflows", "outflows")
+    for stock in stocks:
+        for inflow in stock.inflows.all():
+            has_equation = "no" if inflow.equation is None else "yes"
+            cyto_elements.append(
+                {"data": {"source": inflow.pk,
+                          "target": stock.pk,
+                          "has_equation": has_equation,
+                          "edge_type": "Flow"},
+                 "classes": "variable"}
+            )
+        for outflow in stock.outflows.all():
+            has_equation = "no" if outflow.equation is None else "yes"
+            cyto_elements.append(
+                {"data": {"source": stock.pk,
+                          "target": outflow.pk,
+                          "has_equation": has_equation,
+                          "edge_type": "Flow"},
+                 "classes": "variable"}
+            )
+
+    # ELEMENTS
+    # nodes
     elements = Element.objects.all().select_subclasses()
     element_nodes = [
         {"data": {"id": f"element_{element.pk}",
@@ -406,7 +505,19 @@ def draw_model(
     ]
     cyto_elements.extend(element_nodes)
 
-    # element groups
+    # connections
+    cyto_elements.extend([
+        {
+            "data": {
+                "source": f"element_{connection.from_element_id}",
+                "target": f"element_{connection.to_element_id}"
+            },
+            "classes": f"element {Element.objects.get_subclass(pk=connection.from_element_id).element_type}"
+        }
+        for connection in ElementConnection.objects.all()
+    ])
+
+    # GROUPS
     element_groups = ElementGroup.objects.all().values()
     group_nodes = [
         {"data": {"id": f"group_{element_group.get('id')}",
@@ -419,54 +530,6 @@ def draw_model(
         for element_group in element_groups
     ]
     cyto_elements.extend(group_nodes)
-    print(f"groups took {time.time() - start}")
-    start = time.time()
-
-    # variable connections
-    connections = Connection.objects.all().select_related("to_element")
-    eq_time = 0
-    append_time = 0
-    eq_read_time = 0
-    for connection in connections:
-        eq_start = time.time()
-        has_equation = "no"
-        if connection.to_element is not None:
-            if connection.to_element.equation is not None:
-                eq_read_start = time.time()
-                has_equation = "yes" if f"_E{connection.from_element_id}_" in connection.to_element.equation else "no"
-                eq_read_time += time.time() - eq_read_start
-
-        eq_time += time.time() - eq_start
-        append_start = time.time()
-        cyto_elements.append({"data": {"source": connection.from_element_id,
-                               "target": connection.to_element_id,
-                               "has_equation": has_equation}})
-        append_time += time.time() - append_start
-    print(f"eq took {eq_time}, eq_read took {eq_read_time}, append took {append_time}")
-    print(f"connections took {time.time() - start}")
-    start = time.time()
-
-    # variable flows
-    stocks = Variable.objects.filter(sd_type="Stock").prefetch_related("inflows", "outflows")
-    for stock in stocks:
-        for inflow in stock.inflows.all():
-            has_equation = "no" if inflow.equation is None else "yes"
-            cyto_elements.append(
-                {"data": {"source": inflow.pk,
-                          "target": stock.pk,
-                          "has_equation": has_equation,
-                          "edge_type": "Flow"}}
-            )
-        for outflow in stock.outflows.all():
-            has_equation = "no" if outflow.equation is None else "yes"
-            cyto_elements.append(
-                {"data": {"source": stock.pk,
-                          "target": outflow.pk,
-                          "has_equation": has_equation,
-                          "edge_type": "Flow"}}
-            )
-    print(f"stocks took {time.time() - start}")
-    start = time.time()
 
     return cyto_elements
 
@@ -479,7 +542,6 @@ def draw_model(
 @timer
 def right_sidebar(selectednodedata, _):
     # INIT
-    print(f"selectednotedata={selectednodedata}")
     children = []
     if not selectednodedata:
         return children
@@ -659,17 +721,17 @@ def right_sidebar(selectednodedata, _):
 
         if variable.sd_type in ["Flow", "Variable"]:
             # connections
-            upstream_elements = Variable.objects.filter(downstream_connections__to_element=variable)
+            upstream_variables = Variable.objects.filter(downstream_connections__to_variable=variable)
             upstream_list = dbc.ListGroup(
                 [
                     dbc.ListGroupItem(className="p-1 justify-content-between", children=
                     html.Div(className="d-flex justify-content-between", children=
                     [
                         html.P(style={"font-size": "small"},
-                               children=f"{upstream_element.label} _E{upstream_element.pk}_"),
+                               children=f"{upstream_variable.label} _E{upstream_variable.pk}_"),
                         dbc.Button("X",
                                    id={"type": "element-detail-conn-del",
-                                       "index": f"{upstream_element.pk}-to-{variable.pk}"},
+                                       "index": f"{upstream_variable.pk}-to-{variable.pk}"},
                                    size="sm",
                                    color="danger",
                                    className="p-1",
@@ -678,13 +740,13 @@ def right_sidebar(selectednodedata, _):
 
                              )
                                       )
-                    for upstream_element in upstream_elements
+                    for upstream_variable in upstream_variables
                 ],
                 flush=True,
                 style={"height": "150px", "overflow-y": "scroll"}
             )
 
-            dropdown_options = Variable.objects.exclude(downstream_connections__to_element=variable).exclude(
+            dropdown_options = Variable.objects.exclude(downstream_connections__to_variable=variable).exclude(
                 pk=variable.pk)
             dropdown_list = [
                 {"label": possible_element.label, "value": possible_element.label}

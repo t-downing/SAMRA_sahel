@@ -7,7 +7,7 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_cytoscape as cyto
-from sahel.models import Variable, SimulatedDataPoint, Connection, ElementGroup, \
+from sahel.models import Variable, SimulatedDataPoint, VariableConnection, ElementGroup, \
     MeasuredDataPoint, Source, ResponseOption, ConstantValue, HouseholdConstantValue, Scenario
 import plotly.graph_objects as go
 from sahel.sd_model.model_operations import run_model, timer
@@ -346,7 +346,7 @@ def delete_connection(n_clicks, ids):
     for n_click, id in zip(n_clicks, ids):
         if n_click is not None:
             pks = id.get("index").split("-to-")
-            Connection.objects.get(from_element__pk=pks[0], to_element__pk=pks[1]).delete()
+            VariableConnection.objects.get(from_element__pk=pks[0], to_element__pk=pks[1]).delete()
             return f"{ids}"
 
 
@@ -438,7 +438,7 @@ def submit_connection(n_clicks, nodedata, value):
     element = Variable.objects.get(pk=nodedata.get("id"))
     upstream_element = Variable.objects.get(label=value)
     try:
-        Connection(from_element=upstream_element, to_element=element).save()
+        VariableConnection(from_element=upstream_element, to_element=element).save()
     except:
         return "could not add"
     return "added conenection"
@@ -843,7 +843,7 @@ def redraw_model(date_ord, *_):
     print(f"groups took {time.time() - start}")
     start = time.time()
 
-    connections = Connection.objects.all().select_related("to_element")
+    connections = VariableConnection.objects.all().select_related("to_variable")
     edges=[]
     eq_time = 0
     append_time = 0
@@ -851,10 +851,10 @@ def redraw_model(date_ord, *_):
     for connection in connections:
         eq_start = time.time()
         has_equation = "no"
-        if connection.to_element is not None:
-            if connection.to_element.equation is not None:
+        if connection.to_variable is not None:
+            if connection.to_variable.equation is not None:
                 eq_read_start = time.time()
-                has_equation = "yes" if f"_E{connection.from_element_id}_" in connection.to_element.equation else "no"
+                has_equation = "yes" if f"_E{connection.from_element_id}_" in connection.to_variable.equation else "no"
                 eq_read_time += time.time() - eq_read_start
 
         eq_time += time.time() - eq_start

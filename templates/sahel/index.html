@@ -220,17 +220,46 @@
     </div>
 </div>
 
-<h3 class="h3 mb-2 text-gray-800">Gestion d'information</h3>
-<p>Explorer et ajouter l'information pour le modèle.</p>
+<h3 class="h3 mb-2 text-gray-800">Cartographie</h3>
+<p>Explorer la carte du système.</p>
 
 <div class="row">
-    <div class="col">
+    <div class="col mb-4">
         <div class="card border-left-primary shadow h-100 py-2">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
                     <div class="col mr-2">
                         <div class="h5 font-weight-bold text-uppercase mb-3">
-                            <a href="{% url 'sources' %}" class="text-primary">Sources</a></div>
+                            <a href="{% url 'mapping2modeling' %}" class="text-primary">BETA: Carte</a></div>
+                        <div class="h6 mb-3 font-weight-bold">
+                            BETA
+                        </div>
+                        <div class="p mb-0">
+                            BETA
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <a class="btn" href="{% url 'mapping2modeling' %}">
+                            <i class="fa-solid fa-triangle-exclamation fa-6x text-gray-300"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h3 class="h3 mb-2 text-gray-800">Gestion d'information</h3>
+<p>Explorer et ajouter l'information pour le modèle.</p>
+
+<div class="row">
+    <div class="col mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="h5 font-weight-bold text-uppercase mb-3">
+                            <a href="{% url 'sources' %}" class="text-success">Sources</a></div>
                         <div class="h6 mb-3 font-weight-bold">
                             SOUS CONSTRUCTION
                         </div>
