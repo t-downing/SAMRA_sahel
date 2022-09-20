@@ -30,7 +30,47 @@ class SituationalAnalysis(Element):
         (SITUATIONAL_ANALYSIS, "Analyse de situation"),
     )
 
+    SA_STATUS_GOOD = "AA"
+    SA_STATUS_OK = "BB"
+    SA_STATUS_BAD = "CC"
+    SA_STATUSES = (
+        (SA_STATUS_GOOD, "Good"),
+        (SA_STATUS_OK, "Medium"),
+        (SA_STATUS_BAD, "Bad"),
+    )
+
+    SA_TREND_IMPROVING = "AA"
+    SA_TREND_STAGNANT = "BB"
+    SA_TREND_WORSENING = "CC"
+    SA_TRENDS = (
+        (SA_TREND_IMPROVING, "Improving"),
+        (SA_TREND_STAGNANT, "Stagnant"),
+        (SA_TREND_WORSENING, "Worsening"),
+    )
+
+    SA_RES_HIGH = "AA"
+    SA_RES_MED = "BB"
+    SA_RES_LOW = "CC"
+    SA_RESILIENCE_OPTIONS = (
+        (SA_RES_HIGH, "High"),
+        (SA_RES_MED, "Medium"),
+        (SA_RES_LOW, "Low"),
+    )
+
+    SA_VUL_HIGH = "AA"
+    SA_VUL_MED = "BB"
+    SA_VUL_LOW = "CC"
+    SA_VULNERABILITY_OPTIONS = (
+        (SA_VUL_HIGH, "High"),
+        (SA_VUL_MED, "Medium"),
+        (SA_VUL_LOW, "Low"),
+    )
+
     element_type = models.CharField(choices=SA_TYPES, max_length=2, default=SITUATIONAL_ANALYSIS)
+    status = models.CharField(choices=SA_STATUSES, max_length=2, null=True, blank=True)
+    trend = models.CharField(choices=SA_TRENDS, max_length=2, null=True, blank=True)
+    resilience = models.CharField(choices=SA_RESILIENCE_OPTIONS, max_length=2, null=True, blank=True)
+    vulnerability = models.CharField(choices=SA_VULNERABILITY_OPTIONS, max_length=2, null=True, blank=True)
 
     class Meta:
         verbose_name = "Analyse de situation"
@@ -68,6 +108,17 @@ class ShockStructure(Element):
 
     class Meta:
         verbose_name = "Choc"
+
+
+class Story(models.Model):
+    name = models.CharField(max_length=200)
+    date_created = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(null=True, blank=True)
+
+    elements = models.ManyToManyField("element", related_name="stories")
+
+    def __str__(self):
+        return self.name
 
 
 class Variable(Node):

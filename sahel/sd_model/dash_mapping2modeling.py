@@ -5,7 +5,7 @@ from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
-    SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection
+    SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis
 from .model_operations import timer
 import time
 import pandas as pd
@@ -43,7 +43,7 @@ stylesheet = [
 
     # GROUPS
     # nodes
-    {"selector": ".group",
+    {"selector": "node.group",
      "style": {
          "color": "lightgrey",
          "font-size": 40,
@@ -55,7 +55,7 @@ stylesheet = [
 
     # ELEMENTS
     # nodes
-    {"selector": ".element",
+    {"selector": "node.element",
      "style": {
          "font-size": 20,
          "border-width": 2,
@@ -63,23 +63,29 @@ stylesheet = [
      }},
     {"selector": ".IV",
      "style": {
-         "background-color": "#d7c4ed",
-         "border-color": "#5f2f9d",
-         "color": "#5f2f9d",
-         "line-color": "#9966cc",
-         "target-arrow-color": "#9966cc",
+         # rebeccapurple
+         "background-color": "#d9c6ec",
+         "border-color": "#66329a",
+         "color": "#66329a",
+         "line-color": "#9965cd",
+         "target-arrow-color": "#9965cd",
      }},
     {"selector": ".SA",
      "style": {
-         "background-color": "#FFF8DC",
-         "border-color": "#CD853F",
-         "color": "#CD853F",
+         # chocolate
+         "background-color": "#f9e2d2",
+         "border-color": "#d2691e",
+         "color": "#d2691e",
+         "line-color": "#e99b63",
+         "target-arrow-color": "#e99b63",
      }},
     {"selector": ".SE",
      "style": {
          "background-color": "#F08080",
          "border-color": "crimson",
          "color": "crimson",
+            "line-color": "crimson",
+         "target-arrow-color": "crimson",
      }},
 
     # edges
@@ -191,7 +197,7 @@ app.layout = html.Div(children=[
         dbc.ModalBody(children=[
             dbc.InputGroup(className="mb-2", children=[
                 dbc.InputGroupAddon("Classe", addon_type="prepend"),
-                dbc.Select(id="add-node-class-input", options=[
+                dbc.Select(id="add-node-class-input", value="variable", options=[
                     {"label": "Groupe", "value": "group"},
                     {"label": "Élément", "value": "element"},
                     {"label": "Variable", "value": "variable"},
@@ -211,7 +217,7 @@ app.layout = html.Div(children=[
             ]),
             dbc.InputGroup(className="mb-2", children=[
                 dbc.InputGroupAddon("Unité", addon_type="prepend"),
-                dbc.Select(id="add-node-unit-input", disabled=True),
+                dbc.Select(id="add-node-unit-input"),
             ]),
         ]),
         dbc.ModalFooter(className="d-flex justify-content-end", children=[
@@ -250,12 +256,93 @@ app.layout = html.Div(children=[
     Output("add-node-modal", "is_open"),
     Input("add-node-open", "n_clicks"),
     Input("add-node-close", "n_clicks"),
+    Input("add-node-submit", "n_clicks"),
     State("add-node-modal", "is_open")
 )
-def add_node_modal(open_clicks, close_clicks, is_open):
-    if open_clicks or close_clicks:
+def add_node_modal(open_clicks, close_clicks, submit_clicks, is_open):
+    if open_clicks or close_clicks or submit_clicks:
         return not is_open
     return is_open
+
+
+@app.callback(
+    Output("add-node-subclass-input", "options"),
+    Output("add-node-subclass-input", "value"),
+    Output("add-node-subclass-input", "disabled"),
+    Input("add-node-class-input", "value")
+)
+def add_node_subclass(class_input):
+    options = []
+    value = None
+    disabled = True
+    if class_input == "group":
+        pass
+    elif class_input == "element":
+        options = [
+            {"label": "Analyse de situation", "value": "situationalanalysis"},
+            {"label": "Théorie de changement", "value": "theoryofchange"}
+        ]
+        value = "situationalanalysis"
+        disabled = False
+    elif class_input == "variable":
+        pass
+    return options, value, disabled
+
+
+@app.callback(
+    Output("add-node-type-input", "options"),
+    Output("add-node-type-input", "value"),
+    Output("add-node-type-input", "disabled"),
+    Input("add-node-class-input", "value"),
+    Input("add-node-subclass-input", "value"),
+)
+def add_node_type(class_input, subclass_input):
+    options = []
+    value = None
+    disabled = True
+    if class_input == "groupe":
+        pass
+    elif class_input  == "variable":
+        options = [
+            {"label": sd_type[1], "value": sd_type[0]}
+            for sd_type in Variable.SD_TYPES
+        ]
+        value = "Variable"
+        disabled = False
+    elif subclass_input == "theoryofchange":
+        options = [
+            {"label": tc_type[1], "value": tc_type[0]}
+            for tc_type in TheoryOfChange.TOC_TYPES
+        ]
+        value = TheoryOfChange.INTERVENTION
+        disabled = False
+    elif subclass_input == "situationalanalysis":
+        options = [
+            {"label": sa_type[1], "value": sa_type[0]}
+            for sa_type in SituationalAnalysis.SA_TYPES
+        ]
+        value = SituationalAnalysis.SITUATIONAL_ANALYSIS
+    return options, value, disabled
+
+
+@app.callback(
+    Output("add-node-unit-input", "options"),
+    Output("add-node-unit-input", "value"),
+    Output("add-node-unit-input", "disabled"),
+    Input("add-node-class-input", "value"),
+)
+def add_node_unit(class_input):
+    options = []
+    value = None
+    disabled = True
+    if class_input == "variable":
+        options = [
+            {"label": sd_unit[1], "value": sd_unit[0]}
+            for sd_unit in Variable.UNIT_OPTIONS
+        ]
+        value = "tête / mois"
+        disabled = False
+    return options, value, disabled
 
 
 @app.callback(
@@ -321,6 +408,8 @@ def show_layers(layers):
     Input({"type": "delete-node", "index": ALL}, "n_clicks"),
     Input({"type": "remove-node", "index": ALL}, "n_clicks"),
     Input({"type": "parentchild-submit", "index": ALL}, "n_clicks"),
+    # add node
+    Input("add-node-submit", "n_clicks"),
 
     # STATES
     # relationship modification
@@ -329,6 +418,13 @@ def show_layers(layers):
     State({"type": "remove-node", "index": ALL}, "id"),
     State({"type": "parentchild-submit", "index": ALL}, "id"),
     State({"type": "parentchild-input", "index": ALL}, "value"),
+    # add node
+    State("add-node-class-input", "value"),
+    State("add-node-subclass-input", "value"),
+    State("add-node-type-input", "value"),
+    State("add-node-label-input", "value"),
+    State("add-node-unit-input", "value"),
+    State("add-node-modal", "is_open"),
     # current elements read
     State("cyto", "elements"),
 )
@@ -340,6 +436,8 @@ def draw_model(
         delete_clicks,
         remove_clicks,
         parentchild_clicks,
+        # add node
+        add_node_clicks,
 
         # STATES
         # relationship modification
@@ -348,6 +446,13 @@ def draw_model(
         remove_ids,
         parentchild_ids,
         parentchild_input,
+        # add node
+        class_input,
+        subclass_input,
+        type_input,
+        label_input,
+        unit_input,
+        add_node_modal_is_open,
         # current elements read
         cyto_elements: list[dict],
 ):
@@ -417,6 +522,39 @@ def draw_model(
                     if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
                         cyto_element.get("data").update({"parent": f"{parent_class_str}_{parentchild_input[0]}"})
             return cyto_elements
+
+    # ADD NODE
+    if add_node_clicks > 0 and add_node_modal_is_open:
+        if class_input == "group":
+            element_group = ElementGroup(label=label_input)
+            element_group.save()
+            cyto_elements.append(
+                {"data": {"id": f"group_{element_group.pk}",
+                          "label": element_group.label,
+                          "hierarchy": "group"},
+                 "classes": "group",
+                 "grabbable": False,
+                 "selectable": True,
+                 "pannable": True}
+            )
+            return cyto_elements
+        elif class_input == "element":
+            element = None
+            if subclass_input == "situationalanalysis":
+                element = SituationalAnalysis(label=label_input, element_type=type_input).save()
+            elif subclass_input == "theoryofchange":
+                element = TheoryOfChange(label=label_input, element_type=type_input).save()
+            element.save()
+            cyto_elements.append(
+                {"data": {"id": f"element_{element.pk}",
+                          "label": element.label,
+                          "hierarchy": "element",
+                          "parent": f"group_{element.element_group_id}"},
+                 "classes": f"element {element.element_type}"}
+            )
+        elif class_input == "variable":
+            Variable(label=label_input, sd_type=type_input, unit=unit_input).save()
+
 
     if cyto_elements is not None:
         raise PreventUpdate
@@ -626,6 +764,9 @@ def right_sidebar(selectednodedata, _):
             )
             for variable in element.variables.all()
         ])
+
+        # status, trend, resilience, vulnerability
+
 
         # EBs
         children.append(html.P(className="mt-4 mb-0 font-weight-bold", children="Informations Qualitatives"))

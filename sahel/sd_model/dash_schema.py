@@ -438,7 +438,7 @@ def submit_connection(n_clicks, nodedata, value):
     element = Variable.objects.get(pk=nodedata.get("id"))
     upstream_element = Variable.objects.get(label=value)
     try:
-        VariableConnection(from_element=upstream_element, to_element=element).save()
+        VariableConnection(from_variable=upstream_element, to_variable=element).save()
     except:
         return "could not add"
     return "added conenection"
@@ -854,13 +854,13 @@ def redraw_model(date_ord, *_):
         if connection.to_variable is not None:
             if connection.to_variable.equation is not None:
                 eq_read_start = time.time()
-                has_equation = "yes" if f"_E{connection.from_element_id}_" in connection.to_variable.equation else "no"
+                has_equation = "yes" if f"_E{connection.from_variable_id}_" in connection.to_variable.equation else "no"
                 eq_read_time += time.time() - eq_read_start
 
         eq_time += time.time() - eq_start
         append_start = time.time()
-        edges.append({"data": {"source": connection.from_element_id,
-                                "target": connection.to_element_id,
+        edges.append({"data": {"source": connection.from_variable_id,
+                                "target": connection.to_variable_id,
                                 "has_equation": has_equation}})
         append_time += time.time() - append_start
     print(f"eq took {eq_time}, eq_read took {eq_read_time}, append took {append_time}")
