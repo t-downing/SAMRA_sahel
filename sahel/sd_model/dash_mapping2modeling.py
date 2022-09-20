@@ -410,7 +410,11 @@ def show_layers(layers):
     Input({"type": "parentchild-submit", "index": ALL}, "n_clicks"),
     # add node
     Input("add-node-submit", "n_clicks"),
-
+    # change field
+    [
+        Input({"type": f"{field}-input", "index": ALL}, "value")
+        for field in SituationalAnalysis.SA_FIELDS
+    ],
     # STATES
     # relationship modification
     State({"type": "select-node", "index": ALL}, "id"),
@@ -425,6 +429,11 @@ def show_layers(layers):
     State("add-node-label-input", "value"),
     State("add-node-unit-input", "value"),
     State("add-node-modal", "is_open"),
+    # change field
+    [
+        State({"type": f"{field}-input", "index": ALL}, "id")
+        for field in SituationalAnalysis.SA_FIELDS
+    ],
     # current elements read
     State("cyto", "elements"),
 )
@@ -438,6 +447,11 @@ def draw_model(
         parentchild_clicks,
         # add node
         add_node_clicks,
+        # change field
+        status_field_input,
+        trend_field_input,
+        resilience_field_input,
+        vulnerability_field_input,
 
         # STATES
         # relationship modification
@@ -453,6 +467,11 @@ def draw_model(
         label_input,
         unit_input,
         add_node_modal_is_open,
+        # change fields
+        status_field_id,
+        trend_field_id,
+        resilience_field_id,
+        vulnerability_field_id,
         # current elements read
         cyto_elements: list[dict],
 ):
@@ -554,6 +573,30 @@ def draw_model(
             )
         elif class_input == "variable":
             Variable(label=label_input, sd_type=type_input, unit=unit_input).save()
+
+    # CHANGE FIELD
+    if status_field_input:
+        for field in SituationalAnalysis.SA_FIELDS:
+            if field == "status":
+                value, id = status_field_input, status_field_id
+            elif field == "trend":
+                value, id = trend_field_input, trend_field_id
+            elif field == "resilience":
+                value, id = resilience_field_input, resilience_field_id
+            elif field == "vulnerability":
+                value, id = vulnerability_field_input, vulnerability_field_id
+            else:
+                value, id = None, None
+
+            value = value[0]
+            id = id[0]
+
+            element = SituationalAnalysis.objects.get(pk=id.get("index"))
+            old_value = getattr(element, field)
+
+            if value != old_value:
+                setattr(element, field, value)
+                element.save()
 
 
     if cyto_elements is not None:
@@ -765,8 +808,24 @@ def right_sidebar(selectednodedata, _):
             for variable in element.variables.all()
         ])
 
-        # status, trend, resilience, vulnerability
-
+        # status, trend, resilience, vulnerability for SA only
+        if isinstance(element, SituationalAnalysis):
+            children.append(html.P(className="mt-3 mb-0 font-weight-bold", children="Characteristics"))
+            children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+            children.extend([
+                dbc.InputGroup(className="mb-2", size="sm",  children=[
+                    dbc.InputGroupAddon(addon_type="prepend", children=field.capitalize()),
+                    dbc.Select(
+                        id={"type": f"{field}-input", "index": element.pk},
+                        options=[
+                            {"value": choice[0], "label": choice[1]}
+                            for choice in SituationalAnalysis._meta.get_field(field).choices
+                        ],
+                        value=getattr(element, field)
+                    )
+                ])
+                for field in SituationalAnalysis.SA_FIELDS
+            ])
 
         # EBs
         children.append(html.P(className="mt-4 mb-0 font-weight-bold", children="Informations Qualitatives"))

@@ -25,6 +25,9 @@ class Element(Node):
 
 
 class SituationalAnalysis(Element):
+    # for now, SA_FIELDS must match names of fields to be edited in map
+    SA_FIELDS = ["status", "trend", "resilience", "vulnerability"]
+
     SITUATIONAL_ANALYSIS = "SA"
     SA_TYPES = (
         (SITUATIONAL_ANALYSIS, "Analyse de situation"),
