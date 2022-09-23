@@ -89,6 +89,12 @@ stylesheet = [
      }},
 
     # edges
+    {
+        "selector": "edge.element",
+        "style": {
+            "arrow-scale": 2,
+        }
+    },
 
     # VARIABLES
     # nodes
@@ -158,6 +164,12 @@ stylesheet = [
          "border-width": 3,
      }},
 ]
+
+fieldvalue2color = {
+    "status": {
+        ""
+    }
+}
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -516,6 +528,9 @@ def show_layers(layers, colorbody_field, colorborder_field, colorring_field):
     # delete connection
     Input({"type": "delete-connection", "index": ALL}, "n_clicks"),
 
+    # add connection
+    Input({"type": "add-connection-submit", "index": ALL}, "n_clicks"),
+
     # STATES
 
     # relationship modification
@@ -542,6 +557,10 @@ def show_layers(layers, colorbody_field, colorborder_field, colorring_field):
     # delete connections
     State({"type": "delete-connection", "index": ALL}, "id"),
 
+    # add connections
+    State({"type": "add-connection-submit", "index": ALL}, "id"),
+    State({"type": "add-connection-input", "index": ALL}, "value"),
+
     # current elements read
     State("cyto", "elements"),
 )
@@ -566,6 +585,9 @@ def draw_model(
 
         # delete connection
         delete_connection_clicks,
+
+        # add connection
+        add_connection_clicks,
 
         # STATES
 
@@ -593,9 +615,14 @@ def draw_model(
         # delete connection
         delete_connection_ids,
 
+        # add connection
+        add_connection_ids,
+        add_connection_input,
+
         # current elements read
         cyto_elements: list[dict],
 ):
+    print(f"add_connection_clicks is {add_connection_clicks}")
     # SELECT NODE
     for n_clicks, id in zip(select_clicks, select_ids):
         if n_clicks is not None:
@@ -723,13 +750,30 @@ def draw_model(
     for n_clicks, id in zip(delete_connection_clicks, delete_connection_ids):
         if n_clicks is not None:
             from_element_pk, to_element_pk = [pk.removeprefix("element_") for pk in id.get("index").split("-to-")]
-            print(ElementConnection.objects.get(from_element_id=from_element_pk, to_element_id=to_element_pk))
+            ElementConnection.objects.get(from_element_id=from_element_pk, to_element_id=to_element_pk).delete()
             cyto_elements = [
                 cyto_element
                 for cyto_element in cyto_elements
                 if not (cyto_element.get("data").get("source") == f"element_{from_element_pk}" and
                         cyto_element.get("data").get("target") == f"element_{to_element_pk}")
             ]
+            return cyto_elements
+
+    # ADD CONNECTION
+    for n_clicks, id in zip(add_connection_clicks, add_connection_ids):
+        print(n_clicks)
+        print(id)
+        if n_clicks is not None:
+            to_element_pk = id.get("index").removeprefix("to-element_")
+            from_element_pk = add_connection_input[0].removeprefix("element_")
+            cyto_elements.append({
+                "data": {
+                    "source": f"element_{from_element_pk}",
+                    "target": f"element_{to_element_pk}",
+                },
+                "classes": f"element {Element.objects.get_subclass(pk=from_element_pk).element_type}",
+            })
+            ElementConnection(to_element_id=to_element_pk, from_element_id=from_element_pk).save()
             return cyto_elements
 
     if cyto_elements is not None:
@@ -965,6 +1009,19 @@ def right_sidebar(selectednodedata, _):
             ])
             for upstream_element in Element.objects.filter(downstream_connections__to_element=element)
         ])
+        children.append(dbc.InputGroup(size="sm", children=[
+            dbc.Select(
+                id={"type": "add-connection-input", "index": "only-one"},
+                options=[
+                    {"label": upstream_element.label, "value": f"element_{upstream_element.pk}"}
+                    for upstream_element in
+                    Element.objects.exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
+                ],
+            ),
+            dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
+                id={"type": "add-connection-submit", "index": f"to-element_{element.pk}"}, children="Ajouter"
+            ))
+        ]))
 
         # status, trend, resilience, vulnerability for SA only
         if isinstance(element, SituationalAnalysis):
