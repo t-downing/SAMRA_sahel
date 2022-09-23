@@ -84,7 +84,7 @@ stylesheet = [
          "background-color": "#F08080",
          "border-color": "crimson",
          "color": "crimson",
-            "line-color": "crimson",
+         "line-color": "crimson",
          "target-arrow-color": "crimson",
      }},
 
@@ -162,12 +162,17 @@ stylesheet = [
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 app.layout = html.Div(children=[
+    # INIT
     # init div for populate initial values
     html.Div(id="init", hidden=True, children="init"),
 
-    # overlay stuff, all with position:absolute (cannot click through divs in Dash for some reason, z-index not working either)
+    # OVERLAY
+    # overlay stuff, all with position:absolute
+    # (cannot click through divs in Dash for some reason, z-index not working either)
     html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute"}, children=[
         html.H2(className="mb-4 h2", children="Schéma"),
+
+        # layers
         dbc.Card(className="mb-3", children=[
             dbc.CardBody(className="p-2", children=[
                 dbc.FormGroup(className="m-0", children=[
@@ -186,12 +191,27 @@ app.layout = html.Div(children=[
                 ])
             ])
         ]),
+
+        # colors
+        dbc.Card(className="mb-3", children=[
+            dbc.CardBody(className="p-2", children=[
+                html.P(className="mb-1", children="Couleurs"),
+                *[
+                    dbc.InputGroup(className="mt-1", size="sm", children=[
+                        dbc.InputGroupAddon(addon_type="prepend", children=part.capitalize()),
+                        dbc.Select(id=f"color{part}-input")
+                    ])
+                    for part in ["body", "border", "ring"]
+                ],
+            ])
+        ]),
         dbc.Button(className="mb-3", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
         html.Br(),
         dbc.Button(className="mb-3", id="add-node-open", children="Ajouter", size="sm", color="primary"),
     ]),
 
-    # modals
+    # MODALS
+    # add node
     dbc.Modal(id="add-node-modal", is_open=False, children=[
         dbc.ModalHeader("Ajouter un objet"),
         dbc.ModalBody(children=[
@@ -226,8 +246,10 @@ app.layout = html.Div(children=[
         ]),
     ]),
 
+    # RIGHT SIDEBAR
     html.Div(id="right-sidebar", className="mt-4 mr-4", style={"position": "absolute", "right": 0, "width": "300px"}),
 
+    # CYTO
     # cytoscape underlay with position:absolute
     html.Div(
         style={
@@ -250,6 +272,24 @@ app.layout = html.Div(children=[
         ),
     ),
 ])
+
+
+@app.callback(
+    # color dropdowns
+    *[
+        [Output(f"color{part}-input", "options"), Output(f"color{part}-input", "value")]
+        for part in ["body", "border", "ring"]
+    ],
+    Input("init", "children"),
+)
+def populate_initial(_):
+    options = [{"value": "default", "label": "---"}]
+    options.extend([
+        {"value": field, "label": field}
+        for field in SituationalAnalysis.SA_FIELDS
+    ])
+    value = "default"
+    return options, value, options, value, options, value
 
 
 @app.callback(
@@ -302,7 +342,7 @@ def add_node_type(class_input, subclass_input):
     disabled = True
     if class_input == "groupe":
         pass
-    elif class_input  == "variable":
+    elif class_input == "variable":
         options = [
             {"label": sd_type[1], "value": sd_type[0]}
             for sd_type in Variable.SD_TYPES
@@ -359,12 +399,17 @@ def download_svg(n_clicks):
 @app.callback(
     Output("cyto", "stylesheet"),
     Input("layers-input", "value"),
+    [
+        Input(f"color{part}-input", "value")
+        for part in ["body", "border", "ring"]
+    ]
 )
-def show_layers(layers):
+def show_layers(layers, colorbody_field, colorborder_field, colorring_field):
+    print(f"colorbody_field is {colorbody_field}")
+    # LAYERS
     layers.sort()
     print(layers)
     added_stylesheet = []
-
     if "group" not in layers:
         added_stylesheet.extend([
             {"selector": ".group",
@@ -396,6 +441,55 @@ def show_layers(layers):
 
         ])
 
+    # COLOR
+    # map general values to colors
+    value2color = {}
+    if colorbody_field == "status":
+        print("coloring by status")
+        value2color.update({
+            SituationalAnalysis.SA_STATUS_GOOD: "green",
+            SituationalAnalysis.SA_STATUS_OK: "yellow",
+            SituationalAnalysis.SA_STATUS_BAD: "red",
+        })
+    elif colorbody_field == "trend":
+        value2color.update({
+            SituationalAnalysis.SA_TREND_IMPROVING: "green",
+            SituationalAnalysis.SA_TREND_STAGNANT: "yellow",
+            SituationalAnalysis.SA_TREND_WORSENING: "red",
+        })
+    elif colorbody_field == "resilience":
+        value2color.update({
+            SituationalAnalysis.SA_RES_HIGH: "green",
+            SituationalAnalysis.SA_RES_MED: "yellow",
+            SituationalAnalysis.SA_RES_LOW: "red",
+        })
+
+    # body
+    if colorbody_field != "default":
+        print(f"value2color is {value2color}")
+        print(f"choices are {SituationalAnalysis._meta.get_field(colorbody_field).choices}")
+        added_stylesheet.extend([
+            {
+                "selector": f"[{colorbody_field} = '{choice[0]}']",
+                "style": {
+                    "background-color": value2color.get(choice[0])
+                }
+            }
+            for choice in SituationalAnalysis._meta.get_field(colorbody_field).choices
+        ])
+
+    # border
+    if colorborder_field != "default":
+        added_stylesheet.extend([
+            {
+                "selector": f"[{colorborder_field} = '{choice[0]}']",
+                "style": {
+                    "border-color": value2color.get(choice[0])
+                }
+            }
+            for choice in SituationalAnalysis._meta.get_field(colorborder_field).choices
+        ])
+
     return stylesheet + added_stylesheet
 
 
@@ -403,25 +497,34 @@ def show_layers(layers):
     Output("cyto", "elements"),
 
     # INPUTS
+
     # relationship modification
     Input({"type": "select-node", "index": ALL}, "n_clicks"),
     Input({"type": "delete-node", "index": ALL}, "n_clicks"),
     Input({"type": "remove-node", "index": ALL}, "n_clicks"),
     Input({"type": "parentchild-submit", "index": ALL}, "n_clicks"),
+
     # add node
     Input("add-node-submit", "n_clicks"),
+
     # change field
     [
         Input({"type": f"{field}-input", "index": ALL}, "value")
         for field in SituationalAnalysis.SA_FIELDS
     ],
+
+    # delete connection
+    Input({"type": "delete-connection", "index": ALL}, "n_clicks"),
+
     # STATES
+
     # relationship modification
     State({"type": "select-node", "index": ALL}, "id"),
     State({"type": "delete-node", "index": ALL}, "id"),
     State({"type": "remove-node", "index": ALL}, "id"),
     State({"type": "parentchild-submit", "index": ALL}, "id"),
     State({"type": "parentchild-input", "index": ALL}, "value"),
+
     # add node
     State("add-node-class-input", "value"),
     State("add-node-subclass-input", "value"),
@@ -429,37 +532,50 @@ def show_layers(layers):
     State("add-node-label-input", "value"),
     State("add-node-unit-input", "value"),
     State("add-node-modal", "is_open"),
+
     # change field
     [
         State({"type": f"{field}-input", "index": ALL}, "id")
         for field in SituationalAnalysis.SA_FIELDS
     ],
+
+    # delete connections
+    State({"type": "delete-connection", "index": ALL}, "id"),
+
     # current elements read
     State("cyto", "elements"),
 )
 @timer
 def draw_model(
         # INPUTS
+
         # relationship modification
         select_clicks,
         delete_clicks,
         remove_clicks,
         parentchild_clicks,
+
         # add node
         add_node_clicks,
+
         # change field
         status_field_input,
         trend_field_input,
         resilience_field_input,
         vulnerability_field_input,
 
+        # delete connection
+        delete_connection_clicks,
+
         # STATES
+
         # relationship modification
         select_ids,
         delete_ids,
         remove_ids,
         parentchild_ids,
         parentchild_input,
+
         # add node
         class_input,
         subclass_input,
@@ -467,11 +583,16 @@ def draw_model(
         label_input,
         unit_input,
         add_node_modal_is_open,
+
         # change fields
         status_field_id,
         trend_field_id,
         resilience_field_id,
         vulnerability_field_id,
+
+        # delete connection
+        delete_connection_ids,
+
         # current elements read
         cyto_elements: list[dict],
 ):
@@ -598,6 +719,18 @@ def draw_model(
                 setattr(element, field, value)
                 element.save()
 
+    # DELETE CONNECTION
+    for n_clicks, id in zip(delete_connection_clicks, delete_connection_ids):
+        if n_clicks is not None:
+            from_element_pk, to_element_pk = [pk.removeprefix("element_") for pk in id.get("index").split("-to-")]
+            print(ElementConnection.objects.get(from_element_id=from_element_pk, to_element_id=to_element_pk))
+            cyto_elements = [
+                cyto_element
+                for cyto_element in cyto_elements
+                if not (cyto_element.get("data").get("source") == f"element_{from_element_pk}" and
+                        cyto_element.get("data").get("target") == f"element_{to_element_pk}")
+            ]
+            return cyto_elements
 
     if cyto_elements is not None:
         raise PreventUpdate
@@ -675,16 +808,22 @@ def draw_model(
 
     # ELEMENTS
     # nodes
-    elements = Element.objects.all().select_subclasses()
-    element_nodes = [
-        {"data": {"id": f"element_{element.pk}",
-                  "label": element.label,
-                  "hierarchy": "element",
-                  "parent": f"group_{element.element_group_id}"},
-         "classes": f"element {element.element_type}"}
-        for element in elements
-    ]
-    cyto_elements.extend(element_nodes)
+    cyto_elements.extend([
+        {
+            "data": {
+                "id": f"element_{element.pk}",
+                "label": element.label,
+                "hierarchy": "element",
+                "parent": f"group_{element.element_group_id}",
+                **{
+                    field: getattr(element, field, None)
+                    for field in SituationalAnalysis.SA_FIELDS
+                },
+            },
+            "classes": f"element {element.element_type}"
+        }
+        for element in Element.objects.all().select_subclasses()
+    ])
 
     # connections
     cyto_elements.extend([
@@ -779,19 +918,20 @@ def right_sidebar(selectednodedata, _):
                         outline=True, color="secondary", children=element.element_group.label,
                     ),
                     dbc.Button(
-                        id={"type": "remove-node", "index": f"group_{element.element_group_id}-contains-element_{element.pk}"},
+                        id={"type": "remove-node",
+                            "index": f"group_{element.element_group_id}-contains-element_{element.pk}"},
                         outline=True, color="danger", children="x"
                     )
                 ])
                 if element.element_group is not None else
                 dbc.InputGroup(size="sm", children=[
                     dbc.Select(
-                        id={"type": "parentchild-input",  "index": "only_one"}, bs_size="sm",
+                        id={"type": "parentchild-input", "index": "only_one"}, bs_size="sm",
                         options=[{"label": elementgroup.label, "value": elementgroup.pk}
                                  for elementgroup in ElementGroup.objects.all()],
                     ),
                     dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
-                        id={"type": "parentchild-submit",  "index": f"child-element_{element.pk}"}, children="Saisir"
+                        id={"type": "parentchild-submit", "index": f"child-element_{element.pk}"}, children="Saisir"
                     ))
                 ]),
             ])
@@ -808,12 +948,30 @@ def right_sidebar(selectednodedata, _):
             for variable in element.variables.all()
         ])
 
+        # upstream
+        children.append(html.P(className="mb-0 font-weight-bold", children="Éléments en amont"))
+        children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+        children.extend([
+            dbc.ButtonGroup(className="mb-1 mr-1", size="sm", children=[
+                dbc.Button(
+                    id={"type": "select-node", "index": f"element_{upstream_element.pk}"},
+                    outline=True, color="secondary", children=upstream_element.label
+                ),
+                dbc.Button(
+                    id={"type": "delete-connection",
+                        "index": f"element_{upstream_element.pk}-to-element_{element.pk}"},
+                    outline=True, color="danger", children="x"
+                )
+            ])
+            for upstream_element in Element.objects.filter(downstream_connections__to_element=element)
+        ])
+
         # status, trend, resilience, vulnerability for SA only
         if isinstance(element, SituationalAnalysis):
             children.append(html.P(className="mt-3 mb-0 font-weight-bold", children="Characteristics"))
             children.append(html.Hr(className="mb-2 mt-1 mx-0"))
             children.extend([
-                dbc.InputGroup(className="mb-2", size="sm",  children=[
+                dbc.InputGroup(className="mb-2", size="sm", children=[
                     dbc.InputGroupAddon(addon_type="prepend", children=field.capitalize()),
                     dbc.Select(
                         id={"type": f"{field}-input", "index": element.pk},
@@ -866,12 +1024,12 @@ def right_sidebar(selectednodedata, _):
                 if variable.element is not None else
                 dbc.InputGroup(size="sm", children=[
                     dbc.Select(
-                        id={"type": "parentchild-input",  "index": "only_one"}, bs_size="sm",
+                        id={"type": "parentchild-input", "index": "only_one"}, bs_size="sm",
                         options=[{"label": element.label, "value": element.pk}
                                  for element in Element.objects.all()],
                     ),
                     dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
-                        id={"type": "parentchild-submit",  "index": f"child-variable_{variable.pk}"}, children="Saisir"
+                        id={"type": "parentchild-submit", "index": f"child-variable_{variable.pk}"}, children="Saisir"
                     ))
                 ]),
             ])
