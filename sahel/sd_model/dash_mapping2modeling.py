@@ -11,165 +11,7 @@ import time
 import pandas as pd
 import plotly.graph_objects as go
 from pprint import pprint
-
-stylesheet = [
-    # ALL
-    # nodes
-    {
-        "selector": "node",
-        "style": {
-            "content": "data(label)",
-            "background-color": "data(color)",
-            "width": 100,
-            "height": 100,
-            "border-width": 1,
-            "text-valign": "top",
-            "text-halign": "center",
-            "text-wrap": "wrap",
-            "text-max-width": 100,
-            "background-opacity": 0.7,
-        }
-    },
-    # edges
-    {
-        "selector": "edge",
-        "style": {
-            "curve-style": "unbundled-bezier",
-            "control-point-distance": "50px",
-            "arrow-scale": 1,
-            "target-arrow-shape": "triangle",
-        }
-    },
-
-    # GROUPS
-    # nodes
-    {"selector": "node.group",
-     "style": {
-         "color": "lightgrey",
-         "font-size": 40,
-         "border-width": 3,
-         "border-color": "lightgrey",
-         "background-color": "white",
-         "z-index": 1,
-     }},
-
-    # ELEMENTS
-    # nodes
-    {"selector": "node.element",
-     "style": {
-         "font-size": 20,
-         "border-width": 2,
-         "z-index": 2,
-     }},
-    {"selector": ".IV",
-     "style": {
-         # rebeccapurple
-         "background-color": "#d9c6ec",
-         "border-color": "#66329a",
-         "color": "#66329a",
-         "line-color": "#9965cd",
-         "target-arrow-color": "#9965cd",
-     }},
-    {"selector": ".SA",
-     "style": {
-         # chocolate
-         "background-color": "#f9e2d2",
-         "border-color": "#d2691e",
-         "color": "#d2691e",
-         "line-color": "#e99b63",
-         "target-arrow-color": "#e99b63",
-     }},
-    {"selector": ".SE",
-     "style": {
-         "background-color": "#F08080",
-         "border-color": "crimson",
-         "color": "crimson",
-         "line-color": "crimson",
-         "target-arrow-color": "crimson",
-     }},
-
-    # edges
-    {
-        "selector": "edge.element",
-        "style": {
-            "arrow-scale": 2,
-        }
-    },
-
-    # VARIABLES
-    # nodes
-    {"selector": "node.variable",
-     "style": {
-         "color": "#505050",
-         "border-color": "#505050",
-         "text-valign": "center",
-         "z-index": 3,
-     }},
-    {"selector": "[sd_type = 'Stock']",
-     "style": {
-         "shape": "rectangle",
-         "width": 150,
-     }},
-    {"selector": "[sd_type = 'Input']",
-     "style": {
-         "shape": "diamond",
-     }},
-    {"selector": "[sd_type = 'Household Constant']",
-     "style": {
-         "shape": "diamond",
-     }},
-    {"selector": "[sd_type = 'Constant']",
-     "style": {
-         "shape": "triangle",
-         "text-valign": "bottom",
-     }},
-    {"selector": "[sd_type = 'Pulse Input']",
-     "style": {
-         "shape": "triangle",
-         "text-valign": "bottom",
-     }},
-    {"selector": "[!usable].variable",
-     "style": {
-         "background-color": "whitesmoke",
-         "color": "grey",
-         "border-color": "grey",
-     }},
-
-    # edges
-    {"selector": "edge.variable",
-     "style": {
-         "target-arrow-color": "#808080",
-         "line-color": "#808080",
-         "width": 1,
-     }},
-    {"selector": "[edge_type = 'Flow']",
-     "style": {
-         "line-color": "#DCDCDC",
-         "target-arrow-shape": "none",
-         "mid-target-arrow-shape": "triangle",
-         "mid-target-arrow-color": "grey",
-         "width": 20,
-         "arrow-scale": 0.4,
-         "curve-style": "straight",
-     }},
-    {"selector": "[has_equation = 'no']",
-     "style": {
-         "line-style": "dashed"
-     }},
-
-    # SELECTED
-    {"selector": ":selected",
-     "style": {
-         "border-color": "blue",
-         "border-width": 3,
-     }},
-]
-
-fieldvalue2color = {
-    "status": {
-        ""
-    }
-}
+from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -213,13 +55,15 @@ app.layout = html.Div(children=[
                         dbc.InputGroupAddon(addon_type="prepend", children=part.capitalize()),
                         dbc.Select(id=f"color{part}-input")
                     ])
-                    for part in ["body", "border", "ring"]
+                    for part in ["body", "border"]
                 ],
             ])
         ]),
         dbc.Button(className="mb-3", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
         html.Br(),
         dbc.Button(className="mb-3", id="add-node-open", children="Ajouter", size="sm", color="primary"),
+        html.Br(),
+        dbc.Button(className="mb-3", id="save-positions", children="Sauvegarder", size="sm", color="primary"),
     ]),
 
     # MODALS
@@ -283,14 +127,40 @@ app.layout = html.Div(children=[
             zoom=0.5,
         ),
     ),
+
+    # READOUTS
+    html.P(id="save-positions-readout", hidden=True)
 ])
+
+
+@app.callback(
+    Output("save-positions-readout", "children"),
+    Input("save-positions", "n_clicks"),
+    State("cyto", "elements"),
+)
+@timer
+def save_node_positions(n_clicks, cyto_elements):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    variables_dict = {str(variable.get("id")): variable for variable in Variable.objects.all().values()}
+    objs = []
+    for cyto_element in cyto_elements:
+        if "position" in cyto_element:
+            pk = cyto_element.get("data").get("id")
+            if (variables_dict.get(pk).get("x_pos") != cyto_element.get('position').get("x") or
+                    variables_dict.get(pk).get("y_pos") != cyto_element.get('position').get("y")):
+                variable = Variable.objects.get(pk=pk)
+                variable.x_pos, variable.y_pos = cyto_element.get("position").get("x"), cyto_element.get("position").get("y")
+                objs.append(variable)
+    Variable.objects.bulk_update(objs, ["x_pos", "y_pos"])
 
 
 @app.callback(
     # color dropdowns
     *[
         [Output(f"color{part}-input", "options"), Output(f"color{part}-input", "value")]
-        for part in ["body", "border", "ring"]
+        for part in ["body", "border"]
     ],
     Input("init", "children"),
 )
@@ -301,7 +171,7 @@ def populate_initial(_):
         for field in SituationalAnalysis.SA_FIELDS
     ])
     value = "default"
-    return options, value, options, value, options, value
+    return options, value, options, value
 
 
 @app.callback(
@@ -413,11 +283,10 @@ def download_svg(n_clicks):
     Input("layers-input", "value"),
     [
         Input(f"color{part}-input", "value")
-        for part in ["body", "border", "ring"]
+        for part in ["body", "border"]
     ]
 )
-def show_layers(layers, colorbody_field, colorborder_field, colorring_field):
-    print(f"colorbody_field is {colorbody_field}")
+def show_layers(layers, colorbody_field, colorborder_field):
     # LAYERS
     layers.sort()
     print(layers)
@@ -454,53 +323,30 @@ def show_layers(layers, colorbody_field, colorborder_field, colorring_field):
         ])
 
     # COLOR
-    # map general values to colors
-    value2color = {}
-    if colorbody_field == "status":
-        print("coloring by status")
-        value2color.update({
-            SituationalAnalysis.SA_STATUS_GOOD: "green",
-            SituationalAnalysis.SA_STATUS_OK: "yellow",
-            SituationalAnalysis.SA_STATUS_BAD: "red",
-        })
-    elif colorbody_field == "trend":
-        value2color.update({
-            SituationalAnalysis.SA_TREND_IMPROVING: "green",
-            SituationalAnalysis.SA_TREND_STAGNANT: "yellow",
-            SituationalAnalysis.SA_TREND_WORSENING: "red",
-        })
-    elif colorbody_field == "resilience":
-        value2color.update({
-            SituationalAnalysis.SA_RES_HIGH: "green",
-            SituationalAnalysis.SA_RES_MED: "yellow",
-            SituationalAnalysis.SA_RES_LOW: "red",
-        })
+
 
     # body
-    if colorbody_field != "default":
-        print(f"value2color is {value2color}")
-        print(f"choices are {SituationalAnalysis._meta.get_field(colorbody_field).choices}")
-        added_stylesheet.extend([
-            {
-                "selector": f"[{colorbody_field} = '{choice[0]}']",
+    for part_field, part_name in zip([colorbody_field, colorborder_field], ["body", "border"]):
+        print(f"part_field is {part_field}, part_name is {part_name}")
+        if part_field != "default":
+            print(f"choices are {SituationalAnalysis._meta.get_field(part_field).choices}")
+            # first set all SAs to grey
+            added_stylesheet.append({
+                "selector": ".SA",
                 "style": {
-                    "background-color": value2color.get(choice[0])
+                    partname2cytokey.get(part_name): "grey",
                 }
-            }
-            for choice in SituationalAnalysis._meta.get_field(colorbody_field).choices
-        ])
-
-    # border
-    if colorborder_field != "default":
-        added_stylesheet.extend([
-            {
-                "selector": f"[{colorborder_field} = '{choice[0]}']",
-                "style": {
-                    "border-color": value2color.get(choice[0])
+            })
+            # then color for those with field
+            added_stylesheet.extend([
+                {
+                    "selector": f"[{part_field} = '{choice[0]}']",
+                    "style": {
+                        partname2cytokey.get(part_name): fieldvalue2color.get(part_field).get(choice[0]).get(part_name)
+                    }
                 }
-            }
-            for choice in SituationalAnalysis._meta.get_field(colorborder_field).choices
-        ])
+                for choice in SituationalAnalysis._meta.get_field(part_field).choices
+            ])
 
     return stylesheet + added_stylesheet
 
@@ -622,7 +468,6 @@ def draw_model(
         # current elements read
         cyto_elements: list[dict],
 ):
-    print(f"add_connection_clicks is {add_connection_clicks}")
     # SELECT NODE
     for n_clicks, id in zip(select_clicks, select_ids):
         if n_clicks is not None:
@@ -719,7 +564,9 @@ def draw_model(
                           "parent": f"group_{element.element_group_id}"},
                  "classes": f"element {element.element_type}"}
             )
+            return cyto_elements
         elif class_input == "variable":
+            # NEED TO FINISH WRITING THIS
             Variable(label=label_input, sd_type=type_input, unit=unit_input).save()
 
     # CHANGE FIELD
@@ -761,8 +608,6 @@ def draw_model(
 
     # ADD CONNECTION
     for n_clicks, id in zip(add_connection_clicks, add_connection_ids):
-        print(n_clicks)
-        print(id)
         if n_clicks is not None:
             to_element_pk = id.get("index").removeprefix("to-element_")
             from_element_pk = add_connection_input[0].removeprefix("element_")
