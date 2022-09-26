@@ -200,6 +200,13 @@ class Variable(Node):
     stock_initial_value = models.FloatField(null=True, blank=True)
 
 
+class VariablePosition(models.Model):
+    variable = models.ForeignKey("variable", on_delete=models.CASCADE, related_name="positions")
+    story = models.ForeignKey("story", on_delete=models.CASCADE, related_name="positions")
+    x_pos = models.FloatField()
+    y_pos = models.FloatField()
+
+
 class VariableConnection(models.Model):
     from_variable = models.ForeignKey("variable", related_name="downstream_connections", on_delete=models.CASCADE)
     to_variable = models.ForeignKey("variable", related_name="upstream_connections", on_delete=models.CASCADE)

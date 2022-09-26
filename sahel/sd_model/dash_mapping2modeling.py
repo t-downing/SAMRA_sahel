@@ -5,7 +5,8 @@ from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
-    SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis
+    SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis, \
+    Story
 from .model_operations import timer
 import time
 import pandas as pd
@@ -57,6 +58,14 @@ app.layout = html.Div(children=[
                     ])
                     for part in ["body", "border"]
                 ],
+            ])
+        ]),
+
+        # storylines
+        dbc.Card(className="mb-3", children=[
+            dbc.CardBody(className="p-2", children=[
+                html.P(className="mb-1", children="Histoires"),
+                dbc.Select(id="story-input", className="mb-1", bs_size="sm"),
             ])
         ]),
         dbc.Button(className="mb-3", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
@@ -129,7 +138,8 @@ app.layout = html.Div(children=[
     ),
 
     # READOUTS
-    html.P(id="save-positions-readout", hidden=True)
+    html.P(id="save-positions-readout", hidden=True),
+    html.P(id="current-story", hidden=True, children="init"),
 ])
 
 
@@ -162,16 +172,27 @@ def save_node_positions(n_clicks, cyto_elements):
         [Output(f"color{part}-input", "options"), Output(f"color{part}-input", "value")]
         for part in ["body", "border"]
     ],
+    Output("story-input", "options"),
+    Output("story-input", "value"),
     Input("init", "children"),
 )
 def populate_initial(_):
-    options = [{"value": "default", "label": "---"}]
-    options.extend([
+    # colors
+    color_options = [{"value": "default", "label": "---"}]
+    color_options.extend([
         {"value": field, "label": field}
         for field in SituationalAnalysis.SA_FIELDS
     ])
-    value = "default"
-    return options, value, options, value
+    color_value = "default"
+
+    # storyline
+    story_options = [
+        {"value": story.pk, "label": story.name}
+        for story in Story.objects.all()
+    ]
+    story_value = "1"
+
+    return color_options, color_value, color_options, color_value, story_options, story_value
 
 
 @app.callback(
@@ -353,6 +374,7 @@ def show_layers(layers, colorbody_field, colorborder_field):
 
 @app.callback(
     Output("cyto", "elements"),
+    Output("current-story", "children"),
 
     # INPUTS
 
@@ -376,6 +398,9 @@ def show_layers(layers, colorbody_field, colorborder_field):
 
     # add connection
     Input({"type": "add-connection-submit", "index": ALL}, "n_clicks"),
+
+    # story
+    Input("story-input", "value"),
 
     # STATES
 
@@ -407,6 +432,9 @@ def show_layers(layers, colorbody_field, colorborder_field):
     State({"type": "add-connection-submit", "index": ALL}, "id"),
     State({"type": "add-connection-input", "index": ALL}, "value"),
 
+    # story
+    State("current-story", "children"),
+
     # current elements read
     State("cyto", "elements"),
 )
@@ -434,6 +462,9 @@ def draw_model(
 
         # add connection
         add_connection_clicks,
+
+        # story
+        story_pk,
 
         # STATES
 
@@ -465,6 +496,9 @@ def draw_model(
         add_connection_ids,
         add_connection_input,
 
+        # story
+        current_story_pk,
+
         # current elements read
         cyto_elements: list[dict],
 ):
@@ -477,7 +511,7 @@ def draw_model(
                     cyto_element.update({"selected": True})
                 else:
                     cyto_element.update({"selected": False})
-            return cyto_elements
+            return cyto_elements, current_story_pk
 
     # DELETE NODE
     # there is a Dash Cytoscape bug where the child nodes also get removed when the parent is removed
@@ -494,7 +528,7 @@ def draw_model(
                     cyto_element.get("data").update({"parent": None})
                 if cyto_element.get("data").get("id") != deleted_id:
                     updated_cyto_elements.append(cyto_element)
-            return updated_cyto_elements
+            return updated_cyto_elements, current_story_pk
 
     # REMOVE NODE
     for n_clicks, id in zip(remove_clicks, remove_ids):
@@ -512,7 +546,7 @@ def draw_model(
             for cyto_element in cyto_elements:
                 if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
                     cyto_element.get("data").update({"parent": None})
-            return cyto_elements
+            return cyto_elements, current_story_pk
 
     # CONNECT PARENT
     for n_clicks, id in zip(parentchild_clicks, parentchild_ids):
@@ -533,7 +567,7 @@ def draw_model(
                 for cyto_element in cyto_elements:
                     if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
                         cyto_element.get("data").update({"parent": f"{parent_class_str}_{parentchild_input[0]}"})
-            return cyto_elements
+            return cyto_elements, current_story_pk
 
     # ADD NODE
     if add_node_clicks > 0 and add_node_modal_is_open:
@@ -564,7 +598,7 @@ def draw_model(
                           "parent": f"group_{element.element_group_id}"},
                  "classes": f"element {element.element_type}"}
             )
-            return cyto_elements
+            return cyto_elements, current_story_pk
         elif class_input == "variable":
             # NEED TO FINISH WRITING THIS
             Variable(label=label_input, sd_type=type_input, unit=unit_input).save()
@@ -604,7 +638,7 @@ def draw_model(
                 if not (cyto_element.get("data").get("source") == f"element_{from_element_pk}" and
                         cyto_element.get("data").get("target") == f"element_{to_element_pk}")
             ]
-            return cyto_elements
+            return cyto_elements, current_story_pk
 
     # ADD CONNECTION
     for n_clicks, id in zip(add_connection_clicks, add_connection_ids):
@@ -619,19 +653,26 @@ def draw_model(
                 "classes": f"element {Element.objects.get_subclass(pk=from_element_pk).element_type}",
             })
             ElementConnection(to_element_id=to_element_pk, from_element_id=from_element_pk).save()
-            return cyto_elements
+            return cyto_elements, current_story_pk
 
-    if cyto_elements is not None:
+    print(f"{current_story_pk=}")
+    if current_story_pk == story_pk:
         raise PreventUpdate
 
     ## INITIAL RUN
     # init
+    print("redrawing whole model")
+    current_story_pk = story_pk
     start = time.time()
-    variables = Variable.objects.all().values()
     cyto_elements = []
 
     # VARIABLES
     # nodes
+    if current_story_pk == "1":
+        variables = Variable.objects.all().values()
+    else:
+        variables = Variable.objects.filter(element__stories=current_story_pk).values()
+    print(len(variables))
     for variable in variables:
         color = "white"
         usable = True
@@ -655,9 +696,14 @@ def draw_model(
              "position": {"x": variable.get("x_pos"), "y": variable.get("y_pos")},
              "classes": "variable"}
         )
+    variable_pks = [variable.get("id") for variable in variables]
+    print(variable_pks)
 
     # connections
-    connections = VariableConnection.objects.all().select_related("to_variable")
+    connections = VariableConnection.objects.filter(
+        from_variable__in=variable_pks,
+        to_variable__in=variable_pks,
+    ).select_related("to_variable")
     for connection in connections:
         has_equation = "no"
         if connection.to_variable is not None:
@@ -674,9 +720,9 @@ def draw_model(
         })
 
     # variable flows
-    stocks = Variable.objects.filter(sd_type="Stock").prefetch_related("inflows", "outflows")
+    stocks = Variable.objects.filter(sd_type="Stock", element__stories=story_pk).prefetch_related("inflows", "outflows")
     for stock in stocks:
-        for inflow in stock.inflows.all():
+        for inflow in stock.inflows.filter(element__stories=story_pk):
             has_equation = "no" if inflow.equation is None else "yes"
             cyto_elements.append(
                 {"data": {"source": inflow.pk,
@@ -685,7 +731,7 @@ def draw_model(
                           "edge_type": "Flow"},
                  "classes": "variable"}
             )
-        for outflow in stock.outflows.all():
+        for outflow in stock.outflows.filter(element__stories=story_pk):
             has_equation = "no" if outflow.equation is None else "yes"
             cyto_elements.append(
                 {"data": {"source": stock.pk,
@@ -697,6 +743,7 @@ def draw_model(
 
     # ELEMENTS
     # nodes
+    elements = Element.objects.filter(stories=story_pk).select_subclasses()
     cyto_elements.extend([
         {
             "data": {
@@ -711,8 +758,9 @@ def draw_model(
             },
             "classes": f"element {element.element_type}"
         }
-        for element in Element.objects.all().select_subclasses()
+        for element in elements
     ])
+    element_pks = [element.get("id") for element in elements.values()]
 
     # connections
     cyto_elements.extend([
@@ -723,11 +771,11 @@ def draw_model(
             },
             "classes": f"element {Element.objects.get_subclass(pk=connection.from_element_id).element_type}"
         }
-        for connection in ElementConnection.objects.all()
+        for connection in ElementConnection.objects.filter(from_element__in=element_pks, to_element__in=element_pks)
     ])
 
     # GROUPS
-    element_groups = ElementGroup.objects.all().values()
+    element_groups = ElementGroup.objects.filter(elements__in=element_pks).values()
     group_nodes = [
         {"data": {"id": f"group_{element_group.get('id')}",
                   "label": element_group.get("label"),
@@ -740,7 +788,9 @@ def draw_model(
     ]
     cyto_elements.extend(group_nodes)
 
-    return cyto_elements
+    print(len(cyto_elements))
+
+    return cyto_elements, current_story_pk
 
 
 @app.callback(
