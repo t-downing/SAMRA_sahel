@@ -206,6 +206,9 @@ class VariablePosition(models.Model):
     x_pos = models.FloatField()
     y_pos = models.FloatField()
 
+    def __str__(self):
+        return f"{self.variable=}, {self.story=}, {self.x_pos=}, {self.y_pos=}"
+
 
 class VariableConnection(models.Model):
     from_variable = models.ForeignKey("variable", related_name="downstream_connections", on_delete=models.CASCADE)

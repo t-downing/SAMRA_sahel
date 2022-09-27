@@ -152,6 +152,14 @@ stylesheet = [
          "border-color": "blue",
          "border-width": 3,
      }},
+
+    # HIDDEN
+    {
+        "selector": ".hidden",
+        "style": {
+            "display": "none"
+        }
+    }
 ]
 
 fieldvalue2color = {
