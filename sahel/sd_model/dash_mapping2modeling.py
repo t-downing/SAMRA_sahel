@@ -14,6 +14,7 @@ import plotly.graph_objects as go
 from pprint import pprint
 from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
 from django.db.models import Prefetch
+import json
 
 DEFAULT_STORY_PK = "1"
 
@@ -143,6 +144,7 @@ app.layout = html.Div(children=[
     # READOUTS
     html.P(id="save-positions-readout", hidden=True),
     html.P(id="current-story", hidden=True, children="init"),
+    dcc.Store(id="store"),
 ])
 
 
@@ -162,14 +164,18 @@ def save_node_positions(n_clicks, cyto_elements, story_pk):
 
     objs = []
     for cyto_element in cyto_elements:
-        if "position" in cyto_element:
+        if "position" in cyto_element and "hidden" not in cyto_element.get("classes"):
             pk = cyto_element.get("data").get("id")
             new_x, new_y = cyto_element.get('position').get("x"), cyto_element.get('position').get("y")
             try:
                 old_x, old_y = old_positions.get(str(pk)).get("x_pos"), old_positions.get(str(pk)).get("y_pos")
             except AttributeError:
                 old_x, old_y = None, None
+            # if pk == "102":
+            #     print(f"{old_x=}, {new_x=}")
+            #     pprint(cyto_element)
             if old_x != new_x or old_y != new_y:
+
                 try:
                     position = VariablePosition.objects.get(variable_id=pk, story_id=story_pk)
                     print(f"MOVED EXISTING {position}")
@@ -184,10 +190,8 @@ def save_node_positions(n_clicks, cyto_elements, story_pk):
 
 @app.callback(
     # color dropdowns
-    *[
-        [Output(f"color{part}-input", "options"), Output(f"color{part}-input", "value")]
-        for part in ["body", "border"]
-    ],
+    *[[Output(f"color{part}-input", "options"), Output(f"color{part}-input", "value")]
+      for part in ["body", "border"]],
     Output("story-input", "options"),
     Output("story-input", "value"),
     Input("init", "children"),
@@ -206,7 +210,7 @@ def populate_initial(_):
         {"value": story.pk, "label": story.name}
         for story in Story.objects.all()
     ]
-    story_value = "2"
+    story_value = DEFAULT_STORY_PK
 
     return color_options, color_value, color_options, color_value, story_options, story_value
 
@@ -388,45 +392,58 @@ def show_layers(layers, colorbody_field, colorborder_field):
     return stylesheet + added_stylesheet
 
 
+def append_cyto_iteration(cyto_elements: [dict], new_iteration: int):
+    updated_cyto_elements = []
+    for obj in cyto_elements:
+        data = obj.get("data")
+        if "id" in data:
+            data.update({
+                "id": f"{data.get('id')}_iteration{new_iteration}",
+                "label": f"{data.get('label')} I{new_iteration}"
+            })
+        elif "source" in data:
+            data.update({
+                "source": f"{data.get('source')}_iteration{new_iteration}",
+                "target": f"{data.get('source')}_iteration{new_iteration}"
+            })
+        if "parent" in data:
+            data.update({"parent": f"{data.get('parent')}_iteration{new_iteration}"})
+    return cyto_elements
+
+
 @app.callback(
+    # OUTPUTS
     Output("cyto", "elements"),
     Output("current-story", "children"),
+    Output("store", "data"),
 
     # INPUTS
-
     # relationship modification
     Input({"type": "select-node", "index": ALL}, "n_clicks"),
     Input({"type": "delete-node", "index": ALL}, "n_clicks"),
     Input({"type": "remove-node", "index": ALL}, "n_clicks"),
     Input({"type": "parentchild-submit", "index": ALL}, "n_clicks"),
-
     # add node
     Input("add-node-submit", "n_clicks"),
-
     # change field
-    [
-        Input({"type": f"{field}-input", "index": ALL}, "value")
-        for field in SituationalAnalysis.SA_FIELDS
-    ],
-
+    [Input({"type": f"{field}-input", "index": ALL}, "value")
+     for field in SituationalAnalysis.SA_FIELDS],
     # delete connection
     Input({"type": "delete-connection", "index": ALL}, "n_clicks"),
-
     # add connection
     Input({"type": "add-connection-submit", "index": ALL}, "n_clicks"),
-
     # story
     Input("story-input", "value"),
+    # element store
+    Input("store", "data"),
 
     # STATES
-
     # relationship modification
     State({"type": "select-node", "index": ALL}, "id"),
     State({"type": "delete-node", "index": ALL}, "id"),
     State({"type": "remove-node", "index": ALL}, "id"),
     State({"type": "parentchild-submit", "index": ALL}, "id"),
     State({"type": "parentchild-input", "index": ALL}, "value"),
-
     # add node
     State("add-node-class-input", "value"),
     State("add-node-subclass-input", "value"),
@@ -434,104 +451,70 @@ def show_layers(layers, colorbody_field, colorborder_field):
     State("add-node-label-input", "value"),
     State("add-node-unit-input", "value"),
     State("add-node-modal", "is_open"),
-
     # change field
-    [
-        State({"type": f"{field}-input", "index": ALL}, "id")
-        for field in SituationalAnalysis.SA_FIELDS
-    ],
-
+    [State({"type": f"{field}-input", "index": ALL}, "id")
+     for field in SituationalAnalysis.SA_FIELDS],
     # delete connections
     State({"type": "delete-connection", "index": ALL}, "id"),
-
     # add connections
     State({"type": "add-connection-submit", "index": ALL}, "id"),
     State({"type": "add-connection-input", "index": ALL}, "value"),
-
     # story
     State("current-story", "children"),
-
     # current elements read
     State("cyto", "elements"),
 )
 @timer
 def draw_model(
         # INPUTS
-
         # relationship modification
-        select_clicks,
-        delete_clicks,
-        remove_clicks,
-        parentchild_clicks,
-
+        select_clicks, delete_clicks, remove_clicks, parentchild_clicks,
         # add node
         add_node_clicks,
-
         # change field
-        status_field_input,
-        trend_field_input,
-        resilience_field_input,
-        vulnerability_field_input,
-
+        status_field_input, trend_field_input, resilience_field_input, vulnerability_field_input,
         # delete connection
         delete_connection_clicks,
-
         # add connection
         add_connection_clicks,
-
         # story
         story_pk,
+        # element store
+        cyto_elements_store,
 
         # STATES
-
         # relationship modification
-        select_ids,
-        delete_ids,
-        remove_ids,
-        parentchild_ids,
-        parentchild_input,
-
+        select_ids, delete_ids, remove_ids, parentchild_ids, parentchild_input,
         # add node
-        class_input,
-        subclass_input,
-        type_input,
-        label_input,
-        unit_input,
-        add_node_modal_is_open,
-
+        class_input, subclass_input, type_input, label_input, unit_input, add_node_modal_is_open,
         # change fields
-        status_field_id,
-        trend_field_id,
-        resilience_field_id,
-        vulnerability_field_id,
-
+        status_field_id, trend_field_id, resilience_field_id, vulnerability_field_id,
         # delete connection
         delete_connection_ids,
-
         # add connection
-        add_connection_ids,
-        add_connection_input,
-
+        add_connection_ids, add_connection_input,
         # story
         current_story_pk,
-
         # current elements read
         cyto_elements: list[dict],
 ):
+    print("TOP OF REDRAW")
+    print(f"{type(cyto_elements_store)}")
+    if cyto_elements_store is not None: return json.loads(cyto_elements_store), current_story_pk, None
+
     # SELECT NODE
     for n_clicks, id in zip(select_clicks, select_ids):
         if n_clicks is not None:
             selected_id = id.get("index")
             print(f"clicked on {selected_id}")
+            display_element = {}
             for cyto_element in cyto_elements:
-                pprint(cyto_element)
                 if cyto_element.get("data").get("id") == selected_id:
                     cyto_element.update({"selected": True})
-                    print("updated True:")
-                    pprint(cyto_element)
+                    display_element = cyto_element
                 else:
                     cyto_element.update({"selected": False})
-            return cyto_elements, current_story_pk
+            return [{}], current_story_pk, json.dumps(cyto_elements)
 
     # DELETE NODE
     # there is a Dash Cytoscape bug where the child nodes also get removed when the parent is removed
@@ -548,11 +531,12 @@ def draw_model(
                     cyto_element.get("data").update({"parent": None})
                 if cyto_element.get("data").get("id") != deleted_id:
                     updated_cyto_elements.append(cyto_element)
-            return updated_cyto_elements, current_story_pk
+            return [{}], current_story_pk, json.dumps(cyto_elements)
 
     # REMOVE NODE
     for n_clicks, id in zip(remove_clicks, remove_ids):
         if n_clicks is not None:
+            display_element = {}
             parent_child_ids = id.get("index").split("-contains-")
             parent_id, child_id = parent_child_ids[0], parent_child_ids[1]
             if "element" in child_id:
@@ -566,7 +550,8 @@ def draw_model(
             for cyto_element in cyto_elements:
                 if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
                     cyto_element.get("data").update({"parent": None})
-            return cyto_elements, current_story_pk
+                    display_element = cyto_element
+            return [{}], current_story_pk, json.dumps(cyto_elements)
 
     # CONNECT PARENT
     for n_clicks, id in zip(parentchild_clicks, parentchild_ids):
@@ -587,7 +572,7 @@ def draw_model(
                 for cyto_element in cyto_elements:
                     if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
                         cyto_element.get("data").update({"parent": f"{parent_class_str}_{parentchild_input[0]}"})
-            return cyto_elements, current_story_pk
+            return [{}], current_story_pk, json.dumps(cyto_elements)
 
     # ADD NODE
     if add_node_clicks > 0 and add_node_modal_is_open:
@@ -603,7 +588,7 @@ def draw_model(
                  "selectable": True,
                  "pannable": True}
             )
-            return cyto_elements
+            return [{}], current_story_pk, json.dumps(cyto_elements)
         elif class_input == "element":
             element = None
             if subclass_input == "situationalanalysis":
@@ -618,10 +603,21 @@ def draw_model(
                           "parent": f"group_{element.element_group_id}"},
                  "classes": f"element {element.element_type}"}
             )
-            return cyto_elements, current_story_pk
+            return [{}], current_story_pk, json.dumps(cyto_elements)
         elif class_input == "variable":
-            # NEED TO FINISH WRITING THIS
-            Variable(label=label_input, sd_type=type_input, unit=unit_input).save()
+            variable = Variable(label=label_input, sd_type=type_input, unit=unit_input)
+            variable.save()
+            cyto_elements.append({
+                "data": {
+                    "id": str(variable.pk),
+                    "label": variable.label,
+                    "sd_type": variable.sd_type,
+                    "usable": False,
+                    "hierarchy": "variable"},
+                "position": {"x": 0.0, "y": 0.0},
+                "classes": "variable"
+            })
+            return [{}], current_story_pk, json.dumps(cyto_elements)
 
     # CHANGE FIELD
     if status_field_input:
@@ -658,7 +654,7 @@ def draw_model(
                 if not (cyto_element.get("data").get("source") == f"element_{from_element_pk}" and
                         cyto_element.get("data").get("target") == f"element_{to_element_pk}")
             ]
-            return cyto_elements, current_story_pk
+            return [{}], current_story_pk, json.dumps(cyto_elements)
 
     # ADD CONNECTION
     for n_clicks, id in zip(add_connection_clicks, add_connection_ids):
@@ -673,16 +669,15 @@ def draw_model(
                 "classes": f"element {Element.objects.get_subclass(pk=from_element_pk).element_type}",
             })
             ElementConnection(to_element_id=to_element_pk, from_element_id=from_element_pk).save()
-            return cyto_elements, current_story_pk
+            return [{}], current_story_pk,  json.dumps(cyto_elements)
 
-    print(f"{current_story_pk=}")
     if current_story_pk == story_pk:
         raise PreventUpdate
 
-    ## INITIAL RUN
+    ## CHANGE VIEW
     # init
     print("redrawing whole model")
-    current_story_pk = story_pk
+
     cyto_elements = []
     element_pks_in_story = [obj.get("id") for obj in Element.objects.filter(stories=story_pk).values()]
 
@@ -717,6 +712,12 @@ def draw_model(
             if not variable.story_position:
                 print(f"no position set for {variable}")
                 position = VariablePosition.objects.filter(variable=variable, story_id=DEFAULT_STORY_PK).first()
+                if position is None:
+                    print(f"default position had not yet been set for {variable}, setting to zero now")
+                    position = VariablePosition(
+                        variable=variable, story_id=DEFAULT_STORY_PK, x_pos=0.0, y_pos=0.0
+                    )
+                    position.save()
                 x_pos, y_pos = position.x_pos, position.y_pos
             else:
                 x_pos, y_pos = variable.story_position[0].x_pos, variable.story_position[0].y_pos
@@ -843,7 +844,12 @@ def draw_model(
             if obj.get("data").get("target") not in node_ids:
                 raise ValueError(f"Target {obj.get('data').get('target')} not found in node ids")
 
-    return cyto_elements, current_story_pk
+    print(f"{current_story_pk=}")
+    print(f"{story_pk=}")
+    if current_story_pk == "init":
+        return cyto_elements, story_pk, None
+    else:
+        return [{}], story_pk, json.dumps(cyto_elements)
 
 
 @app.callback(
