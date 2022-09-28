@@ -127,6 +127,7 @@ class Story(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
     description = models.TextField(null=True, blank=True)
+    samra_model = models.ForeignKey("samramodel", null=True, on_delete=models.SET_NULL, related_name="stories")
 
     elements = models.ManyToManyField("element", related_name="stories")
 

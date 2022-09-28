@@ -16,6 +16,7 @@ from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
 from django.db.models import Prefetch
 import json
 
+DEFAULT_SAMRAMODEL = "1"
 DEFAULT_STORY_PK = "1"
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
