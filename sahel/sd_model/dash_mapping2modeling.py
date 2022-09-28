@@ -6,7 +6,7 @@ import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
     SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis, \
-    Story, VariablePosition
+    Story, VariablePosition, SamraModel
 from .model_operations import timer
 import time
 import pandas as pd
@@ -16,7 +16,7 @@ from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
 from django.db.models import Prefetch
 import json
 
-DEFAULT_SAMRAMODEL = "1"
+DEFAULT_SAMRAMODEL_PK = "1"
 DEFAULT_STORY_PK = "1"
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -31,6 +31,9 @@ app.layout = html.Div(children=[
     # (cannot click through divs in Dash for some reason, z-index not working either)
     html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute"}, children=[
         html.H2(className="mb-4 h2", children="Schéma"),
+
+        # samramodel
+        dbc.Select(id="samramodel-input", className="mb-3"),
 
         # layers
         dbc.Card(className="mb-3", children=[
@@ -73,6 +76,8 @@ app.layout = html.Div(children=[
                 dbc.Select(id="story-input", className="mb-1", bs_size="sm"),
             ])
         ]),
+
+        # other
         dbc.Button(className="mb-3", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
         html.Br(),
         dbc.Button(className="mb-3", id="add-node-open", children="Ajouter", size="sm", color="primary"),
@@ -158,8 +163,8 @@ app.layout = html.Div(children=[
     # color dropdowns
     *[[Output(f"color{part}-input", "options"), Output(f"color{part}-input", "value")]
       for part in ["body", "border"]],
-    Output("story-input", "options"),
-    Output("story-input", "value"),
+    Output("samramodel-input", "options"),
+    Output("samramodel-input", "value"),
     Input("init", "children"),
 )
 def populate_initial(_):
@@ -171,14 +176,30 @@ def populate_initial(_):
     ])
     color_value = "default"
 
-    # storyline
-    story_options = [
-        {"value": story.pk, "label": story.name}
-        for story in Story.objects.all()
+    # samramodel
+    samramodel_options = [
+        {"value": model.pk, "label": model.name}
+        for model in SamraModel.objects.all()
     ]
-    story_value = DEFAULT_STORY_PK
+    samramodel_value = DEFAULT_SAMRAMODEL_PK
 
-    return color_options, color_value, color_options, color_value, story_options, story_value
+    return color_options, color_value, color_options, color_value, samramodel_options, samramodel_value
+
+
+@app.callback(
+    Output("story-input", "options"),
+    Output("story-input", "value"),
+    Input("samramodel-input", "value")
+)
+def story_input(samramodel_pk):
+    default_story_pk = SamraModel.objects.get(pk=samramodel_pk).default_story_id
+    options = [{"value": default_story_pk, "label": "---"}]
+    options.extend([
+        {"value": story.pk, "label": story.name}
+        for story in Story.objects.filter(samramodel_id=samramodel_pk, defaultfor__isnull=True)
+    ])
+    value = options[0].get("value")
+    return options, value
 
 
 @app.callback(
@@ -620,9 +641,9 @@ def draw_model(
         elif class_input == "element":
             element = None
             if subclass_input == "situationalanalysis":
-                element = SituationalAnalysis(label=label_input, element_type=type_input).save()
+                element = SituationalAnalysis(label=label_input, element_type=type_input)
             elif subclass_input == "theoryofchange":
-                element = TheoryOfChange(label=label_input, element_type=type_input).save()
+                element = TheoryOfChange(label=label_input, element_type=type_input)
             element.save()
             cyto_elements.append(
                 {"data": {"id": f"element_{element.pk}",

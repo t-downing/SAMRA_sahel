@@ -6,6 +6,7 @@ class SamraModel(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
     description = models.TextField(null=True, blank=True)
+    default_story = models.OneToOneField("story", on_delete=models.SET_NULL, null=True, related_name="defaultfor")
 
     def __str__(self):
         return self.name
@@ -15,7 +16,7 @@ class Node(models.Model):
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
     description = models.TextField(null=True, blank=True)
-    samra_model = models.ForeignKey("samramodel", on_delete=models.SET_NULL, null=True)
+    samramodel = models.ForeignKey("samramodel", on_delete=models.SET_NULL, null=True)
 
     class Meta:
         abstract = True
@@ -32,6 +33,7 @@ class Element(Node):
     # element_group_integer = models.IntegerField(null=True, blank=True)
     x_pos = models.FloatField(null=True, blank=True)
     y_pos = models.FloatField(null=True, blank=True)
+    # stories = models.ManyToManyField("story", related_name="elements", blank=True)
 
 
 class SituationalAnalysis(Element):
@@ -127,9 +129,9 @@ class Story(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
     description = models.TextField(null=True, blank=True)
-    samra_model = models.ForeignKey("samramodel", null=True, on_delete=models.SET_NULL, related_name="stories")
+    samramodel = models.ForeignKey("samramodel", null=True, on_delete=models.SET_NULL, related_name="stories")
 
-    elements = models.ManyToManyField("element", related_name="stories")
+    elements = models.ManyToManyField("element", related_name="stories", blank=True)
 
     def __str__(self):
         return self.name
@@ -263,7 +265,7 @@ class Source(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
     number_of_periods = models.IntegerField(null=True, blank=True)
     link = models.URLField(null=True, blank=True)
-    samra_models = models.ManyToManyField("samramodel", related_name="sources")
+    samramodels = models.ManyToManyField("samramodel", related_name="sources")
 
     def __str__(self):
         return f"{self.title}; pk: {self.pk}"
@@ -331,7 +333,7 @@ class SeasonalInputDataPoint(models.Model):
 class ResponseOption(models.Model):
     name = models.CharField(max_length=500)
     description = models.TextField(null=True, blank=True)
-    samra_model = models.ForeignKey("samramodel", related_name="responseoptions", on_delete=models.SET_NULL, null=True)
+    samramodel = models.ForeignKey("samramodel", related_name="responseoptions", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.name
@@ -340,7 +342,7 @@ class ResponseOption(models.Model):
 class Scenario(models.Model):
     name = models.CharField(max_length=500)
     description = models.TextField(null=True, blank=True)
-    samra_model = models.ForeignKey("samramodel", related_name="scenarios", on_delete=models.SET_NULL, null=True)
+    samramodel = models.ForeignKey("samramodel", related_name="scenarios", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.name
