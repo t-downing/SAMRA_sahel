@@ -8,7 +8,7 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_cytoscape as cyto
 from sahel.models import Variable, SimulatedDataPoint, VariableConnection, ElementGroup, \
-    MeasuredDataPoint, Source, ResponseOption, ConstantValue, HouseholdConstantValue, Scenario
+    MeasuredDataPoint, Source, ResponseOption, ConstantValue, HouseholdConstantValue, Scenario, Element
 import plotly.graph_objects as go
 from sahel.sd_model.model_operations import run_model, timer
 import inspect
@@ -119,8 +119,10 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                 dbc.Card([
                     dbc.CardHeader("Contrôles", id="controls"),
                     dbc.CardBody([
-                        dcc.Dropdown(id="admin1-input", options=admin1s, value=None, placeholder="Région", className="mb-2"),
-                        dcc.Dropdown(id="admin2-input", options=admin1s, value=None, placeholder="Cercle", className="mb-2"),
+                        dcc.Dropdown(id="admin1-input", options=admin1s, value=None, placeholder="Région",
+                                     className="mb-2"),
+                        dcc.Dropdown(id="admin2-input", options=admin1s, value=None, placeholder="Cercle",
+                                     className="mb-2"),
                         # dcc.DatePickerRange(id="daterange-input", start_date=initial_startdate, end_date=initial_enddate, className="mb-2"),
                         dbc.Select(id="scenario-input", placeholder="Scénario", className="mb-2"),
                         dbc.Select(id="responseoption-input", placeholder="Réponse", className="mb-2"),
@@ -146,7 +148,8 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                     children=[
                         html.Div("Schéma"),
                         dbc.FormGroup([
-                            dbc.Checklist(id="schema-group-switch", options=[{"label": "Montrer les détails", "value": 1}],
+                            dbc.Checklist(id="schema-group-switch",
+                                          options=[{"label": "Montrer les détails", "value": 1}],
                                           value=[1], switch=True, inline=True),
                         ]),
                         # dbc.Switch(id="schema-group-switch", label="Montrer les détails", value=True),
@@ -167,7 +170,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                 dbc.CardFooter(dbc.Row([
                     dbc.Col([dbc.Button("Sauvegarder mise en page", n_clicks=0, id="save-positions", size="sm",
                                         style={"marginRight": 10}),
-                            dbc.Button("Download SVG", id="download", size="sm")]),
+                             dbc.Button("Download SVG", id="download", size="sm")]),
                     dbc.Col(dcc.Slider(id="map-date-input",
                                        min=initial_startdate.toordinal(),
                                        max=initial_enddate.toordinal(),
@@ -190,19 +193,23 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                     dbc.InputGroup([
                         dbc.InputGroupAddon("Label", addon_type="prepend"),
                         dbc.Input(id="element-detail-label-input"),
-                        dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-label-submit"), addon_type="append"),
+                        dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-label-submit"),
+                                            addon_type="append"),
                     ], style=ROWSTYLE),
                     dbc.InputGroup([
                         dbc.InputGroupAddon("Type", addon_type="prepend"),
                         dbc.Select(id="element-detail-type-input"),
-                        dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-type-submit"), addon_type="append"),
+                        dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-type-submit"),
+                                            addon_type="append"),
                     ], size="sm", style=ROWSTYLE),
                     dbc.InputGroup([
                         dbc.InputGroupAddon("Groupe", addon_type="prepend"),
                         dbc.Select(id="element-detail-group-input"),
-                        dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-group-submit"), addon_type="append"),
+                        dbc.InputGroupAddon(dbc.Button("Changer", id="element-detail-group-submit"),
+                                            addon_type="append"),
                     ], size="sm", style=ROWSTYLE),
-                    dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2"),
+                    dcc.Graph(figure=initial_fig, id="element-detail-graph", style={"height": "300px"},
+                              className="mb-2"),
                     html.Div(id="element-detail-conn-eq"),
                 ])
             ], style={"height": "900px"}),
@@ -303,7 +310,6 @@ def update_slider(start_date, end_date):
     return start_date.toordinal(), start_date.toordinal(), end_date.toordinal(), marks
 
 
-
 @app.callback(
     Output("cyto", "generateImage"),
     Input("download", "n_clicks"),
@@ -330,7 +336,7 @@ def create_element(_, label, sd_type, unit):
         return "need label", label, sd_type, unit
     if sd_type == "":
         return "need type", label, sd_type, unit
-    if unit =="":
+    if unit == "":
         return "need unit", label, sd_type, unit
     Variable(label=label, sd_type=sd_type, unit=unit).save()
     return f"created element '{label}'", "", "", ""
@@ -496,7 +502,7 @@ def run_model_from_cyto(n_clicks, eq_readout, cv_readout, scenario_pk, response_
 @app.callback(
     Output("element-detail-label-input", "value"),
     Output("element-detail-type-input", "value"),
-    Output("element-detail-group-input", "value"),
+    # Output("element-detail-group-input", "value"),
     Input("cyto", "tapNodeData"),
     State("cyto", "tapNode"),
 )
@@ -506,8 +512,8 @@ def element_detail_title(nodedata, layout):
     if nodedata.get("hierarchy") == "Group":
         return None, None, None
     element = Variable.objects.get(pk=nodedata.get("id"))
-    group = None if element.element_group is None else element.element_group.pk
-    return element.label, element.sd_type, group
+    # group = None if element.element_group is None else element.element_group.pk
+    return element.label, element.sd_type # group
 
 
 @app.callback(
@@ -622,36 +628,38 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
     if nodedata is None or nodedata.get("hierarchy") == "Group":
         return None
 
-    element = Variable.objects.get(pk=nodedata.get("id"))
-    if element.sd_type in ["Flow", "Variable"]:
-        upstream_elements = Variable.objects.filter(downstream_connections__to_element=element)
+    variable = Variable.objects.get(pk=nodedata.get("id"))
+    if variable.sd_type in ["Flow", "Variable"]:
+        upstream_variables = Variable.objects.filter(downstream_connections__to_variable=variable)
         upstream_list = dbc.ListGroup(
             [
                 dbc.ListGroupItem(className="p-1 justify-content-between", children=
-                    html.Div(className="d-flex justify-content-between", children=
-                        [
-                            html.P(style={"font-size": "small"}, children=f"{upstream_element.label} _E{upstream_element.pk}_"),
-                            dbc.Button("X",
-                                       id={"type": "element-detail-conn-del",
-                                           "index": f"{upstream_element.pk}-to-{element.pk}"},
-                                       size="sm",
-                                       color="danger",
-                                       className="p-1",
-                                       outline=True)
-                        ],
+                html.Div(className="d-flex justify-content-between", children=
+                [
+                    html.P(style={"font-size": "small"},
+                           children=f"{upstream_variable.label} _E{upstream_variable.pk}_"),
+                    dbc.Button("X",
+                               id={"type": "element-detail-conn-del",
+                                   "index": f"{upstream_variable.pk}-to-{variable.pk}"},
+                               size="sm",
+                               color="danger",
+                               className="p-1",
+                               outline=True)
+                ],
 
-                    )
-                )
-                for upstream_element in upstream_elements
+                         )
+                                  )
+                for upstream_variable in upstream_variables
             ],
             flush=True,
             style={"height": "150px", "overflow-y": "scroll"}
         )
 
-        dropdown_options = Variable.objects.exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
+        dropdown_options = Variable.objects.exclude(downstream_connections__to_variable=variable).exclude(
+            pk=variable.pk)
         dropdown_list = [
-            {"label": possible_element.label, "value": possible_element.label}
-            for possible_element in dropdown_options
+            {"label": possible_variable.label, "value": possible_variable.label}
+            for possible_variable in dropdown_options
         ]
 
         upstream_card = dbc.Card(className="mb-2", children=[
@@ -660,15 +668,17 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                 [
                     upstream_list,
                     dbc.InputGroup(children=[
-                        dbc.Select(options=dropdown_list, id="element-detail-conn-input", placeholder="Ajouter une influence", bs_size="sm"),
-                        dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-conn-submit", size="sm"), addon_type="append")
+                        dbc.Select(options=dropdown_list, id="element-detail-conn-input",
+                                   placeholder="Ajouter une influence", bs_size="sm"),
+                        dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-conn-submit", size="sm"),
+                                            addon_type="append")
                     ]),
                 ],
                 style={"padding": "0px"},
             )
         ])
 
-        equation_text = element.equation
+        equation_text = variable.equation
         if equation_text is not None:
             print(f"equation is {equation_text}")
             for key_element in Variable.objects.all():
@@ -679,35 +689,38 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
         equation_card = dbc.Card([
             dbc.CardHeader("Équation", className="p-1", style={"font-size": "small"}),
             dbc.CardBody(className="p-2", children=
-                [
-                    html.P(equation_text, id="element-detail-eq-text", style={"font-size": "small", "height": "50px", "overflow-y": "scroll"}),
-                    dbc.InputGroup([
-                        dbc.Input(value=element.equation, id="element-detail-eq-input", bs_size="sm"),
-                        dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-eq-submit", size="sm"), addon_type="append"),
-                    ]),
+            [
+                html.P(equation_text, id="element-detail-eq-text",
+                       style={"font-size": "small", "height": "50px", "overflow-y": "scroll"}),
+                dbc.InputGroup([
+                    dbc.Input(value=variable.equation, id="element-detail-eq-input", bs_size="sm"),
+                    dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-eq-submit", size="sm"),
+                                        addon_type="append"),
+                ]),
 
-                ]
-            )
+            ]
+                         )
         ])
 
         conn_eq_div = html.Div([
             upstream_card,
             equation_card,
         ])
-    elif element.sd_type == "Stock":
+    elif variable.sd_type == "Stock":
         inflows_card = dbc.Card([
             dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux intrants"),
             dbc.CardBody(style={"padding": "0px"}, children=[
                 dbc.ListGroup(
                     [
-                        dbc.ListGroupItem(className="p-1 d-flex justify-content-between", style={"font-size": "small"}, children=[
-                            inflow.label,
-                            dbc.Button("X",
-                                       id={"type": "element-detail-inflow-del",
-                                           "index": f"{element.pk}-inflow-{inflow.pk}"},
-                                       size="sm", color="danger", className="p-1", outline=True)
-                        ])
-                        for inflow in element.inflows.all()
+                        dbc.ListGroupItem(className="p-1 d-flex justify-content-between", style={"font-size": "small"},
+                                          children=[
+                                              inflow.label,
+                                              dbc.Button("X",
+                                                         id={"type": "element-detail-inflow-del",
+                                                             "index": f"{variable.pk}-inflow-{inflow.pk}"},
+                                                         size="sm", color="danger", className="p-1", outline=True)
+                                          ])
+                        for inflow in variable.inflows.all()
                     ],
                     flush=True,
                     style={"height": "100px", "overflow-y": "scroll"}
@@ -715,10 +728,10 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                 dbc.InputGroup([
                     dbc.Select(id="element-detail-inflow-input", bs_size="sm", placeholder="Ajouter un flux entrant",
                                options=[
-                                    {"label": potential_inflow.label, "value": potential_inflow.pk}
-                                    for potential_inflow in Variable.objects.filter(sd_type="Flow")
-                                        .exclude(sd_sink__isnull=False).exclude(sd_source=element)
-                                ]),
+                                   {"label": potential_inflow.label, "value": potential_inflow.pk}
+                                   for potential_inflow in Variable.objects.filter(sd_type="Flow")
+                               .exclude(sd_sink__isnull=False).exclude(sd_source=variable)
+                               ]),
                     dbc.Button("Saisir", id="element-detail-inflow-submit", size="sm")
                 ])
             ])
@@ -729,14 +742,15 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
             dbc.CardBody(style={"padding": "0px"}, children=[
                 dbc.ListGroup(
                     [
-                        dbc.ListGroupItem(className="p-1 d-flex justify-content-between", style={"font-size": "small"}, children=[
-                            outflow.label,
-                            dbc.Button("X",
-                                       id={"type": "element-detail-outflow-del",
-                                           "index": f"{element.pk}-outflow-{outflow.pk}"},
-                                       size="sm", color="danger", className="p-1", outline=True)
-                        ])
-                        for outflow in element.outflows.all()
+                        dbc.ListGroupItem(className="p-1 d-flex justify-content-between", style={"font-size": "small"},
+                                          children=[
+                                              outflow.label,
+                                              dbc.Button("X",
+                                                         id={"type": "element-detail-outflow-del",
+                                                             "index": f"{variable.pk}-outflow-{outflow.pk}"},
+                                                         size="sm", color="danger", className="p-1", outline=True)
+                                          ])
+                        for outflow in variable.outflows.all()
                     ],
                     flush=True,
                     style={"height": "100px", "overflow-y": "scroll"}
@@ -745,7 +759,9 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
                     dbc.Select(id="element-detail-outflow-input", bs_size="sm", placeholder="Ajouter un flux sortant",
                                options=[
                                    {"label": potential_outflow.label, "value": potential_outflow.pk}
-                                   for potential_outflow in Variable.objects.filter(sd_type="Flow").exclude(sd_sink=element).exclude(sd_source=element)
+                                   for potential_outflow in
+                                   Variable.objects.filter(sd_type="Flow").exclude(sd_sink=variable).exclude(
+                                       sd_source=variable)
                                ]),
                     dbc.Button("Saisir", id="element-detail-outflow-submit", size="sm")
                 ])
@@ -753,9 +769,9 @@ def element_detail_conn_eq(nodedata, _, _1, response_pk):
         ], style=ROWSTYLE)
 
         conn_eq_div = html.Div([inflows_card, outflows_card])
-    elif element.sd_type == "Household Constant":
+    elif variable.sd_type == "Household Constant":
         try:
-            value = element.householdconstantvalues.get().value
+            value = variable.householdconstantvalues.get().value
         except HouseholdConstantValue.DoesNotExist:
             value = None
         conn_eq_div = dbc.InputGroup([
@@ -800,51 +816,38 @@ def save_element_positions(n_clicks, cyto_elements, layout):
 @timer
 def redraw_model(date_ord, *_):
     start = time.time()
-    elements = Variable.objects.all().values()
+    variables = Variable.objects.exclude(label__contains="HELLO").values()
     nodes = []
-    for element in elements:
+    for variable in variables:
         color = "white"
-        # dateinput = date.fromordinal(int(date_ord))
-        # datapoint = element.measureddatapoints.filter(element=element, date__lte=dateinput).order_by("-date").first()
-        # if datapoint is not None:
-        #     max_value = element.measureddatapoints.aggregate(Max("value")).get("value__max")
-        #     min_value = element.measureddatapoints.aggregate(Min("value")).get("value__min")
-        #     if max_value != min_value:
-        #         value_norm = (datapoint.value - min_value) / (max_value - min_value)
-        #         if value_norm < 1/3:
-        #             color = "lightcoral"
-        #         elif value_norm < 2/3:
-        #             color = "khaki"
-        #         else:
-        #             color = "lightgreen"
 
         nodes.append(
-            {"data": {"id": element.get("id"),
-                      "label": element.get("label"),
-                      "sd_type": element.get("sd_type"),
-                      "equation_stored": "yes" if element.get("equation") else "no",
-                      "parent": None if element.get("element_group_id") is None else f"group_{element.get('element_group_id')}",
+            {"data": {"id": variable.get("id"),
+                      "label": variable.get("label"),
+                      "sd_type": variable.get("sd_type"),
+                      "equation_stored": "yes" if variable.get("equation") else "no",
+                      "parent": None,
                       "color": color},
-             "position": {"x": element.get("x_pos"), "y": element.get("y_pos")}}
+             "position": {"x": variable.get("x_pos"), "y": variable.get("y_pos")}}
         )
     print(f"elements took {time.time() - start}")
     start = time.time()
 
-    element_groups = ElementGroup.objects.all().values()
-    group_nodes = [
-        {"data": {"id": f"group_{element_group.get('id')}",
-                  "label": element_group.get("label"),
-                  "hierarchy": "Group"},
-         "grabbable": False,
-         "selectable": False,
-         "pannable": True}
-        for element_group in element_groups
-    ]
-    print(f"groups took {time.time() - start}")
-    start = time.time()
+    # element_groups = ElementGroup.objects.all().values()
+    # group_nodes = [
+    #     {"data": {"id": f"group_{element_group.get('id')}",
+    #               "label": element_group.get("label"),
+    #               "hierarchy": "Group"},
+    #      "grabbable": False,
+    #      "selectable": False,
+    #      "pannable": True}
+    #     for element_group in element_groups
+    # ]
+    # print(f"groups took {time.time() - start}")
+    # start = time.time()
 
     connections = VariableConnection.objects.all().select_related("to_variable")
-    edges=[]
+    edges = []
     eq_time = 0
     append_time = 0
     eq_read_time = 0
@@ -860,8 +863,8 @@ def redraw_model(date_ord, *_):
         eq_time += time.time() - eq_start
         append_start = time.time()
         edges.append({"data": {"source": connection.from_variable_id,
-                                "target": connection.to_variable_id,
-                                "has_equation": has_equation}})
+                               "target": connection.to_variable_id,
+                               "has_equation": has_equation}})
         append_time += time.time() - append_start
     print(f"eq took {eq_time}, eq_read took {eq_read_time}, append took {append_time}")
     print(f"connections took {time.time() - start}")
@@ -888,4 +891,4 @@ def redraw_model(date_ord, *_):
             )
     print(f"stocks took {time.time() - start}")
     start = time.time()
-    return nodes + group_nodes + edges + flow_edges
+    return nodes + edges + flow_edges
