@@ -2,10 +2,20 @@ from django.db import models
 from model_utils.managers import InheritanceManager
 
 
+class SamraModel(models.Model):
+    name = models.CharField(max_length=200)
+    date_created = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Node(models.Model):
     label = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
     description = models.TextField(null=True, blank=True)
+    samra_model = models.ForeignKey("samramodel", on_delete=models.SET_NULL, null=True)
 
     class Meta:
         abstract = True
@@ -236,9 +246,9 @@ class ElementConnection(models.Model):
         unique_together = ("from_element", "to_element")
 
 
-class ElementGroup(models.Model):
-    label = models.CharField(max_length=200)
-    date_created = models.DateTimeField(auto_now_add=True)
+class ElementGroup(Node):
+    # label = models.CharField(max_length=200)
+    # date_created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.label
@@ -252,6 +262,7 @@ class Source(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
     number_of_periods = models.IntegerField(null=True, blank=True)
     link = models.URLField(null=True, blank=True)
+    samra_models = models.ManyToManyField("samramodel", related_name="sources")
 
     def __str__(self):
         return f"{self.title}; pk: {self.pk}"
@@ -319,6 +330,7 @@ class SeasonalInputDataPoint(models.Model):
 class ResponseOption(models.Model):
     name = models.CharField(max_length=500)
     description = models.TextField(null=True, blank=True)
+    samra_model = models.ForeignKey("samramodel", related_name="responseoptions", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.name
@@ -327,6 +339,7 @@ class ResponseOption(models.Model):
 class Scenario(models.Model):
     name = models.CharField(max_length=500)
     description = models.TextField(null=True, blank=True)
+    samra_model = models.ForeignKey("samramodel", related_name="scenarios", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.name
