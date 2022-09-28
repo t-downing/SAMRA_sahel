@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Element, ConstantValue, PulseValue
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, ConstantValue, PulseValue
 
 from sahel.sd_model.model_operations import run_model, timer
 
@@ -101,7 +101,7 @@ def populate_initial(_):
     response_options = [{"label": response.name, "value": response.pk} for response in ResponseOption.objects.all()]
     response_value = [1, 2]
     element_options = [{"label": element.label, "value": element.pk}
-                       for element in Element.objects.exclude(simulateddatapoints=None)]
+                       for element in Variable.objects.exclude(simulateddatapoints=None)]
     element1_value = 15
     element2_value = 39
     print(response_value[1])
@@ -134,7 +134,7 @@ def create_response(_, value):
 def create_constantvalue(n_clicks, element_pk, value, date, response_pk):
     if None in [n_clicks, element_pk, value, response_pk]:
         raise PreventUpdate
-    element = Element.objects.get(pk=element_pk)
+    element = Variable.objects.get(pk=element_pk)
     if element.sd_type == "Constant":
         ConstantValue(responseoption_id=response_pk, element_id=element_pk, value=value).save()
     elif element.sd_type == "Pulse Input":
@@ -258,7 +258,7 @@ def build_response(response_pk, *_):
     table_rows.append(html.Tr([
         html.Td(dcc.Dropdown(id="constantvalue-element-input", placeholder="Ajouter un élément",
                              options=[{"label": element.label, "value": element.pk}
-                                      for element in Element.objects.filter(sd_type__in=["Constant", "Pulse Input"])])),
+                                      for element in Variable.objects.filter(sd_type__in=["Constant", "Pulse Input"])])),
         html.Td(dbc.Input(id="constantvalue-value-input")),
         html.Td(id="constantvalue-unit-input"),
         html.Td(dcc.DatePickerSingle(id="constantvalue-date-input")),
@@ -275,7 +275,7 @@ def build_response(response_pk, *_):
 def show_constantvalue_unit(element_pk):
     if element_pk is None:
         raise PreventUpdate
-    return Element.objects.get(pk=element_pk).unit
+    return Variable.objects.get(pk=element_pk).unit
 
 
 @app.callback(
@@ -314,7 +314,7 @@ def update_bar_graph(data):
                                                              secondary_y=("secondary_y", "mean")).reset_index()
     # df = df.groupby(["responseoption_id", "element_id"]).mean().reset_index()
     df["value"] = df[["element_id", "mean", "sum"]].apply(
-        lambda row: row["mean"] if Element.objects.get(pk=row["element_id"]).aggregate_by == "MEAN" else row["sum"],
+        lambda row: row["mean"] if Variable.objects.get(pk=row["element_id"]).aggregate_by == "MEAN" else row["sum"],
         axis=1)
     df["norm_value"] = df["value"] / df.groupby("element_id")["value"].transform(max)
     df = df.sort_values("secondary_y")
@@ -328,11 +328,11 @@ def update_bar_graph(data):
         fig.add_trace(go.Bar(
             name=responseoption.name,
             x=dff["element_id"].apply(
-                lambda pk: f"{Element.objects.get(pk=pk).label}<br>"
-                           f"{'MOYEN' if Element.objects.get(pk=pk).aggregate_by == 'MEAN' else 'TOTAL'}"),
+                lambda pk: f"{Variable.objects.get(pk=pk).label}<br>"
+                           f"{'MOYEN' if Variable.objects.get(pk=pk).aggregate_by == 'MEAN' else 'TOTAL'}"),
             y=dff["norm_value"],
             text=dff[["value", "element_id"]].apply(
-                lambda row: f'{row["value"]:.2}<br>{Element.objects.get(pk=row["element_id"]).unit}', axis=1),
+                lambda row: f'{row["value"]:.2}<br>{Variable.objects.get(pk=row["element_id"]).unit}', axis=1),
         ))
 
     fig.update_layout(barmode="group", showlegend=True, legend=dict(title="Réponse"))
@@ -359,10 +359,10 @@ def update_scatter_graph(data):
                                                              secondary_y=("secondary_y", "mean")).reset_index()
     df = df.sort_values("secondary_y")
     print(df)
-    x_element = Element.objects.get(pk=df.iloc[-1]["element_id"])
-    y_element = Element.objects.get(pk=df.iloc[0]["element_id"])
+    x_element = Variable.objects.get(pk=df.iloc[-1]["element_id"])
+    y_element = Variable.objects.get(pk=df.iloc[0]["element_id"])
     df["value"] = df[["element_id", "mean", "sum"]].apply(
-        lambda row: row["mean"] if Element.objects.get(pk=row["element_id"]).aggregate_by == "MEAN" else row["sum"],
+        lambda row: row["mean"] if Variable.objects.get(pk=row["element_id"]).aggregate_by == "MEAN" else row["sum"],
         axis=1)
     df = df.pivot(index="responseoption_id", columns="element_id", values="value").reset_index()
     print(df)
@@ -402,7 +402,7 @@ def update_line_graph(data):
     df = pd.DataFrame(data)
 
     for element_id in df["element_id"].unique():
-        element = Element.objects.get(pk=element_id)
+        element = Variable.objects.get(pk=element_id)
         dff = df[df["element_id"] == element_id]
         secondary_y = True if dff["secondary_y"].iloc[0] == 1 else False
         fig.update_yaxes(title_text=f"{element.label} ({element.unit})", secondary_y=secondary_y)

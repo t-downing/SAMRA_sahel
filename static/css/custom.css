@@ -3,3 +3,7 @@
    background-image: linear-gradient(180deg, #368365 10%, #368365 100%);
   background-size: cover;
 }
+
+body {
+    font-family: 'Open Sans', sans-serif;
+}

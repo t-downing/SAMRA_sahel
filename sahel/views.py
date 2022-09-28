@@ -3,11 +3,13 @@ from .models import Source
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse, dash_response_builder, \
-    dash_termsoftrade
+    dash_termsoftrade, dash_response_list, dash_mapping2modeling
 
 
-class IndexView(TemplateView):
+class IndexView(LoginRequiredMixin, TemplateView):
     template_name = "sahel/index.html"
+    login_url = '/accounts/login/'
+    redirect_field_name = 'next'
 
 
 class ModelDiagramView(LoginRequiredMixin, TemplateView):
@@ -16,14 +18,20 @@ class ModelDiagramView(LoginRequiredMixin, TemplateView):
     redirect_field_name = 'next'
 
 
-class ComparisonView(LoginRequiredMixin, TemplateView):
-    template_name = "sahel/comparison.html"
+class ResponseView(LoginRequiredMixin, TemplateView):
+    template_name = "sahel/responses.html"
     login_url = '/accounts/login/'
     redirect_field_name = 'next'
 
 
 class ScenarioView(LoginRequiredMixin, TemplateView):
-    template_name = "sahel/scenarios.html"
+    template_name = "sahel/responses.html"
+    login_url = '/accounts/login/'
+    redirect_field_name = 'next'
+
+
+class ForecastView(LoginRequiredMixin, TemplateView):
+    template_name = "sahel/forecasts.html"
     login_url = '/accounts/login/'
     redirect_field_name = 'next'
 
@@ -40,6 +48,12 @@ class TermsOfTradeView(LoginRequiredMixin, TemplateView):
     redirect_field_name = 'next'
 
 
+class ResponseListView(LoginRequiredMixin, TemplateView):
+    template_name = "sahel/responses_list.html"
+    login_url = '/accounts/login/'
+    redirect_field_name = 'next'
+
+
 class EquationBankView(LoginRequiredMixin, TemplateView):
     template_name = "sahel/equation_bank.html"
     login_url = '/accounts/login/'
@@ -49,5 +63,11 @@ class EquationBankView(LoginRequiredMixin, TemplateView):
 class SourceListView(LoginRequiredMixin, ListView):
     template_name = "sahel/sources.html"
     model = Source
+    login_url = '/accounts/login/'
+    redirect_field_name = 'next'
+
+
+class Mapping2Modeling(LoginRequiredMixin, TemplateView):
+    template_name = "sahel/mapping2modeling.html"
     login_url = '/accounts/login/'
     redirect_field_name = 'next'

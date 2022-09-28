@@ -31,6 +31,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     '0.0.0.0',
+    "192.168.39.226",
+    "localhost",
 ]
 
 
@@ -43,8 +45,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # mine
     "sahel",
+    # third party
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
+    "active_link",
 ]
 
 MIDDLEWARE = [
@@ -89,7 +94,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": "d446lmk1hkk665",
-        "USER": os.environ.get("PSQL_USER"),
+        "USER": "fwgyrjjmfdmbgb",
         "PASSWORD": os.environ.get("PSQL_PASSWORD"),
         "HOST": "ec2-18-204-142-254.compute-1.amazonaws.com",
         "PORT": "5432",

@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Element, ConstantValue
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, ConstantValue
 
 from .forecasting import forecast_element
 from .model_operations import timer
@@ -66,7 +66,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
 )
 def update_element_dropdown(_):
     return [{"label": element.label, "value": element.pk}
-            for element in Element.objects.filter(sd_type="Input").exclude(measureddatapoints=None)]
+            for element in Variable.objects.filter(sd_type="Input").exclude(measureddatapoints=None)]
 
 
 @app.callback(
@@ -79,7 +79,7 @@ def update_graph(element_pk, *_):
     fig = go.Figure()
     fig.update_layout(template="simple_white", margin=dict(l=0, r=0, b=0, t=0))
 
-    element = Element.objects.get(pk=element_pk)
+    element = Variable.objects.get(pk=element_pk)
 
     df = pd.DataFrame(element.measureddatapoints.all().values())
     df["forecasted"] = False
@@ -141,6 +141,6 @@ def update_forecast_all(n_clicks):
     if n_clicks is None:
         raise PreventUpdate
     start = time.time()
-    for element in Element.objects.filter(sd_type="Input").exclude(measureddatapoints=None):
+    for element in Variable.objects.filter(sd_type="Input").exclude(measureddatapoints=None):
         forecast_element(element.pk)
     return f"forecasted all, took {time.time() - start} s"

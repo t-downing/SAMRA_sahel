@@ -12,6 +12,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterUniqueTogether(
             name='connection',
-            unique_together={('from_element', 'to_element')},
+            unique_together={('from_variable', 'to_variable')},
         ),
     ]
