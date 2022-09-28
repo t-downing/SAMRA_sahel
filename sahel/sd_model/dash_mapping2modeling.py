@@ -76,7 +76,12 @@ app.layout = html.Div(children=[
         html.Br(),
         dbc.Button(className="mb-3", id="add-node-open", children="Ajouter", size="sm", color="primary"),
         html.Br(),
-        dbc.Button(className="mb-3", id="save-positions", children="Sauvegarder", size="sm", color="primary"),
+        dbc.FormGroup([
+            dbc.Checklist(id="allow-movement-switch",
+                          options=[{"label": "Allow movement", "value": 1}],
+                          value=[], switch=True, inline=True),
+        ]),
+        dbc.Button(className="mb-3", id="update-movement", children="GO", size="sm", color="primary"),
     ]),
 
     # MODALS
@@ -142,50 +147,10 @@ app.layout = html.Div(children=[
     ),
 
     # READOUTS
-    html.P(id="save-positions-readout", hidden=True),
     html.P(id="current-story", hidden=True, children="init"),
+    # store contains positions of elements BEFORE being moved around, and is None if not moving elements around
     dcc.Store(id="store"),
 ])
-
-
-@app.callback(
-    Output("save-positions-readout", "children"),
-    Input("save-positions", "n_clicks"),
-    State("cyto", "elements"),
-    State("current-story", "children")
-)
-@timer
-def save_node_positions(n_clicks, cyto_elements, story_pk):
-    if n_clicks is None:
-        raise PreventUpdate
-
-    old_positions = {str(position.get("variable_id")): position
-                     for position in VariablePosition.objects.filter(story_id=story_pk).values()}
-
-    objs = []
-    for cyto_element in cyto_elements:
-        if "position" in cyto_element and "hidden" not in cyto_element.get("classes"):
-            pk = cyto_element.get("data").get("id")
-            new_x, new_y = cyto_element.get('position').get("x"), cyto_element.get('position').get("y")
-            try:
-                old_x, old_y = old_positions.get(str(pk)).get("x_pos"), old_positions.get(str(pk)).get("y_pos")
-            except AttributeError:
-                old_x, old_y = None, None
-            # if pk == "102":
-            #     print(f"{old_x=}, {new_x=}")
-            #     pprint(cyto_element)
-            if old_x != new_x or old_y != new_y:
-
-                try:
-                    position = VariablePosition.objects.get(variable_id=pk, story_id=story_pk)
-                    print(f"MOVED EXISTING {position}")
-                    position.x_pos, position.y_pos = new_x, new_y
-                    objs.append(position)
-                except VariablePosition.DoesNotExist:
-                    print(f"adding new position for {pk}")
-                    VariablePosition(variable_id=pk, story_id=story_pk, x_pos=new_x, y_pos=new_y).save()
-
-    VariablePosition.objects.bulk_update(objs, ["x_pos", "y_pos"])
 
 
 @app.callback(
@@ -417,6 +382,7 @@ def append_cyto_iteration(cyto_elements: [dict], new_iteration: int):
     Output("current-story", "children"),
     Output("store", "data"),
 
+
     # INPUTS
     # relationship modification
     Input({"type": "select-node", "index": ALL}, "n_clicks"),
@@ -436,6 +402,10 @@ def append_cyto_iteration(cyto_elements: [dict], new_iteration: int):
     Input("story-input", "value"),
     # element store
     Input("store", "data"),
+    # position lock switch
+    Input("allow-movement-switch", "value"),
+    # update movemenet button
+    Input("update-movement", "n_clicks"),
 
     # STATES
     # relationship modification
@@ -481,6 +451,10 @@ def draw_model(
         story_pk,
         # element store
         cyto_elements_store,
+        # position lock switch
+        movement_allowed,
+        # update movement button
+        update_mvmt_clicks,
 
         # STATES
         # relationship modification
@@ -499,8 +473,61 @@ def draw_model(
         cyto_elements: list[dict],
 ):
     print("TOP OF REDRAW")
-    print(f"{type(cyto_elements_store)}")
-    if cyto_elements_store is not None: return json.loads(cyto_elements_store), current_story_pk, None
+    print(f"{movement_allowed=}")
+    print(f"{type(cyto_elements_store)=}")
+    print(f"{update_mvmt_clicks=}")
+
+    if movement_allowed:
+        print(f"movement allowed")
+        if cyto_elements_store is None:
+            print(f"dumping into store")
+            return [], current_story_pk, json.dumps(cyto_elements)
+        else:
+            print("store contains elements")
+            if not cyto_elements:
+                print("no elements in map, loading json")
+                return json.loads(cyto_elements_store), current_story_pk, cyto_elements_store
+            else:
+                print("elements are in map, passing")
+                pass
+    else:
+        print("movement not allowed")
+        if current_story_pk != "init":
+            print("story not init")
+            moved_elements = []
+            if cyto_elements_store is not None:
+                print("movement not allowed, store contains elements, SAVING")
+                old_positions = {
+                    str(element.get("data").get("id")): element.get("position")
+                    for element in json.loads(cyto_elements_store)
+                    if "id" in element.get("data") and "position" in element
+                }
+                print("old_positions[0]:")
+                pprint(old_positions.get("102"))
+                for element in cyto_elements:
+                    if "position" in element and "hidden" not in element.get("classes"):
+                        pk = element.get("data").get("id")
+                        new_x, new_y = element.get('position').get("x"), element.get('position').get("y")
+                        try:
+                            old_x, old_y = old_positions.get(str(pk)).get("x"), old_positions.get(str(pk)).get(
+                                "y")
+                        except AttributeError:
+                            old_x, old_y = None, None
+
+                        if old_x != new_x or old_y != new_y:
+                            try:
+                                position = VariablePosition.objects.get(variable_id=pk, story_id=story_pk)
+                                print(f"MOVED EXISTING {position}")
+                                position.x_pos, position.y_pos = new_x, new_y
+                                moved_elements.append(position)
+                            except VariablePosition.DoesNotExist:
+                                print(f"ADDING NEW POSITIONS for {pk}")
+                                VariablePosition(variable_id=pk, story_id=story_pk, x_pos=new_x, y_pos=new_y).save()
+                VariablePosition.objects.bulk_update(moved_elements, ["x_pos", "y_pos"])
+                return cyto_elements, current_story_pk, None
+            else:
+                print("store is empty, passing")
+                pass
 
     # SELECT NODE
     for n_clicks, id in zip(select_clicks, select_ids):
@@ -508,13 +535,13 @@ def draw_model(
             selected_id = id.get("index")
             print(f"clicked on {selected_id}")
             display_element = {}
-            for cyto_element in cyto_elements:
-                if cyto_element.get("data").get("id") == selected_id:
-                    cyto_element.update({"selected": True})
-                    display_element = cyto_element
+            for element in cyto_elements:
+                if element.get("data").get("id") == selected_id:
+                    element.update({"selected": True})
+                    display_element = element
                 else:
-                    cyto_element.update({"selected": False})
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+                    element.update({"selected": False})
+            return cyto_elements, current_story_pk, None
 
     # DELETE NODE
     # there is a Dash Cytoscape bug where the child nodes also get removed when the parent is removed
@@ -526,12 +553,12 @@ def draw_model(
             elif "group" in deleted_id:
                 ElementGroup.objects.get(pk=deleted_id.removeprefix("group_")).delete()
             updated_cyto_elements = []
-            for cyto_element in cyto_elements:
-                if cyto_element.get("data").get("parent") == deleted_id:
-                    cyto_element.get("data").update({"parent": None})
-                if cyto_element.get("data").get("id") != deleted_id:
-                    updated_cyto_elements.append(cyto_element)
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+            for element in cyto_elements:
+                if element.get("data").get("parent") == deleted_id:
+                    element.get("data").update({"parent": None})
+                if element.get("data").get("id") != deleted_id:
+                    updated_cyto_elements.append(element)
+            return cyto_elements, current_story_pk, None
 
     # REMOVE NODE
     for n_clicks, id in zip(remove_clicks, remove_ids):
@@ -547,11 +574,11 @@ def draw_model(
                 variable = Variable.objects.get(pk=child_id.removeprefix("variable_"))
                 variable.element = None
                 variable.save()
-            for cyto_element in cyto_elements:
-                if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
-                    cyto_element.get("data").update({"parent": None})
-                    display_element = cyto_element
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+            for element in cyto_elements:
+                if element.get("data").get("id") == child_id.removeprefix("variable_"):
+                    element.get("data").update({"parent": None})
+                    display_element = element
+            return cyto_elements, current_story_pk, None
 
     # CONNECT PARENT
     for n_clicks, id in zip(parentchild_clicks, parentchild_ids):
@@ -569,10 +596,10 @@ def draw_model(
                     variable.element_id = parentchild_input[0]
                     variable.save()
                     parent_class_str = "element"
-                for cyto_element in cyto_elements:
-                    if cyto_element.get("data").get("id") == child_id.removeprefix("variable_"):
-                        cyto_element.get("data").update({"parent": f"{parent_class_str}_{parentchild_input[0]}"})
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+                for element in cyto_elements:
+                    if element.get("data").get("id") == child_id.removeprefix("variable_"):
+                        element.get("data").update({"parent": f"{parent_class_str}_{parentchild_input[0]}"})
+            return cyto_elements, current_story_pk, None
 
     # ADD NODE
     if add_node_clicks > 0 and add_node_modal_is_open:
@@ -617,7 +644,7 @@ def draw_model(
                 "position": {"x": 0.0, "y": 0.0},
                 "classes": "variable"
             })
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+            return cyto_elements, current_story_pk, None
 
     # CHANGE FIELD
     if status_field_input:
@@ -654,7 +681,7 @@ def draw_model(
                 if not (cyto_element.get("data").get("source") == f"element_{from_element_pk}" and
                         cyto_element.get("data").get("target") == f"element_{to_element_pk}")
             ]
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+            return cyto_elements, current_story_pk, None
 
     # ADD CONNECTION
     for n_clicks, id in zip(add_connection_clicks, add_connection_ids):
@@ -669,7 +696,7 @@ def draw_model(
                 "classes": f"element {Element.objects.get_subclass(pk=from_element_pk).element_type}",
             })
             ElementConnection(to_element_id=to_element_pk, from_element_id=from_element_pk).save()
-            return [{}], current_story_pk,  json.dumps(cyto_elements)
+            return cyto_elements, current_story_pk, None
 
     if current_story_pk == story_pk:
         raise PreventUpdate
@@ -844,25 +871,32 @@ def draw_model(
             if obj.get("data").get("target") not in node_ids:
                 raise ValueError(f"Target {obj.get('data').get('target')} not found in node ids")
 
-    print(f"{current_story_pk=}")
-    print(f"{story_pk=}")
     if current_story_pk == "init":
+        print("story is init, drawing elements, making store None")
         return cyto_elements, story_pk, None
     else:
-        return [{}], story_pk, json.dumps(cyto_elements)
+        print("story is not init")
+        if movement_allowed:
+            print("movement is allowed, dumping into store")
+            return [], story_pk, json.dumps(cyto_elements)
+        else:
+            print("movement is not allowed, drawing elements, making store None")
+            return cyto_elements, story_pk, None
+
 
 
 @app.callback(
     Output("right-sidebar", "children"),
     Input("cyto", "selectedNodeData"),
     Input("cyto", "elements"),
+    State("allow-movement-switch", "value"),
 )
 @timer
-def right_sidebar(selectednodedata, _):
+def right_sidebar(selectednodedata, _, movement_allowed):
     # INIT
     print(f"{selectednodedata=}")
     children = []
-    if not selectednodedata:
+    if not selectednodedata or movement_allowed:
         return children
     nodedata = selectednodedata[-1]
     scenario_pk = "1"
