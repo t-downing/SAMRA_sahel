@@ -152,6 +152,13 @@ X_FRAME_OPTIONS = "SAMEORIGIN"
 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
+try:
+    from local_settings import *
+except ImportError:
+    pass
+
 import django_heroku
 django_heroku.settings(locals())
+
+
 
