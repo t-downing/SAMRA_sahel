@@ -349,3 +349,4 @@ fabric.properties
 /whole_sometables.json
 .DS_Store
 requirements_mac.txt
+local_settings.py
