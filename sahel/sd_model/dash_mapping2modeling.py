@@ -6,7 +6,7 @@ import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
     SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis, \
-    Story, VariablePosition, SamraModel
+    Story, VariablePosition, SamraModel, ElementPosition
 from .model_operations import timer
 import time
 import pandas as pd
@@ -16,7 +16,7 @@ from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
 from django.db.models import Prefetch
 import json
 
-DEFAULT_SAMRAMODEL_PK = "1"
+DEFAULT_SAMRAMODEL_PK = "2"
 DEFAULT_STORY_PK = "1"
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -48,7 +48,7 @@ app.layout = html.Div(children=[
                             {"label": "Éléments", "value": "element"},
                             {"label": "Variables", "value": "variable"},
                         ],
-                        value=["group", "element", "variable"],
+                        value=["element"],
                         switch=True,
                     )
                 ])
@@ -379,23 +379,15 @@ def show_layers(layers, colorbody_field, colorborder_field):
     return stylesheet + added_stylesheet
 
 
-def append_cyto_iteration(cyto_elements: [dict], new_iteration: int):
-    updated_cyto_elements = []
-    for obj in cyto_elements:
-        data = obj.get("data")
-        if "id" in data:
-            data.update({
-                "id": f"{data.get('id')}_iteration{new_iteration}",
-                "label": f"{data.get('label')} I{new_iteration}"
-            })
-        elif "source" in data:
-            data.update({
-                "source": f"{data.get('source')}_iteration{new_iteration}",
-                "target": f"{data.get('source')}_iteration{new_iteration}"
-            })
-        if "parent" in data:
-            data.update({"parent": f"{data.get('parent')}_iteration{new_iteration}"})
-    return cyto_elements
+@app.callback(
+    Output("cyto", "autolock"),
+    Input("allow-movement-switch", "value")
+)
+def lock_map(movement_allowed):
+    if movement_allowed:
+        return False
+    else:
+        return True
 
 
 @app.callback(
@@ -453,6 +445,8 @@ def append_cyto_iteration(cyto_elements: [dict], new_iteration: int):
     State({"type": "add-connection-input", "index": ALL}, "value"),
     # story
     State("current-story", "children"),
+    # current SAMRA model
+    State("samramodel-input", "value"),
     # current elements read
     State("cyto", "elements"),
 )
@@ -491,6 +485,8 @@ def draw_model(
         add_connection_ids, add_connection_input,
         # story
         current_story_pk,
+        # samra model
+        samramodel_pk,
         # current elements read
         cyto_elements: list[dict],
 ):
@@ -498,6 +494,10 @@ def draw_model(
     print(f"{movement_allowed=}")
     print(f"{type(cyto_elements_store)=}")
     print(f"{update_mvmt_clicks=}")
+    if cyto_elements is not None:
+        print(f"{len(cyto_elements)=}")
+    else:
+        print(f"{cyto_elements=}")
 
     if movement_allowed:
         print(f"movement allowed")
@@ -516,7 +516,7 @@ def draw_model(
         print("movement not allowed")
         if current_story_pk != "init":
             print("story not init")
-            moved_elements = []
+            moved_variables, moved_elements = [], []
             if cyto_elements_store is not None:
                 print("movement not allowed, store contains elements, SAVING")
                 old_positions = {
@@ -524,28 +524,38 @@ def draw_model(
                     for element in json.loads(cyto_elements_store)
                     if "id" in element.get("data") and "position" in element
                 }
-                print("old_positions[0]:")
-                pprint(old_positions.get("102"))
                 for element in cyto_elements:
                     if "position" in element and "hidden" not in element.get("classes"):
-                        pk = element.get("data").get("id")
+                        pprint(element)
+                        id = element.get("data").get("id")
                         new_x, new_y = element.get('position').get("x"), element.get('position').get("y")
                         try:
-                            old_x, old_y = old_positions.get(str(pk)).get("x"), old_positions.get(str(pk)).get(
-                                "y")
+                            old_x, old_y = old_positions.get(str(id)).get("x"), old_positions.get(str(id)).get("y")
                         except AttributeError:
                             old_x, old_y = None, None
 
                         if old_x != new_x or old_y != new_y:
-                            try:
-                                position = VariablePosition.objects.get(variable_id=pk, story_id=story_pk)
-                                print(f"MOVED EXISTING {position}")
-                                position.x_pos, position.y_pos = new_x, new_y
-                                moved_elements.append(position)
-                            except VariablePosition.DoesNotExist:
-                                print(f"ADDING NEW POSITIONS for {pk}")
-                                VariablePosition(variable_id=pk, story_id=story_pk, x_pos=new_x, y_pos=new_y).save()
-                VariablePosition.objects.bulk_update(moved_elements, ["x_pos", "y_pos"])
+                            if "variable" in element.get("classes"):
+                                try:
+                                    position = VariablePosition.objects.get(variable_id=id, story_id=story_pk)
+                                    print(f"MOVED EXISTING {position}")
+                                    position.x_pos, position.y_pos = new_x, new_y
+                                    moved_variables.append(position)
+                                except VariablePosition.DoesNotExist:
+                                    print(f"ADDING NEW POSITIONS for {id}")
+                                    VariablePosition(variable_id=id, story_id=story_pk, x_pos=new_x, y_pos=new_y).save()
+                            elif "element" in element.get("classes"):
+                                id = id.removeprefix("element_")
+                                try:
+                                    position = ElementPosition.objects.get(element_id=id, story_id=story_pk)
+                                    print(f"MOVED EXISTING {position}")
+                                    position.x_pos, position.y_pos = new_x, new_y
+                                    moved_elements.append(position)
+                                except ElementPosition.DoesNotExist:
+                                    print(f"ADDING NEW POSITIONS for {id}")
+                                    ElementPosition(element_id=id, story_id=story_pk, x_pos=new_x, y_pos=new_y).save()
+                VariablePosition.objects.bulk_update(moved_variables, ["x_pos", "y_pos"])
+                ElementPosition.objects.bulk_update(moved_elements, ["x_pos", "y_pos"])
                 return cyto_elements, current_story_pk, None
             else:
                 print("store is empty, passing")
@@ -625,8 +635,9 @@ def draw_model(
 
     # ADD NODE
     if add_node_clicks > 0 and add_node_modal_is_open:
+        print(f"{samramodel_pk=}")
         if class_input == "group":
-            element_group = ElementGroup(label=label_input)
+            element_group = ElementGroup(label=label_input, samramodel_id=samramodel_pk)
             element_group.save()
             cyto_elements.append(
                 {"data": {"id": f"group_{element_group.pk}",
@@ -637,24 +648,26 @@ def draw_model(
                  "selectable": True,
                  "pannable": True}
             )
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+            return cyto_elements, current_story_pk, None
         elif class_input == "element":
             element = None
             if subclass_input == "situationalanalysis":
-                element = SituationalAnalysis(label=label_input, element_type=type_input)
+                element = SituationalAnalysis(label=label_input, element_type=type_input, samramodel_id=samramodel_pk)
             elif subclass_input == "theoryofchange":
-                element = TheoryOfChange(label=label_input, element_type=type_input)
+                element = TheoryOfChange(label=label_input, element_type=type_input, samramodel_id=samramodel_pk)
             element.save()
+            ElementPosition(element=element, story_id=story_pk, x_pos=0.0, y_pos=0.0).save()
             cyto_elements.append(
                 {"data": {"id": f"element_{element.pk}",
                           "label": element.label,
                           "hierarchy": "element",
                           "parent": f"group_{element.element_group_id}"},
-                 "classes": f"element {element.element_type}"}
+                 "classes": f"element {element.element_type}",
+                 "position": {"x": 0.0, "y": 0.0}}
             )
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+            return cyto_elements, current_story_pk, None
         elif class_input == "variable":
-            variable = Variable(label=label_input, sd_type=type_input, unit=unit_input)
+            variable = Variable(label=label_input, sd_type=type_input, unit=unit_input, samramodel_id=samramodel_pk)
             variable.save()
             cyto_elements.append({
                 "data": {
@@ -728,15 +741,25 @@ def draw_model(
     print("redrawing whole model")
 
     cyto_elements = []
-    element_pks_in_story = [obj.get("id") for obj in Element.objects.filter(stories=story_pk).values()]
+    # get elements_pks in story
+    default_story_pk = SamraModel.objects.get(pk=samramodel_pk).default_story_id
+    print(f"{default_story_pk=}")
+    print(f"{story_pk=}")
+    if story_pk == default_story_pk:
+        elements = Element.objects.filter(samramodel_id=samramodel_pk)
+    else:
+        elements = Element.objects.filter(stories=story_pk)
+
+    print(f"{len(elements)=}")
+    element_pks_in_story = [element.pk for element in elements]
 
     # VARIABLES
     # nodes
     queryset = VariablePosition.objects.filter(story_id=story_pk)
-    variables = Variable.objects.all().prefetch_related(Prefetch(
-        "positions", queryset=queryset, to_attr="story_position"
+    variables = Variable.objects.filter(element_id__in=element_pks_in_story).prefetch_related(Prefetch(
+        "variablepositions", queryset=queryset, to_attr="story_position"
     ))
-
+    print(f"{len(variables)=}")
     variable_pks = [variable.pk for variable in variables]
     for variable in variables:
         color = "white"
@@ -760,7 +783,7 @@ def draw_model(
         else:
             if not variable.story_position:
                 print(f"no position set for {variable}")
-                position = VariablePosition.objects.filter(variable=variable, story_id=DEFAULT_STORY_PK).first()
+                position = VariablePosition.objects.filter(variable=variable, story_id=default_story_pk).first()
                 if position is None:
                     print(f"default position had not yet been set for {variable}, setting to zero now")
                     position = VariablePosition(
@@ -784,7 +807,10 @@ def draw_model(
         )
 
     # connections
-    connections = VariableConnection.objects.all().select_related("to_variable")
+    connections = VariableConnection.objects.filter(
+        to_variable_id__in=variable_pks, from_variable_id__in=variable_pks
+    ).select_related("to_variable")
+    print(f"{len(connections)=}")
     for connection in connections:
         has_equation = "no"
         if connection.to_variable is not None:
@@ -801,7 +827,7 @@ def draw_model(
         })
 
     # variable flows
-    stocks = Variable.objects.filter(sd_type="Stock").prefetch_related("inflows", "outflows")
+    stocks = Variable.objects.filter(sd_type="Stock", element_id__in=element_pks_in_story).prefetch_related("inflows", "outflows")
     for stock in stocks:
         for inflow in stock.inflows.all():
             has_equation = "no" if inflow.equation is None else "yes"
@@ -824,14 +850,33 @@ def draw_model(
 
     # ELEMENTS
     # nodes
-    elements = Element.objects.all().select_subclasses()
+    queryset = ElementPosition.objects.filter(story_id=story_pk)
+    elements = elements.select_subclasses().prefetch_related(Prefetch(
+        "elementpositions", queryset=queryset, to_attr="story_position"
+    ))
+    print(f"{len(elements)=}")
     for element in elements:
-        if story_pk == DEFAULT_STORY_PK or element.pk in element_pks_in_story:
+        if element.pk in element_pks_in_story:
             in_story = True
         else:
             in_story = False
 
         class_append = "" if in_story else " hidden"
+        if not element.variables.exists():
+            if not element.story_position:
+                print(f"no position set for {element}")
+                position = ElementPosition.objects.filter(element=element, story_id=default_story_pk).first()
+                if position is None:
+                    print(f"default position had not yet been set for {element}, setting to zero now")
+                    position = ElementPosition(
+                        element=element, story_id=default_story_pk, x_pos=0.0, y_pos=0.0
+                    )
+                    position.save()
+                x_pos, y_pos = position.x_pos, position.y_pos
+            else:
+                x_pos, y_pos = element.story_position[0].x_pos, element.story_position[0].y_pos
+        else:
+            x_pos, y_pos = None, None
 
         cyto_elements.append(
             {
@@ -845,11 +890,16 @@ def draw_model(
                         for field in SituationalAnalysis.SA_FIELDS
                     },
                 },
-                "classes": f"element {element.element_type}" + class_append
+                "classes": f"element {element.element_type}" + class_append,
+                "position": {"x": x_pos, "y": y_pos}
             }
         )
 
     # connections
+    elementconnections = ElementConnection.objects.filter(
+        to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
+    )
+    print(f"{len(elementconnections)=}")
     cyto_elements.extend([
         {
             "data": {
@@ -858,7 +908,9 @@ def draw_model(
             },
             "classes": f"element {Element.objects.get_subclass(pk=connection.from_element_id).element_type}"
         }
-        for connection in ElementConnection.objects.all()
+        for connection in ElementConnection.objects.filter(
+            to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
+        )
     ])
 
     # GROUPS
@@ -883,6 +935,8 @@ def draw_model(
             "pannable": True
         })
     cyto_elements.extend(group_nodes)
+
+    pprint(cyto_elements)
 
     # check that all connections have a valid source and target
     node_ids = [obj.get("data").get("id") for obj in cyto_elements if "id" in obj.get("data")]
