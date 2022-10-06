@@ -15,8 +15,8 @@ stylesheet = [
             "text-halign": "center",
             "text-wrap": "wrap",
             "text-max-width": 100,
-            "background-opacity": 0.7,
-            "background-blacken": -0.7,
+            "background-opacity": 0.5,
+            "background-blacken": -0.8,
         }
     },
     # edges
@@ -236,5 +236,4 @@ fieldvalue2color = {
 partname2cytokey = {
     "body": "background-color",
     "border": "border-color",
-    "ring": "underlay-color"
 }

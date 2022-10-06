@@ -26,6 +26,16 @@ class Node(models.Model):
         return f"{self.label}; pk: {self.pk}"
 
 
+class Sector(models.Model):
+    name = models.CharField(max_length=200)
+    date_created = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(null=True, blank=True)
+    samramodel = models.ForeignKey("samramodel", on_delete=models.SET_NULL, null=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Element(Node):
     objects = InheritanceManager()
     element_group = models.ForeignKey("elementgroup", related_name="elements", null=True, blank=True,
@@ -33,6 +43,7 @@ class Element(Node):
     # element_group_integer = models.IntegerField(null=True, blank=True)
     x_pos = models.FloatField(null=True, blank=True)
     y_pos = models.FloatField(null=True, blank=True)
+    sectors = models.ManyToManyField("sector", blank=True, related_name="elements")
     # stories = models.ManyToManyField("story", related_name="elements", blank=True)
 
 
@@ -260,12 +271,6 @@ class ElementConnection(models.Model):
 
 
 class ElementGroup(Node):
-    # label = models.CharField(max_length=200)
-    # date_created = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.label
-
     class Meta:
         ordering = ["-date_created"]
 

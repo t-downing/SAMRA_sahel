@@ -6,7 +6,7 @@ import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
     SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis, \
-    Story, VariablePosition, SamraModel, ElementPosition
+    Story, VariablePosition, SamraModel, ElementPosition, Sector
 from .model_operations import timer
 import time
 import pandas as pd
@@ -114,6 +114,10 @@ app.layout = html.Div(children=[
             dbc.InputGroup(className="mb-2", children=[
                 dbc.InputGroupAddon("Label", addon_type="prepend"),
                 dbc.Input(id="add-node-label-input"),
+            ]),
+            dbc.InputGroup(id="add-node-sector-input-parent", className="mb-2", children=[
+                dbc.InputGroupAddon("Sector", addon_type="prepend"),
+                dbc.Select(id="add-node-sector-input"),
             ]),
             dbc.InputGroup(className="mb-2", children=[
                 dbc.InputGroupAddon("Unité", addon_type="prepend"),
@@ -296,6 +300,27 @@ def add_node_unit(class_input):
 
 
 @app.callback(
+    Output("add-node-sector-input", "options"),
+    Output("add-node-sector-input", "value"),
+    Output("add-node-sector-input-parent", "hidden"),
+    Input("samramodel-input", "value"),
+    Input("add-node-class-input", "value")
+)
+def add_node_sector(samramodel_pk, class_input):
+    if class_input == "element":
+        sectors = Sector.objects.filter(samramodel_id=samramodel_pk)
+        options = [{"value": "empty", "label": "---"}]
+        options.extend([
+            {"value": sector.pk, "label": sector.name}
+            for sector in sectors
+        ])
+        value = "empty"
+        return options, value, False
+    else:
+        return None, None, True
+
+
+@app.callback(
     Output("cyto", "generateImage"),
     Input("download-submit", "n_clicks"),
 )
@@ -434,6 +459,7 @@ def lock_map(movement_allowed):
     State("add-node-type-input", "value"),
     State("add-node-label-input", "value"),
     State("add-node-unit-input", "value"),
+    State("add-node-sector-input", "value"),
     State("add-node-modal", "is_open"),
     # change field
     [State({"type": f"{field}-input", "index": ALL}, "id")
@@ -476,7 +502,7 @@ def draw_model(
         # relationship modification
         select_ids, delete_ids, remove_ids, parentchild_ids, parentchild_input,
         # add node
-        class_input, subclass_input, type_input, label_input, unit_input, add_node_modal_is_open,
+        class_input, subclass_input, type_input, label_input, unit_input, sector_input, add_node_modal_is_open,
         # change fields
         status_field_id, trend_field_id, resilience_field_id, vulnerability_field_id,
         # delete connection
@@ -526,7 +552,6 @@ def draw_model(
                 }
                 for element in cyto_elements:
                     if "position" in element and "hidden" not in element.get("classes"):
-                        pprint(element)
                         id = element.get("data").get("id")
                         new_x, new_y = element.get('position').get("x"), element.get('position').get("y")
                         try:
@@ -577,6 +602,7 @@ def draw_model(
 
     # DELETE NODE
     # there is a Dash Cytoscape bug where the child nodes also get removed when the parent is removed
+    # there is also a problem that the node remains selected after being deleted, so callback doesn't run
     for n_clicks, id in zip(delete_clicks, delete_ids):
         if n_clicks is not None:
             deleted_id = id.get("index")
@@ -656,6 +682,8 @@ def draw_model(
             elif subclass_input == "theoryofchange":
                 element = TheoryOfChange(label=label_input, element_type=type_input, samramodel_id=samramodel_pk)
             element.save()
+            if sector_input is not None and sector_input != "empty":
+                element.sectors.add(sector_input)
             ElementPosition(element=element, story_id=story_pk, x_pos=0.0, y_pos=0.0).save()
             cyto_elements.append(
                 {"data": {"id": f"element_{element.pk}",
@@ -936,7 +964,6 @@ def draw_model(
         })
     cyto_elements.extend(group_nodes)
 
-    pprint(cyto_elements)
 
     # check that all connections have a valid source and target
     node_ids = [obj.get("data").get("id") for obj in cyto_elements if "id" in obj.get("data")]
@@ -966,9 +993,10 @@ def draw_model(
     Input("cyto", "selectedNodeData"),
     Input("cyto", "elements"),
     State("allow-movement-switch", "value"),
+    State("samramodel-input", "value")
 )
 @timer
-def right_sidebar(selectednodedata, _, movement_allowed):
+def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
     # INIT
     print(f"{selectednodedata=}")
     children = []
@@ -1009,13 +1037,24 @@ def right_sidebar(selectednodedata, _, movement_allowed):
 
     # ELEMENT
     elif nodedata.get("hierarchy") == "element":
-        element = Element.objects.get_subclass(pk=nodedata.get("id").removeprefix("element_"))
+        pk = nodedata.get("id").removeprefix("element_")
+        start = time.time()
+        # fetch element and all related information
+        element = Element.objects.prefetch_related(
+            "variables", "upstream_connections__from_element"
+        ).select_related(
+            "element_group"
+        ).get_subclass(pk=pk)
+        print(f"TIME: {round(time.time() - start, 2)} for element fetch")
+        start = time.time()
 
         # label and type
         children.append(html.H4(className="mb-2 h4", children=element.label))
         children.append(html.H6(className="mb-3 font-italic text-secondary font-weight-light h6",
                                 children=f"ÉLÉMENT | {element.__class__._meta.verbose_name} | "
                                          f"{element.get_element_type_display()}"))
+        print(f"TIME: {round(time.time() - start, 2)} for element label and type")
+        start = time.time()
 
         # parent
         children.append(
@@ -1037,7 +1076,7 @@ def right_sidebar(selectednodedata, _, movement_allowed):
                     dbc.Select(
                         id={"type": "parentchild-input", "index": "only_one"}, bs_size="sm",
                         options=[{"label": elementgroup.label, "value": elementgroup.pk}
-                                 for elementgroup in ElementGroup.objects.all()],
+                                 for elementgroup in ElementGroup.objects.filter(samramodel_id=samrammodel_pk)],
                     ),
                     dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
                         id={"type": "parentchild-submit", "index": f"child-element_{element.pk}"}, children="Saisir"
@@ -1045,6 +1084,8 @@ def right_sidebar(selectednodedata, _, movement_allowed):
                 ]),
             ])
         )
+        print(f"TIME: {round(time.time() - start, 2)} for element parent")
+        start = time.time()
 
         # children
         children.append(html.P(className="mb-0 font-weight-bold", children="Variables / Indicateurs"))
@@ -1056,6 +1097,8 @@ def right_sidebar(selectednodedata, _, movement_allowed):
             )
             for variable in element.variables.all()
         ])
+        print(f"TIME: {round(time.time() - start, 2)} for element children")
+        start = time.time()
 
         # upstream
         children.append(html.P(className="mb-0 font-weight-bold", children="Éléments en amont"))
@@ -1063,30 +1106,35 @@ def right_sidebar(selectednodedata, _, movement_allowed):
         children.extend([
             dbc.ButtonGroup(className="mb-1 mr-1", size="sm", children=[
                 dbc.Button(
-                    id={"type": "select-node", "index": f"element_{upstream_element.pk}"},
-                    outline=True, color="secondary", children=upstream_element.label
+                    id={"type": "select-node", "index": f"element_{upstream_connection.from_element.pk}"},
+                    outline=True, color="secondary", children=upstream_connection.from_element.label
                 ),
                 dbc.Button(
                     id={"type": "delete-connection",
-                        "index": f"element_{upstream_element.pk}-to-element_{element.pk}"},
+                        "index": f"element_{upstream_connection.from_element.pk}-to-element_{element.pk}"},
                     outline=True, color="danger", children="x"
                 )
             ])
-            for upstream_element in Element.objects.filter(downstream_connections__to_element=element)
+            for upstream_connection in element.upstream_connections.all()
         ])
+        print(f"TIME: {round(time.time() - start, 2)} for element upstream existing")
+        start = time.time()
         children.append(dbc.InputGroup(size="sm", children=[
             dbc.Select(
                 id={"type": "add-connection-input", "index": "only-one"},
                 options=[
                     {"label": upstream_element.label, "value": f"element_{upstream_element.pk}"}
                     for upstream_element in
-                    Element.objects.exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
+                    Element.objects.filter(samramodel_id=samrammodel_pk)
+                        .exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
                 ],
             ),
             dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
                 id={"type": "add-connection-submit", "index": f"to-element_{element.pk}"}, children="Ajouter"
             ))
         ]))
+        print(f"TIME: {round(time.time() - start, 2)} for element upstream add")
+        start = time.time()
 
         # status, trend, resilience, vulnerability for SA only
         if isinstance(element, SituationalAnalysis):
@@ -1106,10 +1154,14 @@ def right_sidebar(selectednodedata, _, movement_allowed):
                 ])
                 for field in SituationalAnalysis.SA_FIELDS
             ])
+        print(f"TIME: {round(time.time() - start, 2)} for element status etc")
+        start = time.time()
 
         # EBs
         children.append(html.P(className="mt-4 mb-0 font-weight-bold", children="Informations Qualitatives"))
         children.append(html.Hr(className="mb-4 mt-1 mx-0"))
+        print(f"TIME: {round(time.time() - start, 2)} for element EBs")
+        start = time.time()
 
         # delete
         children.append(
