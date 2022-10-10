@@ -6,7 +6,7 @@ import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
     SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis, \
-    Story, VariablePosition, SamraModel, ElementPosition, Sector
+    Story, VariablePosition, SamraModel, ElementPosition, Sector, EvidenceBit
 from .model_operations import timer
 import time
 import pandas as pd
@@ -80,7 +80,9 @@ app.layout = html.Div(children=[
         # other
         dbc.Button(className="mb-3", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
         html.Br(),
-        dbc.Button(className="mb-3", id="add-node-open", children="Ajouter", size="sm", color="primary"),
+        dbc.Button(className="mb-3", id="add-node-open", children="Ajouter un objet", size="sm", color="primary"),
+        html.Br(),
+        dbc.Button(className="mb-3", id="add-eb-open", children="Add an EB", size="sm", color="primary"),
         html.Br(),
         dbc.FormGroup([
             dbc.Checklist(id="allow-movement-switch",
@@ -127,6 +129,33 @@ app.layout = html.Div(children=[
         dbc.ModalFooter(className="d-flex justify-content-end", children=[
             dbc.Button(id="add-node-close", className="ml-2", n_clicks=0, children="Annuler"),
             dbc.Button(id="add-node-submit", className="ml-2", n_clicks=0, color="primary", children="Saisir"),
+        ]),
+    ]),
+
+    # add EB
+    dbc.Modal(id="add-eb-modal", is_open=False, children=[
+        dbc.ModalHeader("Add an Evidence Bit"),
+        dbc.ModalBody(children=[
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Source", addon_type="prepend"),
+                dbc.Select(id="add-eb-source-input"),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Content", addon_type="prepend"),
+                dbc.Textarea(id="add-eb-content-input"),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Label", addon_type="prepend"),
+                dcc.DatePickerSingle(id="add-eb-date-input"),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Elements", addon_type="prepend"),
+                dcc.Dropdown(id="add-eb-elements-input", style={"width": "100%"}, multi=True),
+            ]),
+        ]),
+        dbc.ModalFooter(className="d-flex justify-content-end", children=[
+            dbc.Button(id="add-eb-close", className="ml-2", n_clicks=0, children="Cancel"),
+            dbc.Button(id="add-eb-submit", className="ml-2", n_clicks=0, color="primary", children="Submit"),
         ]),
     ]),
 
@@ -321,6 +350,62 @@ def add_node_sector(samramodel_pk, class_input):
 
 
 @app.callback(
+    Output("add-eb-modal", "is_open"),
+    Input("add-eb-open", "n_clicks"),
+    Input("add-eb-close", "n_clicks"),
+    Input("add-eb-submit", "n_clicks"),
+    State("add-eb-modal", "is_open")
+)
+def add_eb_modal(open_clicks, close_clicks, submit_clicks, is_open):
+    if open_clicks or close_clicks or submit_clicks:
+        return not is_open
+    return is_open
+
+
+@app.callback(
+    Output("add-eb-elements-input", "options"),
+    Output("add-eb-source-input", "options"),
+    Input("samramodel-input", "value")
+)
+def add_eb_elements(samramodel_pk):
+    element_options = [
+        {"value": obj.get("id"), "label": obj.get("label")}
+        for obj in Element.objects.filter(samramodel_id=samramodel_pk).values()
+    ]
+    source_options = [
+        {"value": obj.get("id"), "label": obj.get("title")}
+        for obj in Source.objects.filter(samramodels=samramodel_pk).values()
+    ]
+    return element_options, source_options
+
+
+@app.callback(
+    Output("add-eb-elements-input", "value"),
+    Output("add-eb-date-input", "date"),
+    Output("add-eb-content-input", "value"),
+    Input("add-eb-submit", "n_clicks"),
+    State("add-eb-source-input", "value"),
+    State("add-eb-content-input", "value"),
+    State("add-eb-date-input", "date"),
+    State("add-eb-elements-input", "value"),
+)
+def add_eb_submit(n_clicks, source_pk, content, date, elements):
+    if n_clicks is None:
+        return None, None, None
+    print(f"{date=}")
+    print(f"{elements=}")
+    eb = EvidenceBit(
+        content=content,
+        eb_date=date,
+        source_id=source_pk,
+    )
+    eb.save()
+    eb.elements.add(*[element for element in elements])
+
+    return None, None, None
+
+
+@app.callback(
     Output("cyto", "generateImage"),
     Input("download-submit", "n_clicks"),
 )
@@ -395,7 +480,8 @@ def show_layers(layers, colorbody_field, colorborder_field):
                 {
                     "selector": f"[{part_field} = '{choice[0]}']",
                     "style": {
-                        partname2cytokey.get(part_name): fieldvalue2color.get(part_field).get(choice[0]).get(part_name)
+                        partname2cytokey.get(part_name): fieldvalue2color.get(part_field).get(choice[0]).get(part_name),
+                        "background-blacken": -0.3,
                     }
                 }
                 for choice in SituationalAnalysis._meta.get_field(part_field).choices
@@ -726,12 +812,20 @@ def draw_model(
             value = value[0]
             id = id[0]
 
-            element = SituationalAnalysis.objects.get(pk=id.get("index"))
+            element = SituationalAnalysis.objects.get(pk=id.get("index").removeprefix("element_"))
             old_value = getattr(element, field)
 
             if value != old_value:
                 setattr(element, field, value)
                 element.save()
+                print(f"SAVED ELEMENT {element} with {field=}, {value=}")
+                for cyto_element in cyto_elements:
+                    if cyto_element.get("data").get("id") == id.get("index"):
+                        print("FOUND IT")
+                        print(f"{cyto_element=}")
+                        print(f"{field=}, {value=}")
+                        cyto_element.get("data").update({field: value})
+                return cyto_elements, current_story_pk, None
 
     # DELETE CONNECTION
     for n_clicks, id in zip(delete_connection_clicks, delete_connection_ids):
@@ -879,9 +973,10 @@ def draw_model(
     # ELEMENTS
     # nodes
     queryset = ElementPosition.objects.filter(story_id=story_pk)
-    elements = elements.select_subclasses().prefetch_related(Prefetch(
-        "elementpositions", queryset=queryset, to_attr="story_position"
-    ))
+    elements = elements.select_subclasses().prefetch_related(
+        Prefetch("elementpositions", queryset=queryset, to_attr="story_position"),
+        Prefetch("variables")
+    )
     print(f"{len(elements)=}")
     for element in elements:
         if element.pk in element_pks_in_story:
@@ -926,20 +1021,25 @@ def draw_model(
     # connections
     elementconnections = ElementConnection.objects.filter(
         to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
-    )
+    ).select_related("from_element__situationalanalysis", "from_element__theoryofchange")
     print(f"{len(elementconnections)=}")
-    cyto_elements.extend([
-        {
+    for connection in elementconnections:
+        element_type = ""
+        try:
+            element_type += " " + connection.from_element.theoryofchange.element_type
+        except Element.theoryofchange.RelatedObjectDoesNotExist:
+            pass
+        try:
+            element_type += " " + connection.from_element.situationalanalysis.element_type
+        except Element.situationalanalysis.RelatedObjectDoesNotExist:
+            pass
+        cyto_elements.append({
             "data": {
                 "source": f"element_{connection.from_element_id}",
                 "target": f"element_{connection.to_element_id}"
             },
-            "classes": f"element {Element.objects.get_subclass(pk=connection.from_element_id).element_type}"
-        }
-        for connection in ElementConnection.objects.filter(
-            to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
-        )
-    ])
+            "classes": "element" + element_type
+        })
 
     # GROUPS
     element_groups = ElementGroup.objects.all().prefetch_related("elements")
@@ -1041,7 +1141,7 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         start = time.time()
         # fetch element and all related information
         element = Element.objects.prefetch_related(
-            "variables", "upstream_connections__from_element"
+            "variables", "upstream_connections__from_element", "evidencebits"
         ).select_related(
             "element_group"
         ).get_subclass(pk=pk)
@@ -1144,7 +1244,7 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
                 dbc.InputGroup(className="mb-2", size="sm", children=[
                     dbc.InputGroupAddon(addon_type="prepend", children=field.capitalize()),
                     dbc.Select(
-                        id={"type": f"{field}-input", "index": element.pk},
+                        id={"type": f"{field}-input", "index": f"element_{element.pk}"},
                         options=[
                             {"value": choice[0], "label": choice[1]}
                             for choice in SituationalAnalysis._meta.get_field(field).choices
@@ -1159,11 +1259,28 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
 
         # EBs
         children.append(html.P(className="mt-4 mb-0 font-weight-bold", children="Informations Qualitatives"))
-        children.append(html.Hr(className="mb-4 mt-1 mx-0"))
+        children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+        for eb in element.evidencebits.all():
+            truncate_length = 5
+            content = eb.content if len(eb.content) < truncate_length else eb.content[:truncate_length] + "..."
+            children.append(
+                dbc.ButtonGroup(className="mb-1 mr-1", size="sm", children=[
+                    dbc.Button(
+                        id={"type": "select-eb", "index": eb.pk},
+                        outline=True, color="secondary", children=content
+                    ),
+                    dbc.Button(
+                        id={"type": "remove-eb", "index": eb.pk},
+                        outline=True, color="danger", children="x"
+                    )
+                ])
+            )
+
         print(f"TIME: {round(time.time() - start, 2)} for element EBs")
         start = time.time()
 
         # delete
+        children.append(html.Hr(className="mb-2 mt-4 mx-0"))
         children.append(
             dbc.Button(
                 id={"type": "delete-node", "index": nodedata.get("id")},
