@@ -1,5 +1,17 @@
 from django.contrib import admin
 from . import models
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
+
+
+class ElementResource(resources.ModelResource):
+    class Meta:
+        model = models.Element
+
+
+class ElementAdmin(ImportExportModelAdmin):
+    resource_class = ElementResource
+
 
 admin.site.register(models.Variable)
 admin.site.register(models.SimulatedDataPoint)
@@ -16,7 +28,7 @@ admin.site.register(models.PulseValue)
 admin.site.register(models.HouseholdConstantValue)
 admin.site.register(models.Scenario)
 admin.site.register(models.ScenarioConstantValue)
-admin.site.register(models.Element)
+admin.site.register(models.Element, ElementAdmin)
 admin.site.register(models.SituationalAnalysis)
 admin.site.register(models.TheoryOfChange)
 admin.site.register(models.ShockStructure)
