@@ -186,6 +186,7 @@ class Variable(Node):
         ("1 / an", "1 / an"),
         ("mm / jour", "mm / jour"),
         ("NDVI", "NDVI"),
+        ("USD / tonne", "USD / tonne"),
     )
     AGG_OPTIONS = (
         ("MEAN", "moyen"),

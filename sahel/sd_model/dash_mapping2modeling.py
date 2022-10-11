@@ -6,7 +6,7 @@ import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
     SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis, \
-    Story, VariablePosition, SamraModel, ElementPosition, Sector, EvidenceBit
+    Story, VariablePosition, SamraModel, ElementPosition, Sector, EvidenceBit, ShockStructure
 from .model_operations import timer
 import time
 import pandas as pd
@@ -15,9 +15,11 @@ from pprint import pprint
 from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
 from django.db.models import Prefetch
 import json
+from .translations import l
 
 DEFAULT_SAMRAMODEL_PK = "2"
 DEFAULT_STORY_PK = "1"
+LANG = "EN"
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -30,8 +32,6 @@ app.layout = html.Div(children=[
     # overlay stuff, all with position:absolute
     # (cannot click through divs in Dash for some reason, z-index not working either)
     html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute"}, children=[
-        html.H2(className="mb-4 h2", children="Schéma"),
-
         # samramodel
         dbc.Select(id="samramodel-input", className="mb-3"),
 
@@ -263,7 +263,8 @@ def add_node_subclass(class_input):
     elif class_input == "element":
         options = [
             {"label": "Analyse de situation", "value": "situationalanalysis"},
-            {"label": "Théorie de changement", "value": "theoryofchange"}
+            {"label": "Théorie de changement", "value": "theoryofchange"},
+            {"label": "Shock structure", "value": "shockstructure"},
         ]
         value = "situationalanalysis"
         disabled = False
@@ -305,6 +306,13 @@ def add_node_type(class_input, subclass_input):
             for sa_type in SituationalAnalysis.SA_TYPES
         ]
         value = SituationalAnalysis.SITUATIONAL_ANALYSIS
+    elif subclass_input == "shockstructure":
+        options = [
+            {"label": sh_type[1], "value": sh_type[0]}
+            for sh_type in ShockStructure.SHOCKSTRUCTURE_TYPES
+        ]
+        value = ShockStructure.SHOCK_EFFECT
+        disabled = False
     return options, value, disabled
 
 
@@ -351,15 +359,50 @@ def add_node_sector(samramodel_pk, class_input):
 
 @app.callback(
     Output("add-eb-modal", "is_open"),
+    Output("add-eb-source-input", "value"),
+    Output("add-eb-elements-input", "value"),
+    Output("add-eb-date-input", "date"),
+    Output("add-eb-content-input", "value"),
+    Output("add-eb-open", "n_clicks"),
+    Output("add-eb-close", "n_clicks"),
+    Output("add-eb-submit", "n_clicks"),
+    # INPUTS
     Input("add-eb-open", "n_clicks"),
     Input("add-eb-close", "n_clicks"),
     Input("add-eb-submit", "n_clicks"),
-    State("add-eb-modal", "is_open")
+    Input({"type": "select-eb", "index": ALL}, "n_clicks"),
+    # STATES
+    State("add-eb-source-input", "value"),
+    State("add-eb-content-input", "value"),
+    State("add-eb-date-input", "date"),
+    State("add-eb-elements-input", "value"),
+    State("add-eb-modal", "is_open"),
+    State({"type": "select-eb", "index": ALL}, "id"),
 )
-def add_eb_modal(open_clicks, close_clicks, submit_clicks, is_open):
-    if open_clicks or close_clicks or submit_clicks:
-        return not is_open
-    return is_open
+def add_eb_modal(
+        # INPUTS
+        open_clicks, close_clicks, submit_clicks, eb_clicks,
+        # STATES
+        source_pk, content, date, elements, is_open, eb_ids
+):
+    if submit_clicks:
+        eb = EvidenceBit(
+                content=content,
+                eb_date=date,
+                source_id=source_pk,
+            )
+        eb.save()
+        eb.elements.add(*[element for element in elements])
+        return False, None, None, None, None, None, None, None
+    if open_clicks or close_clicks:
+        return not is_open, None, None, None, None, None, None, None
+    for n_clicks, id in zip(eb_clicks, eb_ids):
+        if n_clicks is not None:
+            eb = EvidenceBit.objects.get(pk=id.get("index"))
+            element_pks = [element.pk for element in eb.elements.all()]
+            print(f"{eb.source_id=}")
+            return True, eb.source_id, element_pks, eb.eb_date, eb.content, None, None, None
+    raise PreventUpdate
 
 
 @app.callback(
@@ -376,33 +419,8 @@ def add_eb_elements(samramodel_pk):
         {"value": obj.get("id"), "label": obj.get("title")}
         for obj in Source.objects.filter(samramodels=samramodel_pk).values()
     ]
+    print(f"{source_options}")
     return element_options, source_options
-
-
-@app.callback(
-    Output("add-eb-elements-input", "value"),
-    Output("add-eb-date-input", "date"),
-    Output("add-eb-content-input", "value"),
-    Input("add-eb-submit", "n_clicks"),
-    State("add-eb-source-input", "value"),
-    State("add-eb-content-input", "value"),
-    State("add-eb-date-input", "date"),
-    State("add-eb-elements-input", "value"),
-)
-def add_eb_submit(n_clicks, source_pk, content, date, elements):
-    if n_clicks is None:
-        return None, None, None
-    print(f"{date=}")
-    print(f"{elements=}")
-    eb = EvidenceBit(
-        content=content,
-        eb_date=date,
-        source_id=source_pk,
-    )
-    eb.save()
-    eb.elements.add(*[element for element in elements])
-
-    return None, None, None
 
 
 @app.callback(
@@ -457,12 +475,13 @@ def show_layers(layers, colorbody_field, colorborder_field):
              "style": {
                  "text-valign": "center",
              }}
-
         ])
+    added_stylesheet.append({
+        "selector": ".no_children",
+        "style": {"text-valign": "center"}
+    })
 
     # COLOR
-
-
     # body
     for part_field, part_name in zip([colorbody_field, colorborder_field], ["body", "border"]):
         print(f"part_field is {part_field}, part_name is {part_name}")
@@ -767,6 +786,8 @@ def draw_model(
                 element = SituationalAnalysis(label=label_input, element_type=type_input, samramodel_id=samramodel_pk)
             elif subclass_input == "theoryofchange":
                 element = TheoryOfChange(label=label_input, element_type=type_input, samramodel_id=samramodel_pk)
+            elif subclass_input == "shockstructure":
+                element = ShockStructure(label=label_input, element_type=type_input, samramodel_id=samramodel_pk)
             element.save()
             if sector_input is not None and sector_input != "empty":
                 element.sectors.add(sector_input)
@@ -776,7 +797,7 @@ def draw_model(
                           "label": element.label,
                           "hierarchy": "element",
                           "parent": f"group_{element.element_group_id}"},
-                 "classes": f"element {element.element_type}",
+                 "classes": f"element no_children {element.element_type}",
                  "position": {"x": 0.0, "y": 0.0}}
             )
             return cyto_elements, current_story_pk, None
@@ -986,6 +1007,7 @@ def draw_model(
 
         class_append = "" if in_story else " hidden"
         if not element.variables.exists():
+            class_append += " no_children"
             if not element.story_position:
                 print(f"no position set for {element}")
                 position = ElementPosition.objects.filter(element=element, story_id=default_story_pk).first()
@@ -1021,7 +1043,9 @@ def draw_model(
     # connections
     elementconnections = ElementConnection.objects.filter(
         to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
-    ).select_related("from_element__situationalanalysis", "from_element__theoryofchange")
+    ).select_related(
+        "from_element__situationalanalysis", "from_element__theoryofchange", "from_element__shockstructure"
+    )
     print(f"{len(elementconnections)=}")
     for connection in elementconnections:
         element_type = ""
@@ -1032,6 +1056,10 @@ def draw_model(
         try:
             element_type += " " + connection.from_element.situationalanalysis.element_type
         except Element.situationalanalysis.RelatedObjectDoesNotExist:
+            pass
+        try:
+            element_type += " " + connection.from_element.shockstructure.element_type
+        except Element.shockstructure.RelatedObjectDoesNotExist:
             pass
         cyto_elements.append({
             "data": {
@@ -1063,7 +1091,6 @@ def draw_model(
             "pannable": True
         })
     cyto_elements.extend(group_nodes)
-
 
     # check that all connections have a valid source and target
     node_ids = [obj.get("data").get("id") for obj in cyto_elements if "id" in obj.get("data")]
@@ -1149,9 +1176,10 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         start = time.time()
 
         # label and type
+        element_text = "ÉLÉMENT" if LANG == "FR" else "ELEMENT"
         children.append(html.H4(className="mb-2 h4", children=element.label))
         children.append(html.H6(className="mb-3 font-italic text-secondary font-weight-light h6",
-                                children=f"ÉLÉMENT | {element.__class__._meta.verbose_name} | "
+                                children=f"{element_text} | {element.__class__._meta.verbose_name} | "
                                          f"{element.get_element_type_display()}"))
         print(f"TIME: {round(time.time() - start, 2)} for element label and type")
         start = time.time()
@@ -1188,7 +1216,7 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         start = time.time()
 
         # children
-        children.append(html.P(className="mb-0 font-weight-bold", children="Variables / Indicateurs"))
+        children.append(html.P(className="mb-0 font-weight-bold", children=f"Variables / {l('Indicator', LANG)}s"))
         children.append(html.Hr(className="mb-2 mt-1 mx-0"))
         children.extend([
             dbc.Button(
@@ -1201,7 +1229,7 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         start = time.time()
 
         # upstream
-        children.append(html.P(className="mb-0 font-weight-bold", children="Éléments en amont"))
+        children.append(html.P(className="mb-0 font-weight-bold", children=l("Upstream Element", LANG) + "s"))
         children.append(html.Hr(className="mb-2 mt-1 mx-0"))
         children.extend([
             dbc.ButtonGroup(className="mb-1 mr-1", size="sm", children=[
@@ -1258,10 +1286,10 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         start = time.time()
 
         # EBs
-        children.append(html.P(className="mt-4 mb-0 font-weight-bold", children="Informations Qualitatives"))
+        children.append(html.P(className="mt-4 mb-0 font-weight-bold", children=l("Evidence Bit", LANG)))
         children.append(html.Hr(className="mb-2 mt-1 mx-0"))
         for eb in element.evidencebits.all():
-            truncate_length = 5
+            truncate_length = 10
             content = eb.content if len(eb.content) < truncate_length else eb.content[:truncate_length] + "..."
             children.append(
                 dbc.ButtonGroup(className="mb-1 mr-1", size="sm", children=[
@@ -1275,7 +1303,6 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
                     )
                 ])
             )
-
         print(f"TIME: {round(time.time() - start, 2)} for element EBs")
         start = time.time()
 

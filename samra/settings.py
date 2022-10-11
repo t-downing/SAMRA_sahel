@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     # third party
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
     "active_link",
+    'import_export',
 ]
 
 MIDDLEWARE = [

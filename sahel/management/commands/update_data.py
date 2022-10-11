@@ -7,7 +7,7 @@ from hdx.data.dataset import Dataset
 from dateutil import parser
 import pandas as pd
 import numpy as np
-from ...models import RegularDataset, Variable, MeasuredDataPoint, Source
+from ...models import RegularDataset, Variable, MeasuredDataPoint, Source, Element
 from datetime import datetime, timezone, date
 import time
 from pathlib import Path
@@ -293,11 +293,29 @@ def update_ndvi():
     MeasuredDataPoint.objects.bulk_create(objs)
 
 
+def read_ven_producerprices():
+    element_id = 212
+    source_id = 9
+    df = pd.read_csv("data/producer-prices_ven.csv", skiprows=[1])
+    df = df[(df["Item"] == "Cocoa beans") & (df["Unit"] == "USD")][["Year", "Value"]]
+    MeasuredDataPoint.objects.filter(source_id=source_id).delete()
+    MeasuredDataPoint.objects.bulk_create([
+        MeasuredDataPoint(
+            element_id=element_id,
+            source_id=source_id,
+            value=row["Value"],
+            date=date(int(row["Year"]), 7, 1)
+        )
+        for _, row in df.iterrows()
+    ])
+
+
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        update_wfp_price_data()
+        # update_wfp_price_data()
         # update_dm_suividesprix()
         # update_dm_globallivestock()
         # update_acled()
         # update_ndvi()
+        read_ven_producerprices()
         pass
