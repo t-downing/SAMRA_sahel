@@ -13,12 +13,13 @@ import pandas as pd
 import plotly.graph_objects as go
 from pprint import pprint
 from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 import json
 from .translations import l
 
 DEFAULT_SAMRAMODEL_PK = "2"
 DEFAULT_STORY_PK = "1"
+DEFAULT_LAYERS = ["element", "variable"]
 LANG = "EN"
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -48,7 +49,7 @@ app.layout = html.Div(children=[
                             {"label": "Éléments", "value": "element"},
                             {"label": "Variables", "value": "variable"},
                         ],
-                        value=["element"],
+                        value=DEFAULT_LAYERS,
                         switch=True,
                     )
                 ])
@@ -181,7 +182,8 @@ app.layout = html.Div(children=[
             boxSelectionEnabled=True,
             autoRefreshLayout=True,
             responsive=True,
-            zoom=0.5,
+            zoom=0.4,
+            pan={"x": 500, "y": 300}
         ),
     ),
 
@@ -655,6 +657,7 @@ def draw_model(
                     for element in json.loads(cyto_elements_store)
                     if "id" in element.get("data") and "position" in element
                 }
+                # TODO: bulk read old positions into dict instead of element by element
                 for element in cyto_elements:
                     if "position" in element and "hidden" not in element.get("classes"):
                         id = element.get("data").get("id")
@@ -886,6 +889,7 @@ def draw_model(
     cyto_elements = []
     # get elements_pks in story
     default_story_pk = SamraModel.objects.get(pk=samramodel_pk).default_story_id
+    story_pk = int(story_pk)
     print(f"{default_story_pk=}")
     print(f"{story_pk=}")
     if story_pk == default_story_pk:
@@ -899,7 +903,10 @@ def draw_model(
     # VARIABLES
     # nodes
     queryset = VariablePosition.objects.filter(story_id=story_pk)
-    variables = Variable.objects.filter(element_id__in=element_pks_in_story).prefetch_related(Prefetch(
+    variables = Variable.objects.filter(
+        Q(element_id__in=element_pks_in_story) |
+        Q(samramodel_id=samramodel_pk)
+    ).prefetch_related(Prefetch(
         "variablepositions", queryset=queryset, to_attr="story_position"
     ))
     print(f"{len(variables)=}")
@@ -918,6 +925,8 @@ def draw_model(
             in_story = True
         else:
             in_story = False
+
+        in_story = True
 
         class_append = ""
         if not in_story:
@@ -946,7 +955,7 @@ def draw_model(
                       "color": color,
                       "hierarchy": "variable"},
              "position": {"x": x_pos, "y": y_pos},
-             "classes": "variable" + class_append}
+             "classes": "variable"}
         )
 
     # connections
@@ -970,7 +979,7 @@ def draw_model(
         })
 
     # variable flows
-    stocks = Variable.objects.filter(sd_type="Stock", element_id__in=element_pks_in_story).prefetch_related("inflows", "outflows")
+    stocks = Variable.objects.filter(sd_type="Stock", pk__in=variable_pks).prefetch_related("inflows", "outflows")
     for stock in stocks:
         for inflow in stock.inflows.all():
             has_equation = "no" if inflow.equation is None else "yes"
@@ -1125,7 +1134,6 @@ def draw_model(
 @timer
 def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
     # INIT
-    print(f"{selectednodedata=}")
     children = []
     if not selectednodedata or movement_allowed:
         return children

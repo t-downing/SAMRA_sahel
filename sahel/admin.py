@@ -2,6 +2,8 @@ from django.contrib import admin
 from . import models
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
+from import_export.fields import Field
+from import_export.widgets import ManyToManyWidget
 
 
 class ElementResource(resources.ModelResource):
@@ -11,6 +13,19 @@ class ElementResource(resources.ModelResource):
 
 class ElementAdmin(ImportExportModelAdmin):
     resource_class = ElementResource
+
+
+class SituationalAnalysisResource(resources.ModelResource):
+    evidencebits = Field(
+        attribute="evidencebits",
+        widget=ManyToManyWidget(model=models.EvidenceBit, separator="|", field="content")
+    )
+    class Meta:
+        model = models.SituationalAnalysis
+
+
+class SituationalAnalysisAdmin(ImportExportModelAdmin):
+    resource_class = SituationalAnalysisResource
 
 
 admin.site.register(models.Variable)
@@ -29,7 +44,7 @@ admin.site.register(models.HouseholdConstantValue)
 admin.site.register(models.Scenario)
 admin.site.register(models.ScenarioConstantValue)
 admin.site.register(models.Element, ElementAdmin)
-admin.site.register(models.SituationalAnalysis)
+admin.site.register(models.SituationalAnalysis, SituationalAnalysisAdmin)
 admin.site.register(models.TheoryOfChange)
 admin.site.register(models.ShockStructure)
 admin.site.register(models.ElementConnection)
