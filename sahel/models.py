@@ -129,7 +129,7 @@ class SAField(models.Model):
 class SAFieldOption(models.Model):
     label = models.CharField(max_length=100)
     safield = models.ForeignKey("safield", related_name="safieldoptions", on_delete=models.CASCADE)
-    color = ColorField(default="#696969")
+    color = ColorField(default="grey")
     description = models.TextField(null=True, blank=True)
 
     def __str__(self):
