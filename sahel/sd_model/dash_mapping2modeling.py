@@ -1190,6 +1190,14 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         print(f"TIME: {round(time.time() - start, 2)} for element label and type")
         start = time.time()
 
+        # description
+        children.append(html.P(className="mb-0 font-weight-bold", children="Description"))
+        children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+        children.append(html.P(
+            style={"max-height": "100px", "overflow-y": "scroll", "font-size": "small"},
+            children=element.description
+        ))
+
         # parent
         children.append(
             html.Div(className="mb-3", children=[
@@ -1237,7 +1245,7 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         # upstream
         children.append(html.P(className="mb-0 font-weight-bold", children=l("Upstream Element", LANG) + "s"))
         children.append(html.Hr(className="mb-2 mt-1 mx-0"))
-        children.extend([
+        children.append(html.Div(style={"max-height": "100px", "overflow-x": "scroll"}, children=[
             dbc.ButtonGroup(className="mb-1 mr-1", size="sm", children=[
                 dbc.Button(
                     id={"type": "select-node", "index": f"element_{upstream_connection.from_element.pk}"},
@@ -1250,17 +1258,17 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
                 )
             ])
             for upstream_connection in element.upstream_connections.all()
-        ])
+        ]))
         print(f"TIME: {round(time.time() - start, 2)} for element upstream existing")
         start = time.time()
         children.append(dbc.InputGroup(size="sm", children=[
             dbc.Select(
                 id={"type": "add-connection-input", "index": "only-one"},
                 options=[
-                    {"label": upstream_element.label, "value": f"element_{upstream_element.pk}"}
+                    {"label": upstream_element.get("label"), "value": f"element_{upstream_element.get('pk')}"}
                     for upstream_element in
                     Element.objects.filter(samramodel_id=samrammodel_pk)
-                        .exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
+                        .exclude(downstream_connections__to_element=element).exclude(pk=element.pk).values()
                 ],
             ),
             dbc.InputGroupAddon(addon_type="append", children=dbc.Button(

@@ -32,7 +32,9 @@ class Command(BaseCommand):
         with open(path) as json_file:
             kumu_project = json.load(json_file)
 
+        # ELEMENTS
         for k_element in kumu_project.get("elements"):
+            break
             k_data = k_element.get("attributes")
             print(k_data.get("label"))
             k_status = k_data.get("1 - functionality status")
@@ -98,3 +100,41 @@ class Command(BaseCommand):
                 element.regions.add(*region_pks)
 
             pass
+
+        # CONNECTIONS
+        k_id2pk = {
+            element.kumu_id: element.pk
+            for element in Element.objects.all()
+        }
+        for k_conn in kumu_project.get("connections"):
+            break
+            print(k_conn.get("from"))
+            from_pk = k_id2pk.get(k_conn.get("from"))
+            to_pk = k_id2pk.get(k_conn.get("to"))
+            if None not in [from_pk, to_pk]:
+                try:
+                    conn = ElementConnection.objects.get(from_element_id=from_pk, to_element_id=to_pk)
+                except ElementConnection.DoesNotExist:
+                    conn = ElementConnection(from_element_id=from_pk, to_element_id=to_pk)
+                conn.save()
+
+        # POSITIONS
+        target_map = 1
+        samramodel_pk = 2
+        shrink_factor = 0.7
+        x_shift, y_shift = 5000, 0
+        story_pk = SamraModel.objects.get(pk=samramodel_pk).default_story_id
+        objs = []
+        for k_pos in kumu_project.get("maps")[target_map].get("elements"):
+            pprint(k_pos)
+            if k_pos.get("pinned"):
+                pk = k_id2pk.get(k_pos.get("element"))
+                if pk is not None:
+                    pos, _ = ElementPosition.objects.get_or_create(
+                        element_id=pk,
+                        story_id=story_pk
+                    )
+                    pos.x_pos = k_pos.get("position")["x"] * 0.7 + x_shift
+                    pos.y_pos = k_pos.get("position")["y"] * 0.7 + y_shift
+                    objs.append(pos)
+        ElementPosition.objects.bulk_update(objs, ["x_pos", "y_pos"])

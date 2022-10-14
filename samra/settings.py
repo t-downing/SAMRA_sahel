@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "active_link",
     'import_export',
     "massadmin",
+    "colorfield",
 ]
 
 MIDDLEWARE = [

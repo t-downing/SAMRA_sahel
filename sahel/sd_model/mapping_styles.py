@@ -1,4 +1,4 @@
-from sahel.models import SituationalAnalysis
+from sahel.models import *
 
 stylesheet = [
     # ALL
@@ -68,7 +68,7 @@ stylesheet = [
          "line-color": "#e99b63",
          "target-arrow-color": "#e99b63",
      }},
-    {"selector": ".SE",
+    {"selector": ".SE .SH",
      "style": {
          "background-color": "#F08080",
          "border-color": "crimson",

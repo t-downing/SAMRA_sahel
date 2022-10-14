@@ -1,6 +1,7 @@
 from django.db import models
 from model_utils.managers import InheritanceManager
-
+from colorfield.fields import ColorField
+import datetime
 
 class SamraModel(models.Model):
     name = models.CharField(max_length=200)
@@ -115,6 +116,33 @@ class SituationalAnalysis(Element):
 
     class Meta:
         verbose_name = "situational analysis"
+
+
+class SAField(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class SAFieldOption(models.Model):
+    label = models.CharField(max_length=100)
+    safield = models.ForeignKey("safield", related_name="safieldoptions", on_delete=models.CASCADE)
+    color = ColorField(default="#696969")
+    description = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.safield.name}: {self.label}"
+
+
+class SAFieldValue(models.Model):
+    sa = models.ForeignKey("situationalanalysis", on_delete=models.CASCADE, related_name="safieldvalues")
+    safieldoption = models.ForeignKey("safieldoption", on_delete=models.CASCADE, related_name="safieldvalues")
+    date = models.DateField(default=datetime.date.today)
+
+    def __str__(self):
+        return f"{self.sa.label}; {self.safieldoption.safield.name}: {self.safieldoption}; {self.date}"
 
 
 class TheoryOfChange(Element):
