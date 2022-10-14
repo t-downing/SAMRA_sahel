@@ -1,12 +1,11 @@
 from django.core.management.base import BaseCommand
-from ... import models
+from sahel.models import *
 from datetime import date
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        for model in [models.ResponseOption, models.Scenario]:
-            model.objects.all().update(samra_model_id=1)
+        Element.objects.filter(samramodel_id__isnull=True).update(samramodel_id=2)
         pass
 
 

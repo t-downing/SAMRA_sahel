@@ -11,6 +11,9 @@ class SamraModel(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        verbose_name = "SAMRA model"
+
 
 class Node(models.Model):
     label = models.CharField(max_length=200)
@@ -37,6 +40,14 @@ class Sector(models.Model):
 
 
 class Element(Node):
+    FORMAL_SECTOR = "FS"
+    INFORMAL_SECTOR = "IS"
+    BOTH_SECTOR = "BS"
+    SECTOR_TYPES = (
+        (FORMAL_SECTOR, "Formal"),
+        (INFORMAL_SECTOR, "Informal"),
+        (BOTH_SECTOR, "Both"),
+    )
     objects = InheritanceManager()
     element_group = models.ForeignKey("elementgroup", related_name="elements", null=True, blank=True,
                                       on_delete=models.SET_NULL)
@@ -44,16 +55,30 @@ class Element(Node):
     x_pos = models.FloatField(null=True, blank=True)
     y_pos = models.FloatField(null=True, blank=True)
     sectors = models.ManyToManyField("sector", blank=True, related_name="elements")
+    sector_type = models.CharField(choices=SECTOR_TYPES, max_length=2, null=True, blank=True)
+    regions = models.ManyToManyField("region", blank=True, related_name="elements")
+    source = models.ForeignKey("source", blank=True, null=True, related_name="elements", on_delete=models.SET_NULL)
     # stories = models.ManyToManyField("story", related_name="elements", blank=True)
+    kumu_id = models.CharField(max_length=100, null=True, blank=True)
+
+
+class Region(models.Model):
+    name = models.CharField(max_length=200)
+    date_created = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(null=True, blank=True)
+    samramodel = models.ForeignKey("samramodel", on_delete=models.SET_NULL, null=True)
+
+    def __str__(self):
+        return self.name
 
 
 class SituationalAnalysis(Element):
     # for now, SA_FIELDS must match names of fields to be edited in map
-    SA_FIELDS = ["status", "trend", "resilience", "vulnerability"]
+    SA_FIELDS = ["status", "trend", "resilience_vulnerability"]
 
     SITUATIONAL_ANALYSIS = "SA"
     SA_TYPES = (
-        (SITUATIONAL_ANALYSIS, "Analyse de situation"),
+        (SITUATIONAL_ANALYSIS, "Situational Analysis"),
     )
 
     SA_STATUS_GOOD = "AA"
@@ -78,28 +103,18 @@ class SituationalAnalysis(Element):
     SA_RES_MED = "BB"
     SA_RES_LOW = "CC"
     SA_RESILIENCE_OPTIONS = (
-        (SA_RES_HIGH, "High"),
-        (SA_RES_MED, "Medium"),
-        (SA_RES_LOW, "Low"),
-    )
-
-    SA_VUL_HIGH = "AA"
-    SA_VUL_MED = "BB"
-    SA_VUL_LOW = "CC"
-    SA_VULNERABILITY_OPTIONS = (
-        (SA_VUL_HIGH, "High"),
-        (SA_VUL_MED, "Medium"),
-        (SA_VUL_LOW, "Low"),
+        (SA_RES_HIGH, "Resilience"),
+        (SA_RES_MED, "Resilience and Vulnerability"),
+        (SA_RES_LOW, "Vulnerability"),
     )
 
     element_type = models.CharField(choices=SA_TYPES, max_length=2, default=SITUATIONAL_ANALYSIS)
     status = models.CharField(choices=SA_STATUSES, max_length=2, null=True, blank=True)
     trend = models.CharField(choices=SA_TRENDS, max_length=2, null=True, blank=True)
-    resilience = models.CharField(choices=SA_RESILIENCE_OPTIONS, max_length=2, null=True, blank=True)
-    vulnerability = models.CharField(choices=SA_VULNERABILITY_OPTIONS, max_length=2, null=True, blank=True)
+    resilience_vulnerability = models.CharField("resilience/vulnerability", choices=SA_RESILIENCE_OPTIONS, max_length=2, null=True, blank=True)
 
     class Meta:
-        verbose_name = "Analyse de situation"
+        verbose_name = "situational analysis"
 
 
 class TheoryOfChange(Element):
@@ -111,29 +126,29 @@ class TheoryOfChange(Element):
     PROGRAMME_GOAL = "PG"
     TOC_TYPES = (
         (INTERVENTION, "Intervention"),
-        (INTERVENTION_CLUSTER, "Groupe d'interventions"),
-        (SUB_OUTCOME, "Sous-résultat"),
-        (PRIMARY_OUTCOME, "Résultat primaire"),
-        (SECTOR_GOAL, "But du secteur"),
-        (PROGRAMME_GOAL, "But du programme"),
+        (INTERVENTION_CLUSTER, "Intervention Cluster"),
+        (SUB_OUTCOME, "Sub-Outcome"),
+        (PRIMARY_OUTCOME, "Primary Outcome"),
+        (SECTOR_GOAL, "Sector Goal"),
+        (PROGRAMME_GOAL, "Programme Goal"),
     )
     element_type = models.CharField(choices=TOC_TYPES, max_length=2, default=INTERVENTION)
 
     class Meta:
-        verbose_name = "Théorie du changement"
+        verbose_name = "theory of change"
 
 
 class ShockStructure(Element):
     SHOCK_EFFECT = "SE"
     SHOCK = "SH"
     SHOCKSTRUCTURE_TYPES = (
-        (SHOCK_EFFECT, "Effet de choc"),
-        (SHOCK, "Choc"),
+        (SHOCK_EFFECT, "shock effect"),
+        (SHOCK, "shock"),
     )
     element_type = models.CharField(choices=SHOCKSTRUCTURE_TYPES, max_length=2, default=SHOCK_EFFECT)
 
     class Meta:
-        verbose_name = "Choc"
+        verbose_name = "shock structure"
 
 
 class Story(models.Model):
@@ -234,6 +249,9 @@ class VariablePosition(models.Model):
     def __str__(self):
         return f"{self.variable=}, {self.story=}, {self.x_pos=}, {self.y_pos=}"
 
+    class Meta:
+        unique_together = ("variable", "story")
+
 
 class ElementPosition(models.Model):
     element = models.ForeignKey("element", on_delete=models.CASCADE, related_name="elementpositions")
@@ -243,6 +261,9 @@ class ElementPosition(models.Model):
 
     def __str__(self):
         return f"{self.element=}, {self.story=}, {self.x_pos=}, {self.y_pos=}"
+
+    class Meta:
+        unique_together = ("element", "story")
 
 
 class VariableConnection(models.Model):
@@ -262,6 +283,7 @@ class ElementConnection(models.Model):
     from_element = models.ForeignKey("element", related_name="downstream_connections", on_delete=models.CASCADE)
     to_element = models.ForeignKey("element", related_name="upstream_connections", on_delete=models.CASCADE)
     date_created = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.from_element} to {self.to_element}"
@@ -297,6 +319,7 @@ class EvidenceBit(models.Model):
     eb_date = models.DateField(null=True, blank=True)
     source = models.ForeignKey("source", on_delete=models.SET_NULL, related_name="evidencebits", null=True)
     elements = models.ManyToManyField("element", blank=True, related_name="evidencebits")
+    elementconnections = models.ManyToManyField("elementconnection", blank=True, related_name="evidencebits")
 
     def __str__(self):
         return self.content

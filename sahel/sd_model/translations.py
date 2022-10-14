@@ -1,5 +1,4 @@
 def l(word: str, language: str):
-    print(locals())
     FR = "FR"
     dictionary = {
         "Evidence Bit": {FR: "Information Qualitative"},

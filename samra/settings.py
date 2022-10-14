@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
     "active_link",
     'import_export',
+    "massadmin",
 ]
 
 MIDDLEWARE = [

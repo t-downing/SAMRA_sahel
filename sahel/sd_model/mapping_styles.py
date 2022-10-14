@@ -214,23 +214,6 @@ fieldvalue2color = {
             "ring": "red",
         }
     },
-    "vulnerability": {
-        SituationalAnalysis.SA_VUL_LOW: {
-            "body": "green",
-            "border": "green",
-            "ring": "green",
-        },
-        SituationalAnalysis.SA_VUL_MED: {
-            "body": "yellow",
-            "border": "yellow",
-            "ring": "yellow",
-        },
-        SituationalAnalysis.SA_VUL_HIGH: {
-            "body": "red",
-            "border": "red",
-            "ring": "red",
-        }
-    },
 }
 
 partname2cytokey = {

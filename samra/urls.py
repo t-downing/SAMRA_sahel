@@ -17,6 +17,9 @@ from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
+    # massadmin
+    path('admin/', include('massadmin.urls')),
+    # defaults
     path('admin/', admin.site.urls),
     path('', include("sahel.urls")),
     path('accounts/', include('django.contrib.auth.urls')),

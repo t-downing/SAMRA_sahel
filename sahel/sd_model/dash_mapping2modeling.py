@@ -32,7 +32,7 @@ app.layout = html.Div(children=[
     # OVERLAY
     # overlay stuff, all with position:absolute
     # (cannot click through divs in Dash for some reason, z-index not working either)
-    html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute"}, children=[
+    html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute", "width": "200px"}, children=[
         # samramodel
         dbc.Select(id="samramodel-input", className="mb-3"),
 
@@ -44,10 +44,9 @@ app.layout = html.Div(children=[
                     dbc.Checklist(
                         id="layers-input",
                         options=[
-                            {"label": "Secteurs", "value": "sector", "disabled": True},
-                            {"label": "Groupes", "value": "group"},
-                            {"label": "Éléments", "value": "element"},
-                            {"label": "Variables", "value": "variable"},
+                            {"label": f'{l("Group", LANG)}s', "value": "group"},
+                            {"label": f'{l("Element", LANG)}s', "value": "element"},
+                            {"label": f'{l("Variable", LANG)}s', "value": "variable"},
                         ],
                         value=DEFAULT_LAYERS,
                         switch=True,
@@ -550,7 +549,7 @@ def lock_map(movement_allowed):
     Input("store", "data"),
     # position lock switch
     Input("allow-movement-switch", "value"),
-    # update movemenet button
+    # update movement button
     Input("update-movement", "n_clicks"),
 
     # STATES
@@ -590,8 +589,8 @@ def draw_model(
         select_clicks, delete_clicks, remove_clicks, parentchild_clicks,
         # add node
         add_node_clicks,
-        # change field
-        status_field_input, trend_field_input, resilience_field_input, vulnerability_field_input,
+        # change field - these need to match SA_FIELDS
+        status_field_input, trend_field_input, resilience_field_input,
         # delete connection
         delete_connection_clicks,
         # add connection
@@ -610,8 +609,8 @@ def draw_model(
         select_ids, delete_ids, remove_ids, parentchild_ids, parentchild_input,
         # add node
         class_input, subclass_input, type_input, label_input, unit_input, sector_input, add_node_modal_is_open,
-        # change fields
-        status_field_id, trend_field_id, resilience_field_id, vulnerability_field_id,
+        # change fields - these need to match SA_FIELDS
+        status_field_id, trend_field_id, resilience_field_id,
         # delete connection
         delete_connection_ids,
         # add connection
@@ -822,14 +821,13 @@ def draw_model(
     # CHANGE FIELD
     if status_field_input:
         for field in SituationalAnalysis.SA_FIELDS:
+            # these need to match SA_FIELDS
             if field == "status":
                 value, id = status_field_input, status_field_id
             elif field == "trend":
                 value, id = trend_field_input, trend_field_id
-            elif field == "resilience":
+            elif field == "resilience_vulnerability":
                 value, id = resilience_field_input, resilience_field_id
-            elif field == "vulnerability":
-                value, id = vulnerability_field_input, vulnerability_field_id
             else:
                 value, id = None, None
 
@@ -1272,7 +1270,7 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         print(f"TIME: {round(time.time() - start, 2)} for element upstream add")
         start = time.time()
 
-        # status, trend, resilience, vulnerability for SA only
+        # status, trend, resilience for SA only
         if isinstance(element, SituationalAnalysis):
             children.append(html.P(className="mt-3 mb-0 font-weight-bold", children="Characteristics"))
             children.append(html.Hr(className="mb-2 mt-1 mx-0"))
