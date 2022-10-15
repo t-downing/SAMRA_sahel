@@ -15,4 +15,5 @@ urlpatterns = [
     path("termsoftrade", views.TermsOfTradeView.as_view(), name="termsoftrade"),
     path("response_list", views.ResponseListView.as_view(), name="response_list"),
     path("mapping2modeling", views.Mapping2Modeling.as_view(), name="mapping2modeling"),
+    path("evidencebit/create", views.EBCreateView.as_view(), name="eb_create"),
 ]

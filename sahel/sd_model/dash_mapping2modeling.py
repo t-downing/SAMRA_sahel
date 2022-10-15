@@ -6,7 +6,7 @@ import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
     SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis, \
-    Story, VariablePosition, SamraModel
+    Story, VariablePosition, SamraModel, ElementPosition, Sector, EvidenceBit
 from .model_operations import timer
 import time
 import pandas as pd
@@ -16,7 +16,7 @@ from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
 from django.db.models import Prefetch
 import json
 
-DEFAULT_SAMRAMODEL_PK = "1"
+DEFAULT_SAMRAMODEL_PK = "2"
 DEFAULT_STORY_PK = "1"
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -48,7 +48,7 @@ app.layout = html.Div(children=[
                             {"label": "Éléments", "value": "element"},
                             {"label": "Variables", "value": "variable"},
                         ],
-                        value=["group", "element", "variable"],
+                        value=["element"],
                         switch=True,
                     )
                 ])
@@ -80,7 +80,9 @@ app.layout = html.Div(children=[
         # other
         dbc.Button(className="mb-3", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
         html.Br(),
-        dbc.Button(className="mb-3", id="add-node-open", children="Ajouter", size="sm", color="primary"),
+        dbc.Button(className="mb-3", id="add-node-open", children="Ajouter un objet", size="sm", color="primary"),
+        html.Br(),
+        dbc.Button(className="mb-3", id="add-eb-open", children="Add an EB", size="sm", color="primary"),
         html.Br(),
         dbc.FormGroup([
             dbc.Checklist(id="allow-movement-switch",
@@ -115,6 +117,10 @@ app.layout = html.Div(children=[
                 dbc.InputGroupAddon("Label", addon_type="prepend"),
                 dbc.Input(id="add-node-label-input"),
             ]),
+            dbc.InputGroup(id="add-node-sector-input-parent", className="mb-2", children=[
+                dbc.InputGroupAddon("Sector", addon_type="prepend"),
+                dbc.Select(id="add-node-sector-input"),
+            ]),
             dbc.InputGroup(className="mb-2", children=[
                 dbc.InputGroupAddon("Unité", addon_type="prepend"),
                 dbc.Select(id="add-node-unit-input"),
@@ -123,6 +129,33 @@ app.layout = html.Div(children=[
         dbc.ModalFooter(className="d-flex justify-content-end", children=[
             dbc.Button(id="add-node-close", className="ml-2", n_clicks=0, children="Annuler"),
             dbc.Button(id="add-node-submit", className="ml-2", n_clicks=0, color="primary", children="Saisir"),
+        ]),
+    ]),
+
+    # add EB
+    dbc.Modal(id="add-eb-modal", is_open=False, children=[
+        dbc.ModalHeader("Add an Evidence Bit"),
+        dbc.ModalBody(children=[
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Source", addon_type="prepend"),
+                dbc.Select(id="add-eb-source-input"),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Content", addon_type="prepend"),
+                dbc.Textarea(id="add-eb-content-input"),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Label", addon_type="prepend"),
+                dcc.DatePickerSingle(id="add-eb-date-input"),
+            ]),
+            dbc.InputGroup(className="mb-2", children=[
+                dbc.InputGroupAddon("Elements", addon_type="prepend"),
+                dcc.Dropdown(id="add-eb-elements-input", style={"width": "100%"}, multi=True),
+            ]),
+        ]),
+        dbc.ModalFooter(className="d-flex justify-content-end", children=[
+            dbc.Button(id="add-eb-close", className="ml-2", n_clicks=0, children="Cancel"),
+            dbc.Button(id="add-eb-submit", className="ml-2", n_clicks=0, color="primary", children="Submit"),
         ]),
     ]),
 
@@ -296,6 +329,83 @@ def add_node_unit(class_input):
 
 
 @app.callback(
+    Output("add-node-sector-input", "options"),
+    Output("add-node-sector-input", "value"),
+    Output("add-node-sector-input-parent", "hidden"),
+    Input("samramodel-input", "value"),
+    Input("add-node-class-input", "value")
+)
+def add_node_sector(samramodel_pk, class_input):
+    if class_input == "element":
+        sectors = Sector.objects.filter(samramodel_id=samramodel_pk)
+        options = [{"value": "empty", "label": "---"}]
+        options.extend([
+            {"value": sector.pk, "label": sector.name}
+            for sector in sectors
+        ])
+        value = "empty"
+        return options, value, False
+    else:
+        return None, None, True
+
+
+@app.callback(
+    Output("add-eb-modal", "is_open"),
+    Input("add-eb-open", "n_clicks"),
+    Input("add-eb-close", "n_clicks"),
+    Input("add-eb-submit", "n_clicks"),
+    State("add-eb-modal", "is_open")
+)
+def add_eb_modal(open_clicks, close_clicks, submit_clicks, is_open):
+    if open_clicks or close_clicks or submit_clicks:
+        return not is_open
+    return is_open
+
+
+@app.callback(
+    Output("add-eb-elements-input", "options"),
+    Output("add-eb-source-input", "options"),
+    Input("samramodel-input", "value")
+)
+def add_eb_elements(samramodel_pk):
+    element_options = [
+        {"value": obj.get("id"), "label": obj.get("label")}
+        for obj in Element.objects.filter(samramodel_id=samramodel_pk).values()
+    ]
+    source_options = [
+        {"value": obj.get("id"), "label": obj.get("title")}
+        for obj in Source.objects.filter(samramodels=samramodel_pk).values()
+    ]
+    return element_options, source_options
+
+
+@app.callback(
+    Output("add-eb-elements-input", "value"),
+    Output("add-eb-date-input", "date"),
+    Output("add-eb-content-input", "value"),
+    Input("add-eb-submit", "n_clicks"),
+    State("add-eb-source-input", "value"),
+    State("add-eb-content-input", "value"),
+    State("add-eb-date-input", "date"),
+    State("add-eb-elements-input", "value"),
+)
+def add_eb_submit(n_clicks, source_pk, content, date, elements):
+    if n_clicks is None:
+        return None, None, None
+    print(f"{date=}")
+    print(f"{elements=}")
+    eb = EvidenceBit(
+        content=content,
+        eb_date=date,
+        source_id=source_pk,
+    )
+    eb.save()
+    eb.elements.add(*[element for element in elements])
+
+    return None, None, None
+
+
+@app.callback(
     Output("cyto", "generateImage"),
     Input("download-submit", "n_clicks"),
 )
@@ -370,7 +480,8 @@ def show_layers(layers, colorbody_field, colorborder_field):
                 {
                     "selector": f"[{part_field} = '{choice[0]}']",
                     "style": {
-                        partname2cytokey.get(part_name): fieldvalue2color.get(part_field).get(choice[0]).get(part_name)
+                        partname2cytokey.get(part_name): fieldvalue2color.get(part_field).get(choice[0]).get(part_name),
+                        "background-blacken": -0.3,
                     }
                 }
                 for choice in SituationalAnalysis._meta.get_field(part_field).choices
@@ -379,23 +490,15 @@ def show_layers(layers, colorbody_field, colorborder_field):
     return stylesheet + added_stylesheet
 
 
-def append_cyto_iteration(cyto_elements: [dict], new_iteration: int):
-    updated_cyto_elements = []
-    for obj in cyto_elements:
-        data = obj.get("data")
-        if "id" in data:
-            data.update({
-                "id": f"{data.get('id')}_iteration{new_iteration}",
-                "label": f"{data.get('label')} I{new_iteration}"
-            })
-        elif "source" in data:
-            data.update({
-                "source": f"{data.get('source')}_iteration{new_iteration}",
-                "target": f"{data.get('source')}_iteration{new_iteration}"
-            })
-        if "parent" in data:
-            data.update({"parent": f"{data.get('parent')}_iteration{new_iteration}"})
-    return cyto_elements
+@app.callback(
+    Output("cyto", "autolock"),
+    Input("allow-movement-switch", "value")
+)
+def lock_map(movement_allowed):
+    if movement_allowed:
+        return False
+    else:
+        return True
 
 
 @app.callback(
@@ -442,6 +545,7 @@ def append_cyto_iteration(cyto_elements: [dict], new_iteration: int):
     State("add-node-type-input", "value"),
     State("add-node-label-input", "value"),
     State("add-node-unit-input", "value"),
+    State("add-node-sector-input", "value"),
     State("add-node-modal", "is_open"),
     # change field
     [State({"type": f"{field}-input", "index": ALL}, "id")
@@ -453,6 +557,8 @@ def append_cyto_iteration(cyto_elements: [dict], new_iteration: int):
     State({"type": "add-connection-input", "index": ALL}, "value"),
     # story
     State("current-story", "children"),
+    # current SAMRA model
+    State("samramodel-input", "value"),
     # current elements read
     State("cyto", "elements"),
 )
@@ -482,7 +588,7 @@ def draw_model(
         # relationship modification
         select_ids, delete_ids, remove_ids, parentchild_ids, parentchild_input,
         # add node
-        class_input, subclass_input, type_input, label_input, unit_input, add_node_modal_is_open,
+        class_input, subclass_input, type_input, label_input, unit_input, sector_input, add_node_modal_is_open,
         # change fields
         status_field_id, trend_field_id, resilience_field_id, vulnerability_field_id,
         # delete connection
@@ -491,6 +597,8 @@ def draw_model(
         add_connection_ids, add_connection_input,
         # story
         current_story_pk,
+        # samra model
+        samramodel_pk,
         # current elements read
         cyto_elements: list[dict],
 ):
@@ -498,6 +606,10 @@ def draw_model(
     print(f"{movement_allowed=}")
     print(f"{type(cyto_elements_store)=}")
     print(f"{update_mvmt_clicks=}")
+    if cyto_elements is not None:
+        print(f"{len(cyto_elements)=}")
+    else:
+        print(f"{cyto_elements=}")
 
     if movement_allowed:
         print(f"movement allowed")
@@ -516,7 +628,7 @@ def draw_model(
         print("movement not allowed")
         if current_story_pk != "init":
             print("story not init")
-            moved_elements = []
+            moved_variables, moved_elements = [], []
             if cyto_elements_store is not None:
                 print("movement not allowed, store contains elements, SAVING")
                 old_positions = {
@@ -524,28 +636,37 @@ def draw_model(
                     for element in json.loads(cyto_elements_store)
                     if "id" in element.get("data") and "position" in element
                 }
-                print("old_positions[0]:")
-                pprint(old_positions.get("102"))
                 for element in cyto_elements:
                     if "position" in element and "hidden" not in element.get("classes"):
-                        pk = element.get("data").get("id")
+                        id = element.get("data").get("id")
                         new_x, new_y = element.get('position').get("x"), element.get('position').get("y")
                         try:
-                            old_x, old_y = old_positions.get(str(pk)).get("x"), old_positions.get(str(pk)).get(
-                                "y")
+                            old_x, old_y = old_positions.get(str(id)).get("x"), old_positions.get(str(id)).get("y")
                         except AttributeError:
                             old_x, old_y = None, None
 
                         if old_x != new_x or old_y != new_y:
-                            try:
-                                position = VariablePosition.objects.get(variable_id=pk, story_id=story_pk)
-                                print(f"MOVED EXISTING {position}")
-                                position.x_pos, position.y_pos = new_x, new_y
-                                moved_elements.append(position)
-                            except VariablePosition.DoesNotExist:
-                                print(f"ADDING NEW POSITIONS for {pk}")
-                                VariablePosition(variable_id=pk, story_id=story_pk, x_pos=new_x, y_pos=new_y).save()
-                VariablePosition.objects.bulk_update(moved_elements, ["x_pos", "y_pos"])
+                            if "variable" in element.get("classes"):
+                                try:
+                                    position = VariablePosition.objects.get(variable_id=id, story_id=story_pk)
+                                    print(f"MOVED EXISTING {position}")
+                                    position.x_pos, position.y_pos = new_x, new_y
+                                    moved_variables.append(position)
+                                except VariablePosition.DoesNotExist:
+                                    print(f"ADDING NEW POSITIONS for {id}")
+                                    VariablePosition(variable_id=id, story_id=story_pk, x_pos=new_x, y_pos=new_y).save()
+                            elif "element" in element.get("classes"):
+                                id = id.removeprefix("element_")
+                                try:
+                                    position = ElementPosition.objects.get(element_id=id, story_id=story_pk)
+                                    print(f"MOVED EXISTING {position}")
+                                    position.x_pos, position.y_pos = new_x, new_y
+                                    moved_elements.append(position)
+                                except ElementPosition.DoesNotExist:
+                                    print(f"ADDING NEW POSITIONS for {id}")
+                                    ElementPosition(element_id=id, story_id=story_pk, x_pos=new_x, y_pos=new_y).save()
+                VariablePosition.objects.bulk_update(moved_variables, ["x_pos", "y_pos"])
+                ElementPosition.objects.bulk_update(moved_elements, ["x_pos", "y_pos"])
                 return cyto_elements, current_story_pk, None
             else:
                 print("store is empty, passing")
@@ -567,6 +688,7 @@ def draw_model(
 
     # DELETE NODE
     # there is a Dash Cytoscape bug where the child nodes also get removed when the parent is removed
+    # there is also a problem that the node remains selected after being deleted, so callback doesn't run
     for n_clicks, id in zip(delete_clicks, delete_ids):
         if n_clicks is not None:
             deleted_id = id.get("index")
@@ -625,8 +747,9 @@ def draw_model(
 
     # ADD NODE
     if add_node_clicks > 0 and add_node_modal_is_open:
+        print(f"{samramodel_pk=}")
         if class_input == "group":
-            element_group = ElementGroup(label=label_input)
+            element_group = ElementGroup(label=label_input, samramodel_id=samramodel_pk)
             element_group.save()
             cyto_elements.append(
                 {"data": {"id": f"group_{element_group.pk}",
@@ -637,24 +760,28 @@ def draw_model(
                  "selectable": True,
                  "pannable": True}
             )
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+            return cyto_elements, current_story_pk, None
         elif class_input == "element":
             element = None
             if subclass_input == "situationalanalysis":
-                element = SituationalAnalysis(label=label_input, element_type=type_input)
+                element = SituationalAnalysis(label=label_input, element_type=type_input, samramodel_id=samramodel_pk)
             elif subclass_input == "theoryofchange":
-                element = TheoryOfChange(label=label_input, element_type=type_input)
+                element = TheoryOfChange(label=label_input, element_type=type_input, samramodel_id=samramodel_pk)
             element.save()
+            if sector_input is not None and sector_input != "empty":
+                element.sectors.add(sector_input)
+            ElementPosition(element=element, story_id=story_pk, x_pos=0.0, y_pos=0.0).save()
             cyto_elements.append(
                 {"data": {"id": f"element_{element.pk}",
                           "label": element.label,
                           "hierarchy": "element",
                           "parent": f"group_{element.element_group_id}"},
-                 "classes": f"element {element.element_type}"}
+                 "classes": f"element {element.element_type}",
+                 "position": {"x": 0.0, "y": 0.0}}
             )
-            return [{}], current_story_pk, json.dumps(cyto_elements)
+            return cyto_elements, current_story_pk, None
         elif class_input == "variable":
-            variable = Variable(label=label_input, sd_type=type_input, unit=unit_input)
+            variable = Variable(label=label_input, sd_type=type_input, unit=unit_input, samramodel_id=samramodel_pk)
             variable.save()
             cyto_elements.append({
                 "data": {
@@ -685,12 +812,20 @@ def draw_model(
             value = value[0]
             id = id[0]
 
-            element = SituationalAnalysis.objects.get(pk=id.get("index"))
+            element = SituationalAnalysis.objects.get(pk=id.get("index").removeprefix("element_"))
             old_value = getattr(element, field)
 
             if value != old_value:
                 setattr(element, field, value)
                 element.save()
+                print(f"SAVED ELEMENT {element} with {field=}, {value=}")
+                for cyto_element in cyto_elements:
+                    if cyto_element.get("data").get("id") == id.get("index"):
+                        print("FOUND IT")
+                        print(f"{cyto_element=}")
+                        print(f"{field=}, {value=}")
+                        cyto_element.get("data").update({field: value})
+                return cyto_elements, current_story_pk, None
 
     # DELETE CONNECTION
     for n_clicks, id in zip(delete_connection_clicks, delete_connection_ids):
@@ -728,15 +863,25 @@ def draw_model(
     print("redrawing whole model")
 
     cyto_elements = []
-    element_pks_in_story = [obj.get("id") for obj in Element.objects.filter(stories=story_pk).values()]
+    # get elements_pks in story
+    default_story_pk = SamraModel.objects.get(pk=samramodel_pk).default_story_id
+    print(f"{default_story_pk=}")
+    print(f"{story_pk=}")
+    if story_pk == default_story_pk:
+        elements = Element.objects.filter(samramodel_id=samramodel_pk)
+    else:
+        elements = Element.objects.filter(stories=story_pk)
+
+    print(f"{len(elements)=}")
+    element_pks_in_story = [element.pk for element in elements]
 
     # VARIABLES
     # nodes
     queryset = VariablePosition.objects.filter(story_id=story_pk)
-    variables = Variable.objects.all().prefetch_related(Prefetch(
-        "positions", queryset=queryset, to_attr="story_position"
+    variables = Variable.objects.filter(element_id__in=element_pks_in_story).prefetch_related(Prefetch(
+        "variablepositions", queryset=queryset, to_attr="story_position"
     ))
-
+    print(f"{len(variables)=}")
     variable_pks = [variable.pk for variable in variables]
     for variable in variables:
         color = "white"
@@ -760,7 +905,7 @@ def draw_model(
         else:
             if not variable.story_position:
                 print(f"no position set for {variable}")
-                position = VariablePosition.objects.filter(variable=variable, story_id=DEFAULT_STORY_PK).first()
+                position = VariablePosition.objects.filter(variable=variable, story_id=default_story_pk).first()
                 if position is None:
                     print(f"default position had not yet been set for {variable}, setting to zero now")
                     position = VariablePosition(
@@ -784,7 +929,10 @@ def draw_model(
         )
 
     # connections
-    connections = VariableConnection.objects.all().select_related("to_variable")
+    connections = VariableConnection.objects.filter(
+        to_variable_id__in=variable_pks, from_variable_id__in=variable_pks
+    ).select_related("to_variable")
+    print(f"{len(connections)=}")
     for connection in connections:
         has_equation = "no"
         if connection.to_variable is not None:
@@ -801,7 +949,7 @@ def draw_model(
         })
 
     # variable flows
-    stocks = Variable.objects.filter(sd_type="Stock").prefetch_related("inflows", "outflows")
+    stocks = Variable.objects.filter(sd_type="Stock", element_id__in=element_pks_in_story).prefetch_related("inflows", "outflows")
     for stock in stocks:
         for inflow in stock.inflows.all():
             has_equation = "no" if inflow.equation is None else "yes"
@@ -824,14 +972,34 @@ def draw_model(
 
     # ELEMENTS
     # nodes
-    elements = Element.objects.all().select_subclasses()
+    queryset = ElementPosition.objects.filter(story_id=story_pk)
+    elements = elements.select_subclasses().prefetch_related(
+        Prefetch("elementpositions", queryset=queryset, to_attr="story_position"),
+        Prefetch("variables")
+    )
+    print(f"{len(elements)=}")
     for element in elements:
-        if story_pk == DEFAULT_STORY_PK or element.pk in element_pks_in_story:
+        if element.pk in element_pks_in_story:
             in_story = True
         else:
             in_story = False
 
         class_append = "" if in_story else " hidden"
+        if not element.variables.exists():
+            if not element.story_position:
+                print(f"no position set for {element}")
+                position = ElementPosition.objects.filter(element=element, story_id=default_story_pk).first()
+                if position is None:
+                    print(f"default position had not yet been set for {element}, setting to zero now")
+                    position = ElementPosition(
+                        element=element, story_id=default_story_pk, x_pos=0.0, y_pos=0.0
+                    )
+                    position.save()
+                x_pos, y_pos = position.x_pos, position.y_pos
+            else:
+                x_pos, y_pos = element.story_position[0].x_pos, element.story_position[0].y_pos
+        else:
+            x_pos, y_pos = None, None
 
         cyto_elements.append(
             {
@@ -845,21 +1013,33 @@ def draw_model(
                         for field in SituationalAnalysis.SA_FIELDS
                     },
                 },
-                "classes": f"element {element.element_type}" + class_append
+                "classes": f"element {element.element_type}" + class_append,
+                "position": {"x": x_pos, "y": y_pos}
             }
         )
 
     # connections
-    cyto_elements.extend([
-        {
+    elementconnections = ElementConnection.objects.filter(
+        to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
+    ).select_related("from_element__situationalanalysis", "from_element__theoryofchange")
+    print(f"{len(elementconnections)=}")
+    for connection in elementconnections:
+        element_type = ""
+        try:
+            element_type += " " + connection.from_element.theoryofchange.element_type
+        except Element.theoryofchange.RelatedObjectDoesNotExist:
+            pass
+        try:
+            element_type += " " + connection.from_element.situationalanalysis.element_type
+        except Element.situationalanalysis.RelatedObjectDoesNotExist:
+            pass
+        cyto_elements.append({
             "data": {
                 "source": f"element_{connection.from_element_id}",
                 "target": f"element_{connection.to_element_id}"
             },
-            "classes": f"element {Element.objects.get_subclass(pk=connection.from_element_id).element_type}"
-        }
-        for connection in ElementConnection.objects.all()
-    ])
+            "classes": "element" + element_type
+        })
 
     # GROUPS
     element_groups = ElementGroup.objects.all().prefetch_related("elements")
@@ -883,6 +1063,7 @@ def draw_model(
             "pannable": True
         })
     cyto_elements.extend(group_nodes)
+
 
     # check that all connections have a valid source and target
     node_ids = [obj.get("data").get("id") for obj in cyto_elements if "id" in obj.get("data")]
@@ -912,9 +1093,10 @@ def draw_model(
     Input("cyto", "selectedNodeData"),
     Input("cyto", "elements"),
     State("allow-movement-switch", "value"),
+    State("samramodel-input", "value")
 )
 @timer
-def right_sidebar(selectednodedata, _, movement_allowed):
+def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
     # INIT
     print(f"{selectednodedata=}")
     children = []
@@ -955,13 +1137,24 @@ def right_sidebar(selectednodedata, _, movement_allowed):
 
     # ELEMENT
     elif nodedata.get("hierarchy") == "element":
-        element = Element.objects.get_subclass(pk=nodedata.get("id").removeprefix("element_"))
+        pk = nodedata.get("id").removeprefix("element_")
+        start = time.time()
+        # fetch element and all related information
+        element = Element.objects.prefetch_related(
+            "variables", "upstream_connections__from_element", "evidencebits"
+        ).select_related(
+            "element_group"
+        ).get_subclass(pk=pk)
+        print(f"TIME: {round(time.time() - start, 2)} for element fetch")
+        start = time.time()
 
         # label and type
         children.append(html.H4(className="mb-2 h4", children=element.label))
         children.append(html.H6(className="mb-3 font-italic text-secondary font-weight-light h6",
                                 children=f"ÉLÉMENT | {element.__class__._meta.verbose_name} | "
                                          f"{element.get_element_type_display()}"))
+        print(f"TIME: {round(time.time() - start, 2)} for element label and type")
+        start = time.time()
 
         # parent
         children.append(
@@ -983,7 +1176,7 @@ def right_sidebar(selectednodedata, _, movement_allowed):
                     dbc.Select(
                         id={"type": "parentchild-input", "index": "only_one"}, bs_size="sm",
                         options=[{"label": elementgroup.label, "value": elementgroup.pk}
-                                 for elementgroup in ElementGroup.objects.all()],
+                                 for elementgroup in ElementGroup.objects.filter(samramodel_id=samrammodel_pk)],
                     ),
                     dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
                         id={"type": "parentchild-submit", "index": f"child-element_{element.pk}"}, children="Saisir"
@@ -991,6 +1184,8 @@ def right_sidebar(selectednodedata, _, movement_allowed):
                 ]),
             ])
         )
+        print(f"TIME: {round(time.time() - start, 2)} for element parent")
+        start = time.time()
 
         # children
         children.append(html.P(className="mb-0 font-weight-bold", children="Variables / Indicateurs"))
@@ -1002,6 +1197,8 @@ def right_sidebar(selectednodedata, _, movement_allowed):
             )
             for variable in element.variables.all()
         ])
+        print(f"TIME: {round(time.time() - start, 2)} for element children")
+        start = time.time()
 
         # upstream
         children.append(html.P(className="mb-0 font-weight-bold", children="Éléments en amont"))
@@ -1009,30 +1206,35 @@ def right_sidebar(selectednodedata, _, movement_allowed):
         children.extend([
             dbc.ButtonGroup(className="mb-1 mr-1", size="sm", children=[
                 dbc.Button(
-                    id={"type": "select-node", "index": f"element_{upstream_element.pk}"},
-                    outline=True, color="secondary", children=upstream_element.label
+                    id={"type": "select-node", "index": f"element_{upstream_connection.from_element.pk}"},
+                    outline=True, color="secondary", children=upstream_connection.from_element.label
                 ),
                 dbc.Button(
                     id={"type": "delete-connection",
-                        "index": f"element_{upstream_element.pk}-to-element_{element.pk}"},
+                        "index": f"element_{upstream_connection.from_element.pk}-to-element_{element.pk}"},
                     outline=True, color="danger", children="x"
                 )
             ])
-            for upstream_element in Element.objects.filter(downstream_connections__to_element=element)
+            for upstream_connection in element.upstream_connections.all()
         ])
+        print(f"TIME: {round(time.time() - start, 2)} for element upstream existing")
+        start = time.time()
         children.append(dbc.InputGroup(size="sm", children=[
             dbc.Select(
                 id={"type": "add-connection-input", "index": "only-one"},
                 options=[
                     {"label": upstream_element.label, "value": f"element_{upstream_element.pk}"}
                     for upstream_element in
-                    Element.objects.exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
+                    Element.objects.filter(samramodel_id=samrammodel_pk)
+                        .exclude(downstream_connections__to_element=element).exclude(pk=element.pk)
                 ],
             ),
             dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
                 id={"type": "add-connection-submit", "index": f"to-element_{element.pk}"}, children="Ajouter"
             ))
         ]))
+        print(f"TIME: {round(time.time() - start, 2)} for element upstream add")
+        start = time.time()
 
         # status, trend, resilience, vulnerability for SA only
         if isinstance(element, SituationalAnalysis):
@@ -1042,7 +1244,7 @@ def right_sidebar(selectednodedata, _, movement_allowed):
                 dbc.InputGroup(className="mb-2", size="sm", children=[
                     dbc.InputGroupAddon(addon_type="prepend", children=field.capitalize()),
                     dbc.Select(
-                        id={"type": f"{field}-input", "index": element.pk},
+                        id={"type": f"{field}-input", "index": f"element_{element.pk}"},
                         options=[
                             {"value": choice[0], "label": choice[1]}
                             for choice in SituationalAnalysis._meta.get_field(field).choices
@@ -1052,12 +1254,33 @@ def right_sidebar(selectednodedata, _, movement_allowed):
                 ])
                 for field in SituationalAnalysis.SA_FIELDS
             ])
+        print(f"TIME: {round(time.time() - start, 2)} for element status etc")
+        start = time.time()
 
         # EBs
         children.append(html.P(className="mt-4 mb-0 font-weight-bold", children="Informations Qualitatives"))
-        children.append(html.Hr(className="mb-4 mt-1 mx-0"))
+        children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+        for eb in element.evidencebits.all():
+            truncate_length = 5
+            content = eb.content if len(eb.content) < truncate_length else eb.content[:truncate_length] + "..."
+            children.append(
+                dbc.ButtonGroup(className="mb-1 mr-1", size="sm", children=[
+                    dbc.Button(
+                        id={"type": "select-eb", "index": eb.pk},
+                        outline=True, color="secondary", children=content
+                    ),
+                    dbc.Button(
+                        id={"type": "remove-eb", "index": eb.pk},
+                        outline=True, color="danger", children="x"
+                    )
+                ])
+            )
+
+        print(f"TIME: {round(time.time() - start, 2)} for element EBs")
+        start = time.time()
 
         # delete
+        children.append(html.Hr(className="mb-2 mt-4 mx-0"))
         children.append(
             dbc.Button(
                 id={"type": "delete-node", "index": nodedata.get("id")},

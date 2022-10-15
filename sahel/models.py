@@ -26,6 +26,16 @@ class Node(models.Model):
         return f"{self.label}; pk: {self.pk}"
 
 
+class Sector(models.Model):
+    name = models.CharField(max_length=200)
+    date_created = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(null=True, blank=True)
+    samramodel = models.ForeignKey("samramodel", on_delete=models.SET_NULL, null=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Element(Node):
     objects = InheritanceManager()
     element_group = models.ForeignKey("elementgroup", related_name="elements", null=True, blank=True,
@@ -33,6 +43,7 @@ class Element(Node):
     # element_group_integer = models.IntegerField(null=True, blank=True)
     x_pos = models.FloatField(null=True, blank=True)
     y_pos = models.FloatField(null=True, blank=True)
+    sectors = models.ManyToManyField("sector", blank=True, related_name="elements")
     # stories = models.ManyToManyField("story", related_name="elements", blank=True)
 
 
@@ -214,13 +225,23 @@ class Variable(Node):
 
 
 class VariablePosition(models.Model):
-    variable = models.ForeignKey("variable", on_delete=models.CASCADE, related_name="positions")
-    story = models.ForeignKey("story", on_delete=models.CASCADE, related_name="positions")
+    variable = models.ForeignKey("variable", on_delete=models.CASCADE, related_name="variablepositions")
+    story = models.ForeignKey("story", on_delete=models.CASCADE, related_name="variablepositions")
     x_pos = models.FloatField()
     y_pos = models.FloatField()
 
     def __str__(self):
         return f"{self.variable=}, {self.story=}, {self.x_pos=}, {self.y_pos=}"
+
+
+class ElementPosition(models.Model):
+    element = models.ForeignKey("element", on_delete=models.CASCADE, related_name="elementpositions")
+    story = models.ForeignKey("story", on_delete=models.CASCADE, related_name="elementpositions")
+    x_pos = models.FloatField()
+    y_pos = models.FloatField()
+
+    def __str__(self):
+        return f"{self.element=}, {self.story=}, {self.x_pos=}, {self.y_pos=}"
 
 
 class VariableConnection(models.Model):
@@ -250,12 +271,6 @@ class ElementConnection(models.Model):
 
 
 class ElementGroup(Node):
-    # label = models.CharField(max_length=200)
-    # date_created = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.label
-
     class Meta:
         ordering = ["-date_created"]
 
@@ -266,12 +281,24 @@ class Source(models.Model):
     number_of_periods = models.IntegerField(null=True, blank=True)
     link = models.URLField(null=True, blank=True)
     samramodels = models.ManyToManyField("samramodel", related_name="sources")
+    date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.title}; pk: {self.pk}"
 
     class Meta:
         ordering = ["-date_created"]
+
+
+class EvidenceBit(models.Model):
+    content = models.TextField()
+    date_created = models.DateTimeField(auto_now_add=True)
+    eb_date = models.DateField(null=True, blank=True)
+    source = models.ForeignKey("source", on_delete=models.SET_NULL, related_name="evidencebits", null=True)
+    elements = models.ManyToManyField("element", blank=True, related_name="evidencebits")
+
+    def __str__(self):
+        return self.content
 
 
 class RegularDataset(models.Model):

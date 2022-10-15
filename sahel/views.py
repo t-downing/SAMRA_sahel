@@ -1,5 +1,5 @@
-from django.views.generic import TemplateView, ListView
-from .models import Source
+from django.views.generic import TemplateView, ListView, CreateView
+from .models import Source, EvidenceBit
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse, dash_response_builder, \
@@ -71,3 +71,11 @@ class Mapping2Modeling(LoginRequiredMixin, TemplateView):
     template_name = "sahel/mapping2modeling.html"
     login_url = '/accounts/login/'
     redirect_field_name = 'next'
+
+
+class EBCreateView(LoginRequiredMixin, CreateView):
+    template_name = "sahel/eb_create.html"
+    login_url = '/accounts/login/'
+    redirect_field_name = 'next'
+    model = EvidenceBit
+    fields = ["content", "eb_date", "source", "elements"]
