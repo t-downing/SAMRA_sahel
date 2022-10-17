@@ -4,9 +4,7 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
-from sahel.models import Variable, VariableConnection, ElementGroup, HouseholdConstantValue, MeasuredDataPoint, \
-    SimulatedDataPoint, ForecastedDataPoint, Source, Element, ElementConnection, TheoryOfChange, SituationalAnalysis, \
-    Story, VariablePosition, SamraModel, ElementPosition, Sector, EvidenceBit, ShockStructure
+from sahel.models import *
 from .model_operations import timer
 import time
 import pandas as pd
@@ -1296,8 +1294,27 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
                 ])
                 for field in SituationalAnalysis.SA_FIELDS
             ])
+
+            children.append(html.P(className="mt-3 mb-0 font-weight-bold", children="Fields"))
+            children.append(html.Hr(className="mb-2 mt-1 mx-0"))
+            children.extend([
+                dbc.InputGroup(className="mb-2", size="sm", children=[
+                    dbc.InputGroupAddon(addon_type="prepend", children=field.name),
+                    dbc.Select(
+                        id={"type": f"{field.pk}-input", "index": f"element_{element.pk}"},
+                        options=[
+                            {"value": option.pk, "label": option.label}
+                            for option in SAFieldOption.objects.filter(safield=field)
+                        ],
+                        value=SAFieldValue.objects.get(sa=element, safieldoption__safield=field).pk if
+                        SAFieldValue.objects.filter(sa=element, safieldoption__safield=field).exists() else None
+                    )
+                ])
+                for field in SAField.objects.all()
+            ])
         print(f"TIME: {round(time.time() - start, 2)} for element status etc")
         start = time.time()
+
 
         # EBs
         children.append(html.P(className="mt-4 mb-0 font-weight-bold", children=l("Evidence Bit", LANG)))
