@@ -1,21 +1,12 @@
-import psycopg2
+import pyodbc 
 import os
-from dotenv import load_dotenv
 
-print("running root sandbox")
+cnxn = pyodbc.connect(
+    "Driver={ODBC Driver 18 for SQL Server};"
+    "Server=tcp:gvalabaidb03t.gva.icrc.priv;"
+    "Database=SAMRA;"
+    "Trusted_Connection=yes;"
+    f'PASSWORD={os.environ.get("MSSQL_PASSWORD")}'
+    'USER=l_samra_sql_t'
 
-load_dotenv('.env')
-
-conn = psycopg2.connect(
-    dbname="d446lmk1hkk665",
-    user="fwgyrjjmfdmbgb",
-    password=os.environ.get("PSQL_PASSWORD"),
-    host="ec2-18-204-142-254.compute-1.amazonaws.com",
-    port="5432",
 )
-
-cursor = conn.cursor()
-cursor.execute("select relname from pg_class where relkind='r' and relname !~ '^(pg_|sql_)';")
-print(cursor.fetchall())
-
-print(conn)
