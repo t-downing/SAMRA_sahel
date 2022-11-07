@@ -350,3 +350,4 @@ fabric.properties
 .DS_Store
 requirements_mac.txt
 local_settings.py
+/input_files/
