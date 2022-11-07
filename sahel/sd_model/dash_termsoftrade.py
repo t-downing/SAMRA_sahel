@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 from plotly.colors import DEFAULT_PLOTLY_COLORS
 import itertools
 import pandas as pd
+from datetime import datetime
 
 tooltip_style = {"text-decoration-line": "underline", "text-decoration-style": "dotted"}
 
@@ -209,6 +210,19 @@ def update_complex_graph(headcount, cereal_values, cereal_ids, livestock_values,
             hovertemplate="%{text}"
         ))
 
+    # workaround for bug https://github.com/plotly/plotly.py/issues/3065
+    max_date = df["date"].max()
+    max_datetime = datetime(year=max_date.year, month=max_date.month, day=max_date.day)
+    fig.add_vline(
+        x=max_datetime.timestamp() * 1000,
+        line_dash="dash",
+        line_width=2,
+        line_color="grey",
+        annotation_text=f"<i>{max_date:%d %b %Y}</i>",
+        annotation_position="top left",
+        annotation_font_color="grey",
+    )
+
     fig.update_yaxes(title_text="journées")
     fig.update_layout(
         title_text=f"Journées de survie avec vente complète de cheptel",
@@ -261,12 +275,26 @@ def update_simple_graph(livestock_pk, cereal_pk):
             name=admin1,
             mode="lines",
             text=dff.apply(
-                lambda row: f"{cereal_name.capitalize()}: {round(row[int(cereal_pk)])} FCFA / {cereal_unit}<br>"
+                lambda row: f"{row['date']}<br>"
+                            f"{cereal_name.capitalize()}: {round(row[int(cereal_pk)])} FCFA / {cereal_unit}<br>"
                             f"{livestock_name.capitalize()}: {round(row[int(livestock_pk)])} FCFA / tête",
                 axis=1
             ),
             hovertemplate="%{text}",
         ))
+
+    # workaround for bug https://github.com/plotly/plotly.py/issues/3065
+    max_date = df["date"].max()
+    max_datetime = datetime(year=max_date.year, month=max_date.month, day=max_date.day)
+    fig.add_vline(
+        x=max_datetime.timestamp() * 1000,
+        line_dash="dash",
+        line_width=2,
+        line_color="grey",
+        annotation_text=f"<i>{max_date:%d %b %Y}</i>",
+        annotation_position="top left",
+        annotation_font_color="grey",
+    )
 
     fig.update_yaxes(title_text=f"{cereal_unit} {cereal_name} / tête {livestock_name}")
     fig.update_layout(

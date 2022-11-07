@@ -312,10 +312,10 @@ def read_ven_producerprices():
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        # update_wfp_price_data()
+        update_wfp_price_data()
         # update_dm_suividesprix()
         # update_dm_globallivestock()
         # update_acled()
         # update_ndvi()
-        read_ven_producerprices()
+        # read_ven_producerprices()
         pass
