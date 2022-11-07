@@ -94,13 +94,22 @@ DATABASES = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     },
-    "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": "d446lmk1hkk665",
-        "USER": "fwgyrjjmfdmbgb",
-        "PASSWORD": os.environ.get("PSQL_PASSWORD"),
-        "HOST": "ec2-18-204-142-254.compute-1.amazonaws.com",
-        "PORT": "5432",
+    # "default": {
+    #     "ENGINE": "django.db.backends.postgresql_psycopg2",
+    #     "NAME": "d446lmk1hkk665",
+    #     "USER": "fwgyrjjmfdmbgb",
+    #     "PASSWORD": os.environ.get("PSQL_PASSWORD"),
+    #     "HOST": "ec2-18-204-142-254.compute-1.amazonaws.com",
+    #     "PORT": "5432",
+    # }
+        "default": {
+        "ENGINE": "mssql",
+        "NAME": "SAMRA",
+        "USER": "l_samra_sql_t",
+        "PASSWORD": os.environ.get("MSSQL_PASSWORD"),
+        "HOST": "gvalabaidb03t.gva.icrc.priv",
+        "PORT": "1433",
+        "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server", }
     }
 }
 
