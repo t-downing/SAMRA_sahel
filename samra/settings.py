@@ -101,7 +101,19 @@ DATABASES = {
         "PASSWORD": os.environ.get("PSQL_PASSWORD"),
         "HOST": "ec2-18-204-142-254.compute-1.amazonaws.com",
         "PORT": "5432",
-    }
+    },
+    # 'default': {
+    #     'ENGINE': 'mssql',
+    #     'NAME': 'SAMRA',
+    #     'USER': 'l_samra_sql_t',
+    #     'HOST': 'gvalabaidb03t.gva.icrc.priv',
+    #     'PORT': '',
+    #     'PASSWORD': os.environ.get("MSSQL_PASSWORD"),
+    #     'OPTIONS': {
+    #         'driver': 'ODBC Driver 18 for SQL Server',
+    #         'extra_params': 'TrustServerCertificate=yes',
+    #     },
+    # },
 }
 
 
