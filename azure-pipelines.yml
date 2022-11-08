@@ -1,6 +1,7 @@
 trigger:
-- docker
 - main
+- development
+- refs/tags/*
 
 variables:
   docker_tag: $[ replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'refs/tags/', '') ]
