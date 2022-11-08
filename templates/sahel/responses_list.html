@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="h3 mb-3 mt-4 text-gray-800">Résultats : tableau</h3>
+<p class="mb-2">Pour modifier les réponses ou en voir en détail la composition des réponses, naviguez à
+    <a href="{% url 'responses' %}">Construction de réponses</a>
+</p>
+<p class="mb-2">
+    Ce page présente les résultats de quelques éléments clés du modèle pour chaque réponse testée, avec les coûts totaux
+    pour chaque réponse.
+    On peut l'utiliser pour comparer comment les interventions humanitaires qui font partie de chaque réponse
+    influencent ces éléments clés, et la rapport de coût-efficacité de chaque réponse.
+</p>
+<p class="mb-4">
+    Les résultats sont présentés seulement pour un scénario à la fois, alors le menu déroulant peut être utilisé pour
+    voir les résultats pour un scénario différent.
+</p>
+
+<h5 class="h5">Comment lire ce tableau</h5>
+
+{% load plotly_dash %}
+{% plotly_app name="responselist" ratio=1.5 %}
+
+{% endblock %}
