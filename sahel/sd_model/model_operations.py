@@ -24,7 +24,7 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     elements = Variable.objects.filter(
         Q(sd_type="Variable", equation__isnull=False) |
         Q(sd_type="Flow", equation__isnull=False) |
-        Q(sd_type="Stock") |
+        Q(sd_type="Stock", stock_initial_value__isnull=False) |
         Q(sd_type="Input") |
         Q(sd_type="Seasonal Input") |
         Q(sd_type="Scenario Constant") |
@@ -99,6 +99,7 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                 print(f"{element} equation is blank, setting to None")
 
         elif element.sd_type == "Stock":
+            print(f"stock for {element}")
             model.stock(pk).equation = zero_flow
             model.stock(pk).initial_value = element.stock_initial_value
             for inflow in element.inflows.filter(equation__isnull=False).exclude(equation=""):
