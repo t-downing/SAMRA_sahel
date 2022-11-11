@@ -40,7 +40,7 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                     dbc.Button("Re-forecast", id="forecast-test-submit", color="warning", disabled=True),
                     html.Hr(),
                     html.H5("Préviser avec les défauts"),
-                    dbc.Button("Préviser", id="forecast-submit", disabled=True),
+                    dbc.Button("Préviser", id="forecast-submit", disabled=False),
                     dbc.Button("Préviser TOUS", id="forecast-all-submit", color="danger", disabled=True),
                 ]),
             ])
