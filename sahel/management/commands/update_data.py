@@ -191,9 +191,9 @@ def update_dm_globallivestock():
 
     df = pd.melt(df, id_vars=["date", "admin1", "admin2"],
                  value_vars=[element.pk for element in (multicol_elements | singlecol_elements).distinct()])
-    print(df)
     df = df.groupby(["variable", "admin1", "admin2", pd.Grouper(key="date", freq="QS")]).mean().reset_index()
     df["date"] = df["date"] + pd.DateOffset(months=2, days=14)
+    df = df.dropna()
     print(df)
 
     source = Source.objects.get(pk=4)
@@ -312,7 +312,7 @@ def read_ven_producerprices():
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        update_wfp_price_data()
+        # update_wfp_price_data()
         # update_dm_suividesprix()
         # update_dm_globallivestock()
         # update_acled()
