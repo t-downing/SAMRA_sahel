@@ -1,15 +1,16 @@
 from django.core.management.base import BaseCommand
 import django.apps
 from sahel.models import *
+import sys
+from django.core.management import call_command
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        for model in django.apps.apps.get_models():
-            print(model.__name__)
-            objs = model.objects.all()
-            print(f"obj count: {len(objs)}")
-
-            model.objects.using("local").bulk_create(objs)
-
-        pass
+        exclude = [
+            'sahel.MeasuredDataPoint',
+            'sahel.SimulatedDataPoint',
+            'sahel.ForecastedDataPoint',
+        ]
+        with open('output_files/custom_dump.json', 'w'):
+            call_command('dumpdata', 'sahel', exclude=exclude, stdout='f')
