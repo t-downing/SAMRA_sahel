@@ -11,6 +11,7 @@ from sqlalchemy import create_engine
 from django.db.models import Q
 from django.db import connection
 from contextlib import closing
+from samra.settings import DATABASES
 
 
 def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
@@ -241,9 +242,15 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     print(f"SQL iterrows took {time.time() - start} s")
     start = time.time()
 
+    print(f"default database is {DATABASES['default']['ENGINE']}")
+
+    placeholder = '?, ' if DATABASES['default']['ENGINE'] == 'mssql' else '%s, '
+
+    print(f"{placeholder=}")
+
     insert_stmt = (
         "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id) "
-        f"VALUES {', '.join(['(%s, %s, %s, %s, %s)'] * len(df))}"
+        f"VALUES {', '.join(['(' + placeholder + placeholder + placeholder + placeholder + placeholder + ')'] * len(df))}"
     )
     delete_stmt = (
         f"DELETE FROM sahel_simulateddatapoint WHERE "
