@@ -234,35 +234,49 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     print(f"format results took {stop - start} s")
     start = time.time()
 
-    # delete and save done with raw SQL delete and insert (twice as fast as built-in bulk_create)
-    data = []
-    for row in df.itertuples():
-        data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk])
+    if DATABASES['default']['ENGINE'] == 'mssql':
+        # if using MSSQL, use Django ORM because there's a problem with using the raw SQL
+        objs = [
+            SimulatedDataPoint(
+                element_id=row.variable,
+                value=row.value,
+                date=row.date,
+                scenario_id=scenario_pk,
+                responseoption_id=responseoption_pk
+            )
+            for row in df.itertuples()
+        ]
 
-    print(f"SQL iterrows took {time.time() - start} s")
-    start = time.time()
+        print(f"df iterrows took {time.time() - start} s")
+        start = time.time()
 
-    print(f"default database is {DATABASES['default']['ENGINE']}")
+        SimulatedDataPoint.objects.filter(scenario_id=scenario_pk, responseoption_id=responseoption_pk).delete()
+        SimulatedDataPoint.objects.bulk_create(objs)
 
-    placeholder = '?' if DATABASES['default']['ENGINE'] == 'mssql' else '%s'
+        print(f"bulk_create took {time.time() - start} s")
+        start = time.time()
+    else:
+        # delete and save done with raw SQL delete and insert (twice as fast as built-in bulk_create)
+        data = []
+        for row in df.itertuples():
+            data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk])
 
-    print(f"{placeholder=}")
+        print(f"SQL iterrows took {time.time() - start} s")
+        start = time.time()
 
-    insert_stmt = (
-        "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id) "
-        f"VALUES {', '.join(['(' + ', '.join([placeholder] * 5) + ')'] * len(df))}"
-    )
-    print(insert_stmt[:200])
-    delete_stmt = (
-        f"DELETE FROM sahel_simulateddatapoint WHERE "
-        f"scenario_id = {scenario_pk} AND responseoption_id = {responseoption_pk}"
-    )
-    with closing(connection.cursor()) as cursor:
-        cursor.execute(delete_stmt)
-        cursor.execute(insert_stmt, data)
+        insert_stmt = (
+            "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id) "
+            f"VALUES {', '.join(['(' + ', '.join(['%s'] * 5) + ')'] * len(df))}"
+        )
+        delete_stmt = (
+            f"DELETE FROM sahel_simulateddatapoint WHERE "
+            f"scenario_id = {scenario_pk} AND responseoption_id = {responseoption_pk}"
+        )
+        with closing(connection.cursor()) as cursor:
+            cursor.execute(delete_stmt)
+            cursor.execute(insert_stmt, data)
 
-    print(f"SQL bulk delete and insert took {time.time() - start} s")
-    start = time.time()
+        print(f"SQL bulk delete and insert took {time.time() - start} s")
 
     return df
 
