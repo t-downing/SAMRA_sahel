@@ -244,14 +244,15 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
 
     print(f"default database is {DATABASES['default']['ENGINE']}")
 
-    placeholder = '?, ' if DATABASES['default']['ENGINE'] == 'mssql' else '%s, '
+    placeholder = '?' if DATABASES['default']['ENGINE'] == 'mssql' else '%s'
 
     print(f"{placeholder=}")
 
     insert_stmt = (
         "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id) "
-        f"VALUES {', '.join(['(' + placeholder + placeholder + placeholder + placeholder + placeholder + ')'] * len(df))}"
+        f"VALUES {', '.join(['(' + ', '.join([placeholder] * 5) + ')'] * len(df))}"
     )
+    print(insert_stmt[:200])
     delete_stmt = (
         f"DELETE FROM sahel_simulateddatapoint WHERE "
         f"scenario_id = {scenario_pk} AND responseoption_id = {responseoption_pk}"
