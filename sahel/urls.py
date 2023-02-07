@@ -1,6 +1,9 @@
 from django.urls import path, include
 from . import views
+from rest_framework import routers
 
+router = routers.DefaultRouter()
+router.register(f'elements', views.ElementViewSet)
 
 urlpatterns = [
     path("", views.IndexView.as_view(), name="index"),
@@ -16,4 +19,6 @@ urlpatterns = [
     path("response_list", views.ResponseListView.as_view(), name="response_list"),
     path("mapping2modeling", views.Mapping2Modeling.as_view(), name="mapping2modeling"),
     path("evidencebit/create", views.EBCreateView.as_view(), name="eb_create"),
+    path('api/', include(router.urls)),
+    path('api/api-auth/', include('rest_framework.urls', namespace='rest_framework'))
 ]

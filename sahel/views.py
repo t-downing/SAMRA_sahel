@@ -1,6 +1,8 @@
 from django.views.generic import TemplateView, ListView, CreateView
-from .models import Source, EvidenceBit
+from .models import Source, EvidenceBit, Element
 from django.contrib.auth.mixins import LoginRequiredMixin
+from rest_framework import viewsets
+from .serializers import ElementSerializer
 
 from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse, dash_response_builder, \
     dash_termsoftrade, dash_response_list, dash_mapping2modeling
@@ -79,3 +81,8 @@ class EBCreateView(LoginRequiredMixin, CreateView):
     redirect_field_name = 'next'
     model = EvidenceBit
     fields = ["content", "eb_date", "source", "elements"]
+
+
+class ElementViewSet(viewsets.ModelViewSet):
+    queryset = Element.objects.all()
+    serializer_class = ElementSerializer
