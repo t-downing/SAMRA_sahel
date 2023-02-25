@@ -4,8 +4,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from rest_framework import viewsets
 from .serializers import ElementSerializer
 
-from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse, dash_response_builder, \
-    dash_termsoftrade, dash_response_list, dash_mapping2modeling
+# from .sd_model import dash_schema, dash_comparison, dash_forecasts, dash_scenarioresponse, dash_response_builder, \
+#     dash_termsoftrade, dash_response_list, dash_mapping2modeling
 
 
 class IndexView(LoginRequiredMixin, TemplateView):

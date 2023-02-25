@@ -351,3 +351,6 @@ fabric.properties
 requirements_mac.txt
 local_settings.py
 /input_files/
+venv2/
+/venv2/
+
