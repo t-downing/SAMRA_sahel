@@ -6,12 +6,7 @@ from sahel.sd_model.forecasting import forecast_element
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        count = 0
-        for variable in Variable.objects.all():
-            if not variable.unit == variable.unit.replace("FCFA", "LCY"):
-                variable.unit = variable.unit.replace("FCFA", "LCY")
-                variable.save()
-        print(count)
+        HouseholdConstantValue.objects.all().update(admin0='Mali')
         pass
 
 

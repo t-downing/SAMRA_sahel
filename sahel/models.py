@@ -452,6 +452,7 @@ class ScenarioConstantValue(models.Model):
 class HouseholdConstantValue(models.Model):
     element = models.ForeignKey("variable", related_name="householdconstantvalues", on_delete=models.CASCADE)
     value = models.FloatField(null=True)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
         return f"Element: {self.element}; Value: {self.value}"

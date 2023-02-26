@@ -1612,7 +1612,7 @@ def right_sidebar(selectednodedata, _, adm0, movement_allowed, samrammodel_pk):
 
         elif variable.sd_type == "Household Constant":
             try:
-                value = variable.householdconstantvalues.get().value
+                value = variable.householdconstantvalues.get(admin0=adm0).value
             except HouseholdConstantValue.DoesNotExist:
                 value = None
             householdvalue_card = dbc.InputGroup([
