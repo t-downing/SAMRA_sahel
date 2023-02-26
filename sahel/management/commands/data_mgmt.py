@@ -6,10 +6,12 @@ from sahel.sd_model.forecasting import forecast_element
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        elements = Variable.objects.filter(sd_type="Input").exclude(measureddatapoints=None)
-        for element in elements:
-            print(element)
-            forecast_element(element.pk)
+        count = 0
+        for variable in Variable.objects.all():
+            if not variable.unit == variable.unit.replace("FCFA", "LCY"):
+                variable.unit = variable.unit.replace("FCFA", "LCY")
+                variable.save()
+        print(count)
         pass
 
 

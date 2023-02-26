@@ -3,6 +3,7 @@ from model_utils.managers import InheritanceManager
 from colorfield.fields import ColorField
 import datetime
 
+
 class SamraModel(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -207,13 +208,13 @@ class Variable(Node):
         ("tête", "tête"),
         ("tête / mois", "tête / mois"),
         ("tête / an", "tête / an"),
-        ("FCFA", "FCFA"),
-        ("FCFA / mois", "FCFA / mois"),
-        ("FCFA / jour", "FCFA / jour"),
-        ("FCFA / an", "FCFA / an"),
-        ("FCFA / tête", "FCFA / tête"),
-        ("FCFA / kg", "FCFA / kg"),
-        ("FCFA / L", "FCFA / L"),
+        ("LCY", "LCY"),
+        ("LCY / mois", "LCY / mois"),
+        ("LCY / jour", "LCY / jour"),
+        ("LCY / an", "LCY / an"),
+        ("LCY / tête", "LCY / tête"),
+        ("LCY / kg", "LCY / kg"),
+        ("LCY / L", "LCY / L"),
         ("kg", "kg"),
         ("kg / mois", "kg / mois"),
         ("kg / jour", "kg / jour"),
@@ -368,6 +369,7 @@ class MeasuredDataPoint(models.Model):
     value = models.FloatField(null=True)
     element = models.ForeignKey("variable", related_name="measureddatapoints", on_delete=models.CASCADE)
     source = models.ForeignKey("source", related_name="measureddatapoints", null=True, on_delete=models.SET_NULL)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
     market = models.CharField(max_length=200, null=True, blank=True)
@@ -382,6 +384,7 @@ class SimulatedDataPoint(models.Model):
     element = models.ForeignKey("variable", related_name="simulateddatapoints", on_delete=models.CASCADE)
     scenario = models.ForeignKey("scenario", related_name="simulateddatapoints", null=True, on_delete=models.CASCADE)
     responseoption = models.ForeignKey("responseoption", related_name="simulateddatapoints", null=True, on_delete=models.CASCADE)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
 
@@ -393,6 +396,7 @@ class ForecastedDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField()
     element = models.ForeignKey("variable", related_name="forecasteddatapoints", on_delete=models.CASCADE)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
 
