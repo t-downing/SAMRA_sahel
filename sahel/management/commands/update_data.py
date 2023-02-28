@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from dotenv import load_dotenv
 from unidecode import unidecode
+from itertools import chain
 
 admin1s = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
 
@@ -85,6 +86,7 @@ def update_mrt_wfp():
     df = pd.read_csv('data/wfp_food_prices_mrt.csv', skiprows=[1])
     df = df[df['admin1'].isin(mrt_adm1s)]
     df["price"] = df["price"].replace({0: np.nan})
+    df = df.dropna()
 
     elements = Variable.objects.filter(vam_commodity__isnull=False)
     objs = []
@@ -110,6 +112,48 @@ def update_mrt_wfp():
 
     MeasuredDataPoint.objects.filter(source_id=11).delete()
     MeasuredDataPoint.objects.bulk_create(objs)
+
+
+def update_mrt_prixmarche():
+    markets = (
+        ('Bassikounou', 'BDD PM_BKN'),
+        ('Fassala', 'BDD PM_fass'),
+        ('Akor', 'BDD PM_Akor'),
+        ('Gneibe', 'BDD PM_Gneibe'),
+        ('Mberra', 'BDD PM_CpMberra'),
+    )
+    skiprange = list(chain(range(7), range(46, 100)))
+    df_all = pd.DataFrame()
+    for market in markets:
+        df = pd.read_excel('data/2_1_ BDD sur les prix Marché_ BKN.xls', sheet_name=market[1], skiprows=skiprange)
+        df = df.set_index('Aliment de base')
+        df = df.transpose()
+        df['date'] = pd.date_range(start='2022-01-01', periods=24, freq='MS')
+        df = pd.melt(df, id_vars=['date'])
+        df["value"] = df["value"].replace({0: np.nan})
+        df = df.dropna()
+        df['date'] = df['date'] + pd.DateOffset(months=2, days=14)
+        df['market'] = market[0]
+        df_all = pd.concat([df_all, df])
+    print(df_all['Aliment de base'].unique())
+    objs = []
+    # variables = Variable.objects.filter(mrt_prixmarche_name__isnull=False)
+    # for variable in variables:
+    #     dff = df_all[df_all['Aliment de base'] == variable.mrt_prixmarche_name]
+    #     print(f"{variable.label}: {len(dff)} data points")
+    #     for _, row in dff.iterrows():
+    #         objs.append(MeasuredDataPoint(
+    #             element_id=variable.pk,
+    #             date=row["date"],
+    #             admin0="Mauritanie",
+    #             admin1='Hodh Ech Chargui',
+    #             admin2='Bassikounou',
+    #             market=row["market"],
+    #             value=row["value"],
+    #             source_id=12,
+    #         ))
+    # MeasuredDataPoint.objects.filter(source_id=12).delete()
+    # MeasuredDataPoint.objects.bulk_create(objs)
 
 
 def update_dm_suividesprix():
@@ -350,5 +394,6 @@ class Command(BaseCommand):
         # update_acled()
         # update_ndvi()
         # read_ven_producerprices()
-        update_mrt_wfp()
+        # update_mrt_wfp()
+        update_mrt_prixmarche()
         pass

@@ -267,6 +267,7 @@ class Variable(Node):
     kcal_per_kg = models.IntegerField(null=True, blank=True)
     model_output_variable = models.BooleanField(default=True)
     stock_initial_value = models.FloatField(null=True, blank=True)
+    mrt_prixmarche_name = models.CharField(max_length=200, null=True, blank=True)
 
 
 class VariablePosition(models.Model):

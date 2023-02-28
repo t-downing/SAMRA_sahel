@@ -485,7 +485,6 @@ def download_svg(n_clicks):
 def show_layers(layers, colorbody_field, colorborder_field):
     # LAYERS
     layers.sort()
-    print(layers)
     added_stylesheet = []
     if "group" not in layers:
         added_stylesheet.extend([
@@ -503,6 +502,7 @@ def show_layers(layers, colorbody_field, colorborder_field):
                  "background-opacity": "0",
                  "border-width": "0",
                  "text-opacity": "0",
+                 'line-width': '0',
              }},
         ])
     if "variable" not in layers:
@@ -1107,6 +1107,8 @@ def draw_model(
             element_type += " " + connection.from_element.shockstructure.element_type
         except Element.shockstructure.RelatedObjectDoesNotExist:
             pass
+        print(connection)
+        print(element_type)
         cyto_elements.append({
             "data": {
                 "source": f"element_{connection.from_element_id}",
