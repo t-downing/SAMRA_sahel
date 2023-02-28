@@ -15,10 +15,15 @@ from django.db.models import Prefetch, Q
 import json
 from .translations import l
 
-DEFAULT_SAMRAMODEL_PK = "2"
+DEFAULT_SAMRAMODEL_PK = "1"
+DEFAULT_ADM0 = "Mauritanie"
 DEFAULT_STORY_PK = "1"
 DEFAULT_LAYERS = ["element", "variable"]
 LANG = "EN"
+CURRENCY = {
+    'Mali': 'FCFA',
+    'Mauritanie': 'MRU'
+}
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -33,6 +38,8 @@ app.layout = html.Div(children=[
     html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute", "width": "200px"}, children=[
         # samramodel
         dbc.Select(id="samramodel-input", className="mb-3"),
+        dbc.Select(id="adm0-input", className="mb-3", bs_size="sm"),
+        dbc.Select(id="adm1-input", className="mb-3", bs_size="sm"),
 
         # layers
         dbc.Card(className="mb-3", children=[
@@ -216,6 +223,40 @@ def populate_initial(_):
     samramodel_value = DEFAULT_SAMRAMODEL_PK
 
     return color_options, color_value, color_options, color_value, samramodel_options, samramodel_value
+
+
+@app.callback(
+    Output("adm0-input", "options"),
+    Output("adm0-input", "value"),
+    Output("adm0-input", "disabled"),
+    Input("samramodel-input", "value")
+)
+def adm0_input(samramodel_pk):
+    sahel_adm0s = [
+        {'value': adm0, 'label': adm0}
+        for adm0 in ["Mali", "Mauritanie"]
+    ]
+    if samramodel_pk == "1":
+        return sahel_adm0s, DEFAULT_ADM0, False
+    else:
+        return None, None, True
+
+
+@app.callback(
+    Output("adm1-input", "options"),
+    Output("adm1-input", "value"),
+    Output("adm1-input", "disabled"),
+    Input("adm0-input", "value")
+)
+def adm1_input(adm0_input):
+    mali_adm1s = [
+        {'value': adm1, 'label': adm1}
+        for adm1 in ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
+    ]
+    if adm0_input == "Mali":
+        return mali_adm1s, None, False
+    else:
+        return None, None, True
 
 
 @app.callback(
@@ -444,7 +485,6 @@ def download_svg(n_clicks):
 def show_layers(layers, colorbody_field, colorborder_field):
     # LAYERS
     layers.sort()
-    print(layers)
     added_stylesheet = []
     if "group" not in layers:
         added_stylesheet.extend([
@@ -462,6 +502,7 @@ def show_layers(layers, colorbody_field, colorborder_field):
                  "background-opacity": "0",
                  "border-width": "0",
                  "text-opacity": "0",
+                 'line-width': '0',
              }},
         ])
     if "variable" not in layers:
@@ -1066,6 +1107,8 @@ def draw_model(
             element_type += " " + connection.from_element.shockstructure.element_type
         except Element.shockstructure.RelatedObjectDoesNotExist:
             pass
+        print(connection)
+        print(element_type)
         cyto_elements.append({
             "data": {
                 "source": f"element_{connection.from_element_id}",
@@ -1124,11 +1167,12 @@ def draw_model(
     Output("right-sidebar", "children"),
     Input("cyto", "selectedNodeData"),
     Input("cyto", "elements"),
+    Input("adm0-input", "value"),
     State("allow-movement-switch", "value"),
     State("samramodel-input", "value")
 )
 @timer
-def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
+def right_sidebar(selectednodedata, _, adm0, movement_allowed, samrammodel_pk):
     # INIT
     children = []
     if not selectednodedata or movement_allowed:
@@ -1389,7 +1433,7 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         fig.update_xaxes(title_text="Date")
 
         df = pd.DataFrame(SimulatedDataPoint.objects
-                          .filter(element=variable, scenario_id=scenario_pk, responseoption_id=responseoption_pk)
+                          .filter(element=variable, scenario_id=scenario_pk, responseoption_id=responseoption_pk, admin0=adm0)
                           .values("date", "value"))
         if not df.empty:
             fig.add_trace(go.Scatter(
@@ -1399,9 +1443,9 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
             ))
 
         if admin1 is None:
-            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable).values())
+            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable, admin0=adm0).values())
         else:
-            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable, admin1=admin1).values())
+            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable, admin0=adm0, admin1=admin1).values())
 
         if not df.empty:
             source_ids = df["source_id"].drop_duplicates()
@@ -1421,7 +1465,7 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         fig.update_layout(
             legend=dict(yanchor="bottom", x=0, y=1),
             showlegend=True,
-            yaxis=dict(title=variable.unit + unit_append),
+            yaxis=dict(title=variable.unit.replace("LCY", CURRENCY.get(adm0)) + unit_append),
         )
         fig_div = dcc.Graph(figure=fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2")
         children.append(fig_div)
@@ -1570,7 +1614,7 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
 
         elif variable.sd_type == "Household Constant":
             try:
-                value = variable.householdconstantvalues.get().value
+                value = variable.householdconstantvalues.get(admin0=adm0).value
             except HouseholdConstantValue.DoesNotExist:
                 value = None
             householdvalue_card = dbc.InputGroup([
