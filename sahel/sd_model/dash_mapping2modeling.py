@@ -37,9 +37,10 @@ app.layout = html.Div(children=[
     # (cannot click through divs in Dash for some reason, z-index not working either)
     html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute", "width": "200px"}, children=[
         # samramodel
-        dbc.Select(id="samramodel-input", className="mb-3"),
-        dbc.Select(id="adm0-input", className="mb-3", bs_size="sm"),
-        dbc.Select(id="adm1-input", className="mb-3", bs_size="sm"),
+        dbc.Select(id="samramodel-input", className=""),
+        dbc.Select(id="adm0-input", className="", bs_size="sm"),
+        dbc.Select(id="adm1-input", className="", bs_size="sm"),
+        dbc.Select(id="adm2-input", className="mb-3", bs_size="sm"),
 
         # layers
         dbc.Card(className="mb-3", children=[
@@ -253,8 +254,26 @@ def adm1_input(adm0_input):
         {'value': adm1, 'label': adm1}
         for adm1 in ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
     ]
+    mrt_adm1s = [
+        {'value': 'Hodh Ech Chargui', 'label': 'Hodh Ech Chargui'}
+    ]
     if adm0_input == "Mali":
         return mali_adm1s, None, False
+    elif adm0_input == "Mauritanie":
+        return mrt_adm1s, 'Hodh Ech Chargui', False
+    else:
+        return None, None, True
+
+
+@app.callback(
+    Output("adm2-input", "options"),
+    Output("adm2-input", "value"),
+    Output("adm2-input", "disabled"),
+    Input("adm1-input", "value")
+)
+def adm2_input(adm1_input):
+    if adm1_input == "Hodh Ech Chargui":
+        return [{'value': 'Bassikounou', 'label': 'Bassikounou'}], 'Bassikounou', False
     else:
         return None, None, True
 

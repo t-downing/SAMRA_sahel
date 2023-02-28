@@ -130,6 +130,7 @@ def update_mrt_prixmarche():
         df = df.transpose()
         df['date'] = pd.date_range(start='2022-01-01', periods=24, freq='MS')
         df = pd.melt(df, id_vars=['date'])
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
         df["value"] = df["value"].replace({0: np.nan})
         df = df.dropna()
         df['date'] = df['date'] + pd.DateOffset(months=2, days=14)
@@ -137,23 +138,23 @@ def update_mrt_prixmarche():
         df_all = pd.concat([df_all, df])
     print(df_all['Aliment de base'].unique())
     objs = []
-    # variables = Variable.objects.filter(mrt_prixmarche_name__isnull=False)
-    # for variable in variables:
-    #     dff = df_all[df_all['Aliment de base'] == variable.mrt_prixmarche_name]
-    #     print(f"{variable.label}: {len(dff)} data points")
-    #     for _, row in dff.iterrows():
-    #         objs.append(MeasuredDataPoint(
-    #             element_id=variable.pk,
-    #             date=row["date"],
-    #             admin0="Mauritanie",
-    #             admin1='Hodh Ech Chargui',
-    #             admin2='Bassikounou',
-    #             market=row["market"],
-    #             value=row["value"],
-    #             source_id=12,
-    #         ))
-    # MeasuredDataPoint.objects.filter(source_id=12).delete()
-    # MeasuredDataPoint.objects.bulk_create(objs)
+    variables = Variable.objects.filter(mrt_prixmarche_name__isnull=False)
+    for variable in variables:
+        dff = df_all[df_all['Aliment de base'] == variable.mrt_prixmarche_name]
+        print(f"{variable.label}: {len(dff)} data points")
+        for _, row in dff.iterrows():
+            objs.append(MeasuredDataPoint(
+                element_id=variable.pk,
+                date=row["date"],
+                admin0="Mauritanie",
+                admin1='Hodh Ech Chargui',
+                admin2='Bassikounou',
+                market=row["market"],
+                value=row["value"],
+                source_id=12,
+            ))
+    MeasuredDataPoint.objects.filter(source_id=12).delete()
+    MeasuredDataPoint.objects.bulk_create(objs)
 
 
 def update_dm_suividesprix():
