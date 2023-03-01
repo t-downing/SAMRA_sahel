@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Variable, ConstantValue
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, ResponseConstantValue
 
 from .forecasting import forecast_element
 from .model_operations import timer

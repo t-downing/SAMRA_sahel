@@ -18,12 +18,19 @@ from .translations import l
 DEFAULT_SAMRAMODEL_PK = "1"
 DEFAULT_ADM0 = "Mauritanie"
 DEFAULT_STORY_PK = "1"
-DEFAULT_LAYERS = ["element", "variable"]
+DEFAULT_LAYERS = [
+    'group',
+    # 'element',
+    'variable',
+]
 LANG = "EN"
 CURRENCY = {
     'Mali': 'FCFA',
     'Mauritanie': 'MRU'
 }
+ADM0S = ['Mali', 'Mauritanie']
+MALI_ADM1S = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
+MRT_ADM1S = ['Hodh Ech Chargi']
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -250,7 +257,7 @@ def adm0_scenarioresponse_input(samramodel_pk):
     if samramodel_pk == "1":
         sahel_adm0s = [
             {'value': adm0, 'label': adm0}
-            for adm0 in ["Mali", "Mauritanie"]
+            for adm0 in ADM0S
         ]
         scenario_options = [
             {'value': scenario.pk, 'label': scenario.name}
@@ -280,15 +287,16 @@ def adm0_scenarioresponse_input(samramodel_pk):
 def adm1_input(adm0_input):
     mali_adm1s = [
         {'value': adm1, 'label': adm1}
-        for adm1 in ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
+        for adm1 in MALI_ADM1S
     ]
     mrt_adm1s = [
-        {'value': 'Hodh Ech Chargui', 'label': 'Hodh Ech Chargui'}
+        {'value': adm1, 'label': adm1}
+        for adm1 in MRT_ADM1S
     ]
     if adm0_input == "Mali":
         return mali_adm1s, None, False
     elif adm0_input == "Mauritanie":
-        return mrt_adm1s, 'Hodh Ech Chargui', False
+        return mrt_adm1s, 'Hodh Ech Chargi', False
     else:
         return None, None, True
 
@@ -300,7 +308,7 @@ def adm1_input(adm0_input):
     Input("adm1-input", "value")
 )
 def adm2_input(adm1_input):
-    if adm1_input == "Hodh Ech Chargui":
+    if adm1_input == "Hodh Ech Chargi":
         return [{'value': 'Bassikounou', 'label': 'Bassikounou'}], 'Bassikounou', False
     else:
         return None, None, True
@@ -1154,8 +1162,6 @@ def draw_model(
             element_type += " " + connection.from_element.shockstructure.element_type
         except Element.shockstructure.RelatedObjectDoesNotExist:
             pass
-        print(connection)
-        print(element_type)
         cyto_elements.append({
             "data": {
                 "source": f"element_{connection.from_element_id}",
@@ -1222,13 +1228,12 @@ def draw_model(
 )
 @timer
 def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, movement_allowed, samrammodel_pk):
+    # TODO: admin1 and admin2 filtering on graph
     # INIT
     children = []
     if not selectednodedata or movement_allowed:
         return children
     nodedata = selectednodedata[-1]
-    # scenario_pk = "1"
-    # responseoption_pk = "1"
     admin1 = None
 
     # GROUP
@@ -1481,6 +1486,8 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
         fig = go.Figure(layout=go.Layout(template="simple_white", margin=go.layout.Margin(l=0, r=0, b=0, t=0)))
         fig.update_xaxes(title_text="Date")
 
+        # simulated DPs
+        # TODO: disagg by admin1-2
         df = pd.DataFrame(SimulatedDataPoint.objects
                           .filter(element=variable, scenario_id=scenario_pk, responseoption_id=responseoption_pk, admin0=adm0)
                           .values("date", "value"))
@@ -1491,10 +1498,11 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
                 name="Simulé",
             ))
 
-        if admin1 is None:
-            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable, admin0=adm0).values())
-        else:
-            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable, admin0=adm0, admin1=admin1).values())
+        # measured DPs
+        mdps = MeasuredDataPoint.objects.filter(element=variable, admin0=adm0)
+        if admin1 is not None:
+            mdps = mdps.filter(admin1=admin1)
+        df = pd.DataFrame(mdps.values())
 
         if not df.empty:
             source_ids = df["source_id"].drop_duplicates()

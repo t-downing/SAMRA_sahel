@@ -3,6 +3,9 @@ from model_utils.managers import InheritanceManager
 from colorfield.fields import ColorField
 import datetime
 
+# TODO: refactor element to variable
+# TODO: add admin0-2 as models
+
 
 class SamraModel(models.Model):
     name = models.CharField(max_length=200)
@@ -432,9 +435,10 @@ class Scenario(models.Model):
         return self.name
 
 
-class ConstantValue(models.Model):
-    element = models.ForeignKey("variable", related_name="constantvalues", on_delete=models.CASCADE)
-    responseoption = models.ForeignKey("responseoption", related_name="constantvalues", on_delete=models.CASCADE)
+class ResponseConstantValue(models.Model):
+    element = models.ForeignKey("variable", related_name="responseconstantvalues", on_delete=models.CASCADE)
+    responseoption = models.ForeignKey("responseoption", related_name="responseconstantvalues", on_delete=models.CASCADE)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     value = models.FloatField()
 
     def __str__(self):
@@ -469,3 +473,11 @@ class PulseValue(models.Model):
     def __str__(self):
         return f"Element: {self.element}; ResponseOption: {self.responseoption}; Pulse Height: {self.value}"
 
+
+class GeographicConstantValue(models.Model):
+    element = models.ForeignKey('variable', related_name='countryconstantvalues', on_delete=models.CASCADE)
+    value = models.FloatField(null=True)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
+
+    def __str__(self):
+        return f"Element: {self.element}; Country: {self.admin0}; Value: {self.value}"

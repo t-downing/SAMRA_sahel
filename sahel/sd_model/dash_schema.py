@@ -8,7 +8,7 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 from dash.exceptions import PreventUpdate
 import dash_cytoscape as cyto
 from sahel.models import Variable, SimulatedDataPoint, VariableConnection, ElementGroup, \
-    MeasuredDataPoint, Source, ResponseOption, ConstantValue, HouseholdConstantValue, Scenario, Element
+    MeasuredDataPoint, Source, ResponseOption, ResponseConstantValue, HouseholdConstantValue, Scenario, Element
 import plotly.graph_objects as go
 from sahel.sd_model.model_operations import run_model, timer
 import inspect

@@ -82,11 +82,15 @@ def update_mali_wfp_price_data():
 
 
 def update_mrt_wfp():
-    mrt_adm1s = ['Hodh Ech Chargi', 'Hodh El Gharbi']
+    # TODO: consolidate with other VAM function
+    # TODO: actually set up proper automation
+    mrt_adm1s = ['Hodh Ech Chargi']
+    mrt_adm2s = ['Bassikounou']
     df = pd.read_csv('data/wfp_food_prices_mrt.csv', skiprows=[1])
-    df = df[df['admin1'].isin(mrt_adm1s)]
+    df = df[(df['admin1'].isin(mrt_adm1s) & df['admin2'].isin(mrt_adm2s))]
     df["price"] = df["price"].replace({0: np.nan})
     df = df.dropna()
+    print(f'{len(df)} data points')
 
     elements = Variable.objects.filter(vam_commodity__isnull=False)
     objs = []
@@ -329,21 +333,30 @@ def update_acled():
     MeasuredDataPoint.objects.bulk_create(objs)
 
 
-def update_ndvi():
+def update_ndvi(admin0):
     source = Source.objects.get(pk=7)
-    admin1_files = (
-        ("Mali - Gao_Pasture_", "Gao"),
-        ("Mali - Kidal__", "Kidal"),
-        ("Mali - Mopti_Pasture_", "Mopti"),
-        ("Mali - Tombouctou_Pasture_", "Tombouctou")
-    )
+    admin1_files = None
+    admin2 = None
+    min_year = None
+    if admin0 == 'Mali':
+        admin1_files = (
+            ("Mali - Gao_Pasture_", "Gao"),
+            ("Mali - Kidal__", "Kidal"),
+            ("Mali - Mopti_Pasture_", "Mopti"),
+            ("Mali - Tombouctou_Pasture_", "Tombouctou")
+        )
+        min_year = 2012
+    elif admin0 == 'Mauritanie':
+        admin1_files = (
+            ("Mauritania - Hodh Ech Chargi - Bassikounou__", "Hodh Ech Chargi"),
+        )
+        admin2 = 'Bassikounou'
+        min_year = 2015
     objs = []
     for admin1_file in admin1_files:
         for measure in ["NDVI-", "Rainfall"]:
             element_ids = [169, 170] if measure == "Rainfall" else [171, 172]
-            for year in range(2012, 2023):
-                if not (year == 2022 and admin1_file[1] == "Gao" and measure == "Rainfall"):
-                    pass
+            for year in range(min_year, 2023):
                 df = pd.read_csv(f"data/wfp seasonal explorer/{admin1_file[0]}{measure}{year}.csv")
                 df["Day"] = df["Dekad"] * 10 - 5
                 df["date"] = pd.to_datetime(df[["Year", "Month", "Day"]])
@@ -356,17 +369,21 @@ def update_ndvi():
                         source=source,
                         value=row[real_column],
                         date=row["date"],
+                        admin0=admin0,
                         admin1=admin1_file[1],
+                        admin2=admin2,
                     ))
                     objs.append(MeasuredDataPoint(
                         element_id=element_ids[1],
                         source=source,
                         value=row[avg_column],
                         date=row["date"],
+                        admin0=admin0,
                         admin1=admin1_file[1],
+                        admin2=admin2,
                     ))
 
-    MeasuredDataPoint.objects.filter(source=source).delete()
+    MeasuredDataPoint.objects.filter(source=source, admin0=admin0).delete()
     MeasuredDataPoint.objects.bulk_create(objs)
 
 
@@ -393,8 +410,8 @@ class Command(BaseCommand):
         # update_dm_suividesprix()
         # update_dm_globallivestock()
         # update_acled()
-        # update_ndvi()
+        # update_ndvi('Mauritanie')
         # read_ven_producerprices()
-        # update_mrt_wfp()
-        update_mrt_prixmarche()
+        update_mrt_wfp()
+        # update_mrt_prixmarche()
         pass

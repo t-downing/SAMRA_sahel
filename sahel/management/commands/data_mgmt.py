@@ -6,7 +6,7 @@ from sahel.sd_model.forecasting import forecast_element
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        SimulatedDataPoint.objects.all().update(admin0='Mali')
+        ResponseConstantValue.objects.all().update(admin0='Mali')
 
         pass
 

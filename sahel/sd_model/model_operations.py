@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
-from ..models import Variable, SimulatedDataPoint, MeasuredDataPoint, ConstantValue, ResponseOption, \
+from ..models import Variable, SimulatedDataPoint, MeasuredDataPoint, ResponseConstantValue, ResponseOption, \
     SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue
 from datetime import datetime, date
 import time, functools, warnings
@@ -12,6 +12,8 @@ from django.db.models import Q
 from django.db import connection
 from contextlib import closing
 from samra.settings import DATABASES
+
+DAYS_IN_MONTH = 30.437
 
 
 def run_model(
@@ -113,10 +115,10 @@ def run_model(
             model.stock(pk).equation = zero_flow
             model.stock(pk).initial_value = element.stock_initial_value
             for inflow in element.inflows.filter(equation__isnull=False).exclude(equation=""):
-                model.stock(pk).equation += model.flow(inflow.pk) / 30.437 if "mois" in inflow.unit else 1.0
+                model.stock(pk).equation += model.flow(inflow.pk) / DAYS_IN_MONTH if "mois" in inflow.unit else 1.0
             for outflow in element.outflows.filter(equation__isnull=False).exclude(equation=""):
                 if "mois" in outflow.unit:
-                    model.stock(pk).equation -= model.flow(outflow.pk) / 30.437
+                    model.stock(pk).equation -= model.flow(outflow.pk) / DAYS_IN_MONTH
                 else:
                     model.stock(pk).equation -= model.flow(outflow.pk)
 
@@ -124,7 +126,7 @@ def run_model(
     print(f"set up equations took {stop - start} s")
     start = time.time()
 
-    # set inputs
+    # read inputs
     mdps = MeasuredDataPoint.objects.filter(date__gte=startdate, date__lte=enddate, admin0=adm0)
     fdps = ForecastedDataPoint.objects.filter(date__gte=startdate, date__lte=enddate, admin0=adm0)
     if adm1 is not None:
@@ -139,6 +141,7 @@ def run_model(
     m_time = 0.0
     f_time = 0.0
 
+    # set inputs
     for element in elements:
         pk = str(element.pk)
         if element.sd_type in ["Input", "Seasonal Input"]:
@@ -146,8 +149,6 @@ def run_model(
                 if element.sd_type == "Input":
                     # load measured points
                     m_start = time.time()
-                    # df_m = pd.DataFrame(MeasuredDataPoint.objects.filter(element=element).values())
-                    # df_m = pd.DataFrame(measureddatapoints.filter(element_id=pk))
                     df_m = df_m_all[df_m_all["element_id"] == int(pk)]
                     if not df_m.empty:
                         df_m = df_m.groupby("date").mean().reset_index()[["date", "value"]]
@@ -155,25 +156,17 @@ def run_model(
 
                     # load forecasted points
                     f_start = time.time()
-                    # df_f = pd.DataFrame(element.forecasteddatapoints.all().values())
-                    # df_f = pd.DataFrame(forecasteddatapoints.filter(element_id=pk))
                     df_f = pd.DataFrame()
                     if not df_f_all.empty:
                         df_f = df_f_all[df_f_all["element_id"] == int(pk)]
                         if not df_f.empty:
                             df_f = df_f.groupby("date").mean().reset_index()[["date", "value"]]
                     f_time += time.time() - f_start
-
                     df = pd.concat([df_m, df_f], ignore_index=True)
-                    # df["t"] = df["date"].apply(datetime.toordinal)
                     if df.empty:
-                        print(f'df for {element} empty, setting eq to 1.0')
-                        model.converter(pk).equation = 1.0
+                        print(f"couldn't find timeseries data for {element}, setting eq to 0.0")
+                        model.converter(pk).equation = 0.0
                         continue
-                    else:
-                        # model.points[pk] = df[["t", "value"]].values.tolist()
-                        # model.converter(pk).equation = sd.lookup(sd.time(), pk)
-                        pass
                 else:
                     df = pd.DataFrame(SeasonalInputDataPoint.objects.filter(element=element).values())
                     if df.empty:
@@ -220,9 +213,9 @@ def run_model(
     for element in elements:
         if element.sd_type == "Constant":
             try:
-                constants_values[str(element.pk)] = element.constantvalues.get(
-                    responseoption_id=responseoption_pk).value
-            except ConstantValue.DoesNotExist:
+                constants_values[str(element.pk)] = element.responseconstantvalues.get(
+                    responseoption_id=responseoption_pk, admin0=adm0).value
+            except ResponseConstantValue.DoesNotExist:
                 pass
         elif element.sd_type == "Scenario Constant":
             try:
@@ -234,6 +227,9 @@ def run_model(
                 constants_values[str(element.pk)] = element.householdconstantvalues.get().value
             except HouseholdConstantValue.DoesNotExist:
                 pass
+    stop = time.time()
+    print(f"setup constants took {stop - start} s")
+    start = time.time()
 
     # setup to run model
     model_env = bptk()
@@ -243,6 +239,7 @@ def run_model(
 
     # run model
     # for purposes of running bptk, just set scenario to "base"
+    # TODO: loop over scenarios and responses here with bptk constants instead of outside function
     bptk_scenario = "base"
     model_env.register_scenarios(scenarios={bptk_scenario: {"constants": constants_values}},
                                  scenario_manager="scenario_manager")
@@ -265,6 +262,7 @@ def run_model(
 
     if DATABASES['default']['ENGINE'] == 'mssql':
         # if using MSSQL, use Django ORM because there's a problem with using the raw SQL
+        # TODO: add admin0-2 functionality
         objs = [
             SimulatedDataPoint(
                 element_id=row.variable,
@@ -286,6 +284,7 @@ def run_model(
         start = time.time()
     else:
         # delete and save done with raw SQL delete and insert (twice as fast as built-in bulk_create)
+        # TODO: add admin1-2 functionality
         data = []
         for row in df.itertuples():
             data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk, adm0])
