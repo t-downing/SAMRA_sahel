@@ -61,34 +61,42 @@ app.layout = html.Div(children=[
             ])
         ]),
 
-        # colors
-        dbc.Card(className="mb-3", children=[
-            dbc.CardBody(className="p-2", children=[
-                html.P(className="mb-1", children="Couleurs"),
-                *[
-                    dbc.InputGroup(className="mt-1", size="sm", children=[
-                        dbc.InputGroupAddon(addon_type="prepend", children=part.capitalize()),
-                        dbc.Select(id=f"color{part}-input")
+        # mapping / modeling tabs
+        dbc.Tabs([
+            dbc.Tab(label='Modeling', children=[
+                dbc.Select(id="scenario-input", placeholder="Scénario", className="mb-2"),
+                dbc.Select(id="responseoption-input", placeholder="Réponse", className="mb-2"),
+            ]),
+            dbc.Tab(label='Mapping', children=[
+                # colors
+                dbc.Card(className="mb-3", children=[
+                    dbc.CardBody(className="p-2", children=[
+                        html.P(className="mb-1", children="Couleurs"),
+                        *[
+                            dbc.InputGroup(className="mt-1", size="sm", children=[
+                                dbc.InputGroupAddon(addon_type="prepend", children=part.capitalize()),
+                                dbc.Select(id=f"color{part}-input")
+                            ])
+                            for part in ["body", "border"]
+                        ],
                     ])
-                    for part in ["body", "border"]
-                ],
-            ])
-        ]),
+                ]),
 
-        # storylines
-        dbc.Card(className="mb-3", children=[
-            dbc.CardBody(className="p-2", children=[
-                html.P(className="mb-1", children="Histoires"),
-                dbc.Select(id="story-input", className="mb-1", bs_size="sm"),
-            ])
-        ]),
+                # storylines
+                dbc.Card(className="mb-3", children=[
+                    dbc.CardBody(className="p-2", children=[
+                        html.P(className="mb-1", children="Histoires"),
+                        dbc.Select(id="story-input", className="mb-1", bs_size="sm"),
+                    ])
+                ]),
 
+                dbc.Button(className="mb-3", id="add-eb-open", children="Add an EB", size="sm", color="primary"),
+            ]),
+        ]),
         # other
         dbc.Button(className="mb-3", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
         html.Br(),
         dbc.Button(className="mb-3", id="add-node-open", children="Ajouter un objet", size="sm", color="primary"),
-        html.Br(),
-        dbc.Button(className="mb-3", id="add-eb-open", children="Add an EB", size="sm", color="primary"),
         html.Br(),
         dbc.FormGroup([
             dbc.Checklist(id="allow-movement-switch",
@@ -230,17 +238,37 @@ def populate_initial(_):
     Output("adm0-input", "options"),
     Output("adm0-input", "value"),
     Output("adm0-input", "disabled"),
+    Output("scenario-input", "options"),
+    Output("scenario-input", "value"),
+    Output("scenario-input", "disabled"),
+    Output("responseoption-input", "options"),
+    Output("responseoption-input", "value"),
+    Output("responseoption-input", "disabled"),
     Input("samramodel-input", "value")
 )
-def adm0_input(samramodel_pk):
-    sahel_adm0s = [
-        {'value': adm0, 'label': adm0}
-        for adm0 in ["Mali", "Mauritanie"]
-    ]
+def adm0_scenarioresponse_input(samramodel_pk):
     if samramodel_pk == "1":
-        return sahel_adm0s, DEFAULT_ADM0, False
+        sahel_adm0s = [
+            {'value': adm0, 'label': adm0}
+            for adm0 in ["Mali", "Mauritanie"]
+        ]
+        scenario_options = [
+            {'value': scenario.pk, 'label': scenario.name}
+            for scenario in Scenario.objects.filter(samramodel_id=samramodel_pk)
+        ]
+        scenario_value = scenario_options[0].get('value')
+        response_options = [
+            {'value': response.pk, 'label': response.name}
+            for response in ResponseOption.objects.filter(samramodel_id=samramodel_pk)
+        ]
+        response_value = response_options[0].get('value')
+        return sahel_adm0s, DEFAULT_ADM0, False, \
+               scenario_options, scenario_value, False, \
+               response_options, response_value, False
     else:
-        return None, None, True
+        return None, None, True, \
+               None, None, True, \
+               None, None, True
 
 
 @app.callback(
@@ -1187,18 +1215,20 @@ def draw_model(
     Input("cyto", "selectedNodeData"),
     Input("cyto", "elements"),
     Input("adm0-input", "value"),
+    Input('scenario-input', 'value'),
+    Input('responseoption-input', 'value'),
     State("allow-movement-switch", "value"),
     State("samramodel-input", "value")
 )
 @timer
-def right_sidebar(selectednodedata, _, adm0, movement_allowed, samrammodel_pk):
+def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, movement_allowed, samrammodel_pk):
     # INIT
     children = []
     if not selectednodedata or movement_allowed:
         return children
     nodedata = selectednodedata[-1]
-    scenario_pk = "1"
-    responseoption_pk = "1"
+    # scenario_pk = "1"
+    # responseoption_pk = "1"
     admin1 = None
 
     # GROUP

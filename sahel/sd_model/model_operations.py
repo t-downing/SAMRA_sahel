@@ -14,15 +14,24 @@ from contextlib import closing
 from samra.settings import DATABASES
 
 
-def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
+def run_model(
+        scenario_pk: int,
+        responseoption_pk: int,
+        samramodel_pk: int,
+        adm0: str,
+        adm1: str = None,
+        adm2: str = None,
+        startdate: date = date(2022, 7, 1),
+        enddate: date = date(2024, 7, 1),
+        timestep: int = 2,
+):
     start = time.time()
-    startdate, enddate = date(2022, 7, 1), date(2024, 7, 1)
 
-    model = Model(starttime=startdate.toordinal(), stoptime=enddate.toordinal(), dt=2)
+    model = Model(starttime=startdate.toordinal(), stoptime=enddate.toordinal(), dt=timestep)
     zero_flow = model.flow("Zero Flow")
     zero_flow.equation = 0.0
 
-    elements = Variable.objects.filter(
+    elements = Variable.objects.filter(samramodel_id=samramodel_pk).filter(
         Q(sd_type="Variable", equation__isnull=False) |
         Q(sd_type="Flow", equation__isnull=False) |
         Q(sd_type="Stock", stock_initial_value__isnull=False) |
@@ -116,8 +125,16 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     start = time.time()
 
     # set inputs
-    df_m_all = pd.DataFrame(MeasuredDataPoint.objects.filter(date__gte=startdate, date__lte=enddate).values())
-    df_f_all = pd.DataFrame(ForecastedDataPoint.objects.filter(date__gte=startdate, date__lte=enddate).values())
+    mdps = MeasuredDataPoint.objects.filter(date__gte=startdate, date__lte=enddate, admin0=adm0)
+    fdps = ForecastedDataPoint.objects.filter(date__gte=startdate, date__lte=enddate, admin0=adm0)
+    if adm1 is not None:
+        mdps = mdps.filter(admin1=adm1)
+        fdps = fdps.filter(admin1=adm1)
+        if adm2 is not None:
+            mdps = mdps.filter(admin2=adm2)
+            fdps = fdps.filter(admin2=adm2)
+    df_m_all = pd.DataFrame(mdps.values())
+    df_f_all = pd.DataFrame(fdps.values())
 
     m_time = 0.0
     f_time = 0.0
@@ -140,15 +157,23 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                     f_start = time.time()
                     # df_f = pd.DataFrame(element.forecasteddatapoints.all().values())
                     # df_f = pd.DataFrame(forecasteddatapoints.filter(element_id=pk))
-                    df_f = df_f_all[df_f_all["element_id"] == int(pk)]
-                    if not df_f.empty:
-                        df_f = df_f.groupby("date").mean().reset_index()[["date", "value"]]
+                    df_f = pd.DataFrame()
+                    if not df_f_all.empty:
+                        df_f = df_f_all[df_f_all["element_id"] == int(pk)]
+                        if not df_f.empty:
+                            df_f = df_f.groupby("date").mean().reset_index()[["date", "value"]]
                     f_time += time.time() - f_start
 
                     df = pd.concat([df_m, df_f], ignore_index=True)
-                    df["t"] = df["date"].apply(datetime.toordinal)
-                    model.points[pk] = df[["t", "value"]].values.tolist()
-                    model.converter(pk).equation = sd.lookup(sd.time(), pk)
+                    # df["t"] = df["date"].apply(datetime.toordinal)
+                    if df.empty:
+                        print(f'df for {element} empty, setting eq to 1.0')
+                        model.converter(pk).equation = 1.0
+                        continue
+                    else:
+                        # model.points[pk] = df[["t", "value"]].values.tolist()
+                        # model.converter(pk).equation = sd.lookup(sd.time(), pk)
+                        pass
                 else:
                     df = pd.DataFrame(SeasonalInputDataPoint.objects.filter(element=element).values())
                     if df.empty:
@@ -168,7 +193,9 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
                 model.points[pk] = df[["t", "value"]].values.tolist()
                 model.converter(pk).equation = sd.lookup(sd.time(), pk)
             else:
-                if pk in model_output_pks: model_output_pks.remove(pk)
+                if pk in model_output_pks:
+                    print(pk)
+                    model_output_pks.remove(pk)
 
     print(f"m took {m_time}, f took {f_time}")
 
@@ -179,6 +206,7 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     # smoothed variables
     for element in smoothed_elements:
         pk = str(element.pk)
+        print(element.label)
         # exec is limited to use sd.* and smooth functions, and can only see and edit the dict model_locals
         exec(f"temp_eq = {element.equation}", {"__builtins__": None, "sd": sd, "smooth": smooth}, model_locals)
         model.converter(pk).equation = model_locals.get("temp_eq")
@@ -228,7 +256,8 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
     start = time.time()
 
     df["date"] = df["t"].apply(datetime.fromordinal)
-    df = pd.melt(df, id_vars=["date"], value_vars=model_output_pks)
+    df = df.drop(columns=['t'])
+    df = pd.melt(df, id_vars=["date"])
 
     stop = time.time()
     print(f"format results took {stop - start} s")
@@ -259,18 +288,18 @@ def run_model(scenario_pk: int = 1, responseoption_pk: int = 1):
         # delete and save done with raw SQL delete and insert (twice as fast as built-in bulk_create)
         data = []
         for row in df.itertuples():
-            data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk])
+            data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk, adm0])
 
         print(f"SQL iterrows took {time.time() - start} s")
         start = time.time()
 
         insert_stmt = (
-            "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id) "
-            f"VALUES {', '.join(['(' + ', '.join(['%s'] * 5) + ')'] * len(df))}"
+            "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id, admin0) "
+            f"VALUES {', '.join(['(' + ', '.join(['%s'] * 6) + ')'] * len(df))}"
         )
         delete_stmt = (
             f"DELETE FROM sahel_simulateddatapoint WHERE "
-            f"scenario_id = {scenario_pk} AND responseoption_id = {responseoption_pk}"
+            f"scenario_id = {scenario_pk} AND responseoption_id = {responseoption_pk} AND admin0 = '{adm0}';"
         )
         with closing(connection.cursor()) as cursor:
             cursor.execute(delete_stmt)
