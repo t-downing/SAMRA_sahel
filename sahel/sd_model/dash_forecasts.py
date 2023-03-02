@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Variable, ResponseConstantValue
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, ResponseConstantValue, ADMIN0S
 
 from .forecasting import forecast_element
 from .model_operations import timer
@@ -15,18 +15,22 @@ import plotly
 from plotly.subplots import make_subplots
 import pandas as pd
 
+# TODO: vastly simplify, remove all controls and literally just show data (forecasting should be done automatically
+#  or triggered by admin somehow, not here)
+
 default_colors = plotly.colors.DEFAULT_PLOTLY_COLORS
 
 app = DjangoDash("forecasts", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, children=[
+    html.Div(id='init'),
     dbc.Row([
         dbc.Col([
             dbc.Card(className="shadow mb-4 mt-4", children=[
-                dbc.CardHeader("Montrer prévision", id="element-input-header"),
+                dbc.CardHeader("Montrer prévision"),
                 dbc.CardBody([
-                    dbc.Select(
-                        id="element-input", value=42),
+                    dbc.Select(id=(ADMIN0_INPUT := 'admin0-input')),
+                    dbc.Select(id=(ELEMENT_INPUT := "element-input")),
                     html.Hr(),
                     html.H6("SARIMA parameters"),
                     dbc.InputGroup([
@@ -61,49 +65,81 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
 
 
 @app.callback(
-    Output("element-input", "options"),
-    Input("element-input-header", "children")
+    Output(ADMIN0_INPUT, 'options'),
+    Output(ADMIN0_INPUT, 'value'),
+    Output(ELEMENT_INPUT, "options"),
+    Output(ELEMENT_INPUT, 'value'),
+    Input('init', 'children'),
 )
-def update_element_dropdown(_):
-    return [{"label": element.label, "value": element.pk}
-            for element in Variable.objects.filter(sd_type="Input").exclude(measureddatapoints=None)]
+def init(_):
+    variables = Variable.objects.filter(sd_type="Input").exclude(measureddatapoints=None)
+    return (
+        [{'value': adm0, 'label': adm0} for adm0 in ADMIN0S],
+        'Mauritanie',
+        [{"label": variable.label, "value": variable.pk} for variable in variables],
+        42,
+    )
 
 
 @app.callback(
     Output("element-graph", "figure"),
-    Input("element-input", "value"),
+    Input(ELEMENT_INPUT, "value"),
+    Input(ADMIN0_INPUT, 'value'),
     Input("forecast-readout", "children"),
     Input("forecast-test-readout", "children"),
 )
-def update_graph(element_pk, *_):
+def update_graph(element_pk, adm0, *_):
     fig = go.Figure()
     fig.update_layout(template="simple_white", margin=dict(l=0, r=0, b=0, t=0))
 
     element = Variable.objects.get(pk=element_pk)
 
-    df = pd.DataFrame(element.measureddatapoints.all().values())
+    df = pd.DataFrame(element.measureddatapoints.filter(admin0=adm0).values())
     df["forecasted"] = False
-    df_forecast = pd.DataFrame(element.forecasteddatapoints.all().values())
+    df_forecast = pd.DataFrame(element.forecasteddatapoints.filter(admin0=adm0).values())
     df_forecast["forecasted"] = True
     df = pd.concat([df, df_forecast], ignore_index=True)
 
-    dff = df.groupby(["date", "forecasted"]).mean().reset_index()
-    fig.add_trace(go.Scatter(
-        x=dff[~dff["forecasted"]]["date"], y=dff[~dff["forecasted"]]["value"], name="Mesuré",
-        line=dict(color="black", width=2), legendgroup="AVG", legendgrouptitle_text="AVG"))
-    fig.add_trace(go.Scatter(
-        x=dff[dff["forecasted"]]["date"], y=dff[dff["forecasted"]]["value"], name="Prévisé",
-        line=dict(color="black", width=2, dash="dash"), legendgroup="AVG"))
+    admin1s = df["admin1"].unique()
 
-    for admin1, color in zip(df["admin1"].unique(), default_colors):
+    if len(admin1s) > 1:
+        dff = df.groupby(["date", "forecasted"]).mean().reset_index()
+        fig.add_trace(go.Scatter(
+            x=dff[~dff["forecasted"]]["date"], y=dff[~dff["forecasted"]]["value"], name="Mesuré",
+            line=dict(color="black", width=2), legendgroup="AVG", legendgrouptitle_text="AVG"))
+        fig.add_trace(go.Scatter(
+            x=dff[dff["forecasted"]]["date"], y=dff[dff["forecasted"]]["value"], name="Prévisé",
+            line=dict(color="black", width=2, dash="dash"), legendgroup="AVG"))
+
+    for admin1, color in zip(admin1s, default_colors):
         dff = df[df["admin1"] == admin1]
         dff = dff.groupby(["date", "forecasted"]).mean().reset_index()
+        print(dff.columns)
         fig.add_trace(go.Scatter(
-            x=dff[~dff["forecasted"]]["date"], y=dff[~dff["forecasted"]]["value"],
-            name="Mesuré", line=dict(color=color, width=1), legendgroup=admin1, legendgrouptitle_text=admin1))
+            x=dff[~dff["forecasted"]]["date"],
+            y=dff[~dff["forecasted"]]["value"],
+            name="Mesuré",
+            line=dict(color=color, width=1),
+            legendgroup=admin1,
+            legendgrouptitle_text=admin1
+        ))
+        x_forecast = list(dff[dff["forecasted"]]["date"])
         fig.add_trace(go.Scatter(
-            x=dff[dff["forecasted"]]["date"], y=dff[dff["forecasted"]]["value"],
-            name="Prévisé", line=dict(color=color, dash="dash", width=1), legendgroup=admin1))
+            x=x_forecast,
+            y=dff[dff["forecasted"]]["value"],
+            name="Prévisé",
+            line=dict(color=color, dash="dash", width=1),
+            legendgroup=admin1
+        ))
+        fig.add_trace(go.Scatter(
+            x=x_forecast+x_forecast[::-1], # x, then x reversed
+            y=list(dff[dff["forecasted"]]["upper_bound"])+list(dff[dff["forecasted"]]["lower_bound"])[::-1], # upper, then lower reversed
+            fill='toself',
+            line=dict(color=color, width=0),
+            opacity=0.3,
+            hoverinfo="skip",
+            showlegend=False
+        ))
 
     return fig
 

@@ -200,6 +200,7 @@ class Story(models.Model):
     def __str__(self):
         return self.name
 
+
 # TODO: do types properly
 class Variable(Node):
     SD_TYPES = (
@@ -277,6 +278,7 @@ class Variable(Node):
     model_output_variable = models.BooleanField(default=True)
     stock_initial_value = models.FloatField(null=True, blank=True)
     mrt_prixmarche_name = models.CharField(max_length=200, null=True, blank=True)
+    must_be_positive = models.BooleanField(default=True)
 
 
 class VariablePosition(models.Model):
@@ -409,6 +411,8 @@ class ForecastedDataPoint(models.Model):
     admin0 = models.CharField(max_length=200, null=True, blank=True)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
+    upper_bound = models.FloatField(null=True, blank=True)
+    lower_bound = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return str(f"Element: {self.element}; Date: {self.date}; Forecasted Value: {self.value}")
