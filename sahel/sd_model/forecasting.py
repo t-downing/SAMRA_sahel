@@ -20,8 +20,6 @@ def forecast_element(element_pk, sarima_params=None):
     else:
         number_of_periods = 12
 
-
-
     # resample into MS or QS (previously LIKELY on 15th of month etc)
     if number_of_periods == 12:
         period = "MS"
@@ -67,12 +65,15 @@ def forecast_element(element_pk, sarima_params=None):
         dateoffset = pd.DateOffset(months=2 if period == "QS" else 0, days=14 if period in ["QS", "MS"] else 10)
 
         # record and re-shift forward to 15th of month
-        objs += [ForecastedDataPoint(
-            element=element,
-            admin1=admin1,
-            date=date + dateoffset,
-            value=value
-        ) for date, value in forecast_points.iteritems()]
+        objs += [
+            ForecastedDataPoint(
+                element=element,
+                admin1=admin1,
+                date=date + dateoffset,
+                value=value
+            )
+            for date, value in forecast_points.iteritems()
+        ]
 
     ForecastedDataPoint.objects.filter(element=element).delete()
     ForecastedDataPoint.objects.bulk_create(objs)

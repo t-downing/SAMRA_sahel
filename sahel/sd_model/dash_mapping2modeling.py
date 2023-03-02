@@ -24,11 +24,6 @@ DEFAULT_LAYERS = [
     'variable',
 ]
 LANG = "EN"
-CURRENCY = {
-    'Mali': 'FCFA',
-    'Mauritanie': 'MRU'
-}
-ADM0S = ['Mali', 'Mauritanie']
 MALI_ADM1S = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
 MRT_ADM1S = ['Hodh Ech Chargi']
 
@@ -257,7 +252,7 @@ def adm0_scenarioresponse_input(samramodel_pk):
     if samramodel_pk == "1":
         sahel_adm0s = [
             {'value': adm0, 'label': adm0}
-            for adm0 in ADM0S
+            for adm0 in ADMIN0S
         ]
         scenario_options = [
             {'value': scenario.pk, 'label': scenario.name}
@@ -268,10 +263,12 @@ def adm0_scenarioresponse_input(samramodel_pk):
             {'value': response.pk, 'label': response.name}
             for response in ResponseOption.objects.filter(samramodel_id=samramodel_pk)
         ]
-        response_value = response_options[0].get('value')
-        return sahel_adm0s, DEFAULT_ADM0, False, \
-               scenario_options, scenario_value, False, \
-               response_options, response_value, False
+        response_value = 1
+        return (
+            sahel_adm0s, DEFAULT_ADM0, False,
+            scenario_options, scenario_value, False,
+            response_options, response_value, False,
+        )
     else:
         return None, None, True, \
                None, None, True, \

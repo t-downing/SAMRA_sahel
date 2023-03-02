@@ -7,6 +7,12 @@ import datetime
 # TODO: add admin0-2 as models
 
 
+ADMIN0S = ['Mali', 'Mauritanie']
+CURRENCY = {
+    'Mali': 'FCFA',
+    'Mauritanie': 'MRU'
+}
+
 class SamraModel(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -194,7 +200,7 @@ class Story(models.Model):
     def __str__(self):
         return self.name
 
-
+# TODO: do types properly
 class Variable(Node):
     SD_TYPES = (
         ("Stock", "Stock"),
@@ -466,6 +472,7 @@ class HouseholdConstantValue(models.Model):
 class PulseValue(models.Model):
     element = models.ForeignKey("variable", related_name="pulsevalues", on_delete=models.CASCADE)
     responseoption = models.ForeignKey("responseoption", related_name="pulsevalues", on_delete=models.CASCADE)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     value = models.FloatField()
     startdate = models.DateField()
     enddate = models.DateField(null=True, blank=True)

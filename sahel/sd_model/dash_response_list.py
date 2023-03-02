@@ -104,7 +104,7 @@ def populate_initial(_, style_data_conditional):
     # read cost value
     element = Variable.objects.get(pk=cost_element_pk)
     df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(
-        element_pk=cost_element_pk, scenario_pks=scenario_pks, response_pks=response_pks,
+        adm0=None, element_pk=cost_element_pk, scenario_pks=scenario_pks, response_pks=response_pks,
     )
     columns.append({
         "id": "total_cost",
@@ -124,7 +124,7 @@ def populate_initial(_, style_data_conditional):
 
         # read results for element
         df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(
-            element_pk=element_pk, scenario_pks=scenario_pks, response_pks=response_pks,
+            adm0=None, element_pk=element_pk, scenario_pks=scenario_pks, response_pks=response_pks,
         )
         eff_unit = "1" if agg_unit == "1000 FCFA" else f"{agg_unit} / {divider_text} FCFA"
 

@@ -6,7 +6,7 @@ from sahel.sd_model.forecasting import forecast_element
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        ResponseConstantValue.objects.all().update(admin0='Mali')
+        PulseValue.objects.all().update(admin0='Mali')
 
         pass
 

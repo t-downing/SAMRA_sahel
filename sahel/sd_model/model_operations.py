@@ -337,7 +337,8 @@ def timer(func):
     return wrapper_timer
 
 
-def read_results(element_pk, scenario_pks, response_pks, agg_value: str = None):
+def read_results(adm0, element_pk, scenario_pks, response_pks, agg_value: str = None):
+    # TODO: again, add admin1-2
     # initialize
     baseline_response_pk = 1
     response_pks_filter = response_pks.copy()
@@ -350,6 +351,7 @@ def read_results(element_pk, scenario_pks, response_pks, agg_value: str = None):
 
     # read in element df
     df = pd.DataFrame(SimulatedDataPoint.objects.filter(
+        admin0=adm0,
         element_id=element_pk,
         scenario_id__in=scenario_pks,
         responseoption_id__in=response_pks_filter,
@@ -404,6 +406,7 @@ def read_results(element_pk, scenario_pks, response_pks, agg_value: str = None):
 
     # read in cost df
     df_cost = pd.DataFrame(SimulatedDataPoint.objects.filter(
+        admin0=adm0,
         element_id=102,
         scenario_id__in=scenario_pks,
         responseoption_id__in=response_pks_filter,
@@ -414,7 +417,7 @@ def read_results(element_pk, scenario_pks, response_pks, agg_value: str = None):
         "responseoption_id", "scenario_id",
         "responseoption__name", "scenario__name"
     ]).sum().reset_index()
-    df_cost_agg["value"] *= period / 30.437
+    df_cost_agg["value"] *= period / DAYS_IN_MONTH
 
     # calculate cost efficiency
     for scenario_pk in scenario_pks:
@@ -422,6 +425,8 @@ def read_results(element_pk, scenario_pks, response_pks, agg_value: str = None):
                                 (df_agg["responseoption_id"] == baseline_response_pk)]["value"]
         baseline_cost = df_cost_agg.loc[(df_cost_agg["scenario_id"] == scenario_pk) &
                                     (df_cost_agg["responseoption_id"] == baseline_response_pk)]["value"]
+        print(f'{baseline_value=}')
+        print(f'{baseline_cost=}')
         df_agg.loc[df_agg["scenario_id"] == scenario_pk, "baseline_value"] = float(baseline_value)
         df_cost_agg.loc[df_cost_agg["scenario_id"] == scenario_pk, "baseline_cost"] = float(baseline_cost)
 

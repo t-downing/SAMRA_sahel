@@ -6,7 +6,7 @@ from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario, ADMIN0S
 from sahel.sd_model.model_operations import run_model, timer, read_results
 
 import plotly.graph_objects as go
@@ -15,21 +15,24 @@ import itertools
 import pandas as pd
 
 DASHES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
+DEFAULT_ADM0 = 'Mauritanie'
+DEFAULT_SAMRAMODEL_PK = 1
 
 app = DjangoDash("scenarioresponse", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, children=[
+    html.Div(id=(INIT := "init"), hidden=True, children='init'),
     dbc.Row([
         dbc.Col(width=2, children=[
             dbc.Card(className="shadow mb-4 mt-4", children=[
                 dbc.CardBody([
-                    html.Div(id="filters"),
-                    dbc.Select(id="element-input", className="mb-2", style={"font-size": "small"}),
-                    dbc.Select(id="agg-input", className="mb-2", style={"font-size": "small"}),
+                    dbc.Select(id=(ADMIN0_INPUT := "admin0-input"), className="mb-2", style={"font-size": "small"}),
+                    dbc.Select(id=(VARIABLE_INPUT := "variable-input"), className="mb-2", style={"font-size": "small"}),
+                    dbc.Select(id=(AGG_INPUT := "agg-input"), className="mb-2", style={"font-size": "small"}),
                     html.H6("Scénarios:"),
-                    dbc.Checklist(id="scenario-input", className="mb-2", style={"font-size": "small"}),
+                    dbc.Checklist(id=(SCENARIO_INPUT := "scenario-input"), className="mb-2", style={"font-size": "small"}),
                     html.H6("Réponses:"),
-                    dbc.Checklist(id="response-input", className="mb-2",
+                    dbc.Checklist(id=(RESPONSE_INPUT := "response-input"), className="mb-2",
                                   style={"height": "195px", "overflow-y": "scroll", "font-size": "small"}),
                     dbc.Button("Réexécuter", id="rerun-submit", color="danger", size="sm", disabled=True),
                 ])
@@ -65,21 +68,25 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
 
 
 @app.callback(
-    Output("element-input", "options"),
-    Output("element-input", "value"),
-    Output("agg-input", "options"),
-    Output("scenario-input", "options"),
-    Output("scenario-input", "value"),
-    Output("response-input", "options"),
-    Output("response-input", "value"),
-    Input("filters", "children")
+    Output(VARIABLE_INPUT, "options"),
+    Output(VARIABLE_INPUT, "value"),
+    Output(AGG_INPUT, "options"),
+    Output(ADMIN0_INPUT, "options"),
+    Output(ADMIN0_INPUT, "value"),
+    Output(SCENARIO_INPUT, "options"),
+    Output(SCENARIO_INPUT, "value"),
+    Output(RESPONSE_INPUT, "options"),
+    Output(RESPONSE_INPUT, "value"),
+    Input(INIT, "children")
 )
 @timer
 def populate_initial(_):
+    admin0_options = [{'label': adm0, 'value': adm0} for adm0 in ADMIN0S]
+    admin0_value = DEFAULT_ADM0
     included_types=["Stock", "Flow", "Variable"]
-    element_options = [{"label": element.get("label"), "value": element.get("id")}
+    variable_options = [{"label": element.get("label"), "value": element.get("id")}
                        for element in Variable.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types).values("id", "label")]
-    element_value = 77
+    variable_value = 77
     agg_options = [{"label": agg[1], "value": agg[0]} for agg in Variable.AGG_OPTIONS]
     scenario_options = [{"label": scenario.get("name"), "value": scenario.get("id")}
                         for scenario in Scenario.objects.all().order_by("id").values("id", "name")]
@@ -87,12 +94,17 @@ def populate_initial(_):
     response_options = [{"label": obj.get("name"), "value": obj.get("id")}
                         for obj in ResponseOption.objects.all().order_by("id").values("id", "name")]
     response_value = [obj.get("value") for obj in response_options[0:3]]
-    return element_options, element_value, agg_options, scenario_options, scenario_value, response_options, response_value
+    return (
+        variable_options, variable_value, agg_options,
+        admin0_options, admin0_value,
+        scenario_options, scenario_value,
+        response_options, response_value
+    )
 
 
 @app.callback(
-    Output("agg-input", "value"),
-    Input("element-input", "value"),
+    Output(AGG_INPUT, "value"),
+    Input(VARIABLE_INPUT, "value"),
 )
 @timer
 def update_default_agg(element_pk):
@@ -102,18 +114,19 @@ def update_default_agg(element_pk):
 @app.callback(
     Output("rerun-readout", "children"),
     Input("rerun-submit", "n_clicks"),
-    State("scenario-input", "value"),
-    State("response-input", "value"),
+    State(ADMIN0_INPUT, "value"),
+    State(SCENARIO_INPUT, "value"),
+    State(RESPONSE_INPUT, "value"),
 )
 @timer
-def rerun_model(n_clicks, scenario_pks, response_pks):
+def rerun_model(n_clicks, adm0, scenario_pks, response_pks):
     if n_clicks is None:
         raise PreventUpdate
     start = time.time()
     n = len(scenario_pks) * len(response_pks)
     for scenario_pk in scenario_pks:
         for response_pk in response_pks:
-            run_model(scenario_pk=scenario_pk, responseoption_pk=response_pk)
+            run_model(scenario_pk, response_pk, DEFAULT_SAMRAMODEL_PK, adm0)
     stop = time.time()
     duration = stop - start
     duration_per = duration / n
@@ -125,13 +138,14 @@ def rerun_model(n_clicks, scenario_pks, response_pks):
     Output("time-graph", "figure"),
     Output("scatter-graph", "figure"),
     Output("eff-graph", "figure"),
-    Input("element-input", "value"),
-    Input("agg-input", "value"),
-    Input("scenario-input", "value"),
-    Input("response-input", "value")
+    Input(ADMIN0_INPUT, "value"),
+    Input(VARIABLE_INPUT, "value"),
+    Input(AGG_INPUT, "value"),
+    Input(SCENARIO_INPUT, "value"),
+    Input(RESPONSE_INPUT, "value")
 )
 @timer
-def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
+def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks):
     # set colors
     baseline_response_pk = 1
     scenario_pks.sort()
@@ -144,7 +158,7 @@ def update_graphs(element_pk, agg_value, scenario_pks, response_pks):
 
     # read results
     df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(
-        element_pk=element_pk, scenario_pks=scenario_pks, response_pks=response_pks, agg_value=agg_value
+        adm0=adm0, element_pk=element_pk, scenario_pks=scenario_pks, response_pks=response_pks, agg_value=agg_value
     )
 
     # bar graph
