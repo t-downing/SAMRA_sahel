@@ -42,7 +42,8 @@ class VariableAdmin(ImportExportModelAdmin):
     resource_class =  VariableResource
 
     list_filter = [
-        'samramodel'
+        'samramodel',
+        'sd_type'
     ]
 
 

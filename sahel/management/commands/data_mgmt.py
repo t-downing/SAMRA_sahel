@@ -7,8 +7,11 @@ import pandas as pd
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        df = pd.DataFrame(ForecastedDataPoint.objects.filter(admin0='Mali').values('element__label'))
-        print(df['element__label'].unique())
+        pks = [248, 249, 250]
+        mdps = MeasuredDataPoint.objects.filter(pk__in=pks)
+        for mdp in mdps:
+            value = mdp.value / 50
+
         pass
 
 

@@ -113,7 +113,12 @@ def run_model(
         elif element.sd_type == "Stock":
             print(f"stock for {element}")
             model.stock(pk).equation = zero_flow
-            model.stock(pk).initial_value = element.stock_initial_value
+            initial_value_var_pk = element.stock_initial_value_variable_id
+            if initial_value_var_pk is not None:
+                model.stock(pk).initial_value = model.constant(str(element.stock_initial_value_variable_id))
+            else:
+                print(f"couldn't find initial_value_variable for {element}, setting initial value to 1.0")
+                model.stock(pk).initial_value = 1.0
             for inflow in element.inflows.filter(equation__isnull=False).exclude(equation=""):
                 model.stock(pk).equation += model.flow(inflow.pk) / DAYS_IN_MONTH if "mois" in inflow.unit else 1.0
             for outflow in element.outflows.filter(equation__isnull=False).exclude(equation=""):
@@ -164,8 +169,11 @@ def run_model(
                     f_time += time.time() - f_start
                     df = pd.concat([df_m, df_f], ignore_index=True)
                     if df.empty:
-                        print(f"couldn't find timeseries data for {element}, setting eq to 0.0")
-                        model.converter(pk).equation = 0.0
+                        default_value = element.constant_default_value
+                        print(f'{default_value=}')
+                        if default_value is None: default_value = 0.0
+                        print(f"couldn't find timeseries data for {element}, setting eq to {default_value}")
+                        model.converter(pk).equation = default_value
                         continue
                 else:
                     df = pd.DataFrame(SeasonalInputDataPoint.objects.filter(element=element).values())
@@ -186,8 +194,8 @@ def run_model(
                 model.points[pk] = df[["t", "value"]].values.tolist()
                 model.converter(pk).equation = sd.lookup(sd.time(), pk)
             else:
+                # print(f"{element} not used in any equations, removing from modeling")
                 if pk in model_output_pks:
-                    print(pk)
                     model_output_pks.remove(pk)
 
     print(f"m took {m_time}, f took {f_time}")
@@ -197,6 +205,7 @@ def run_model(
     start = time.time()
 
     # smoothed variables
+    # TODO: check if there's a problem setting smoothed variables before constants
     for element in smoothed_elements:
         pk = str(element.pk)
         print(element.label)
@@ -210,103 +219,134 @@ def run_model(
 
     # set constant values
     constants_values = {}
-    for element in elements:
-        if element.sd_type == "Constant":
-            try:
-                constants_values[str(element.pk)] = element.responseconstantvalues.get(
-                    responseoption_id=responseoption_pk, admin0=adm0).value
-            except ResponseConstantValue.DoesNotExist:
-                pass
-        elif element.sd_type == "Scenario Constant":
-            try:
-                constants_values[str(element.pk)] = element.scenarioconstantvalues.get(scenario_id=scenario_pk).value
-            except ScenarioConstantValue.DoesNotExist:
-                pass
-        elif element.sd_type == "Household Constant":
-            try:
-                constants_values[str(element.pk)] = element.householdconstantvalues.get().value
-            except HouseholdConstantValue.DoesNotExist:
-                pass
-    stop = time.time()
-    print(f"setup constants took {stop - start} s")
-    start = time.time()
+    response_cv_df = pd.DataFrame(ResponseConstantValue.objects.filter(admin0=adm0).values())
+    scenario_cv_df = pd.DataFrame(ScenarioConstantValue.objects.filter().values())
+    household_cv_df = pd.DataFrame(HouseholdConstantValue.objects.filter(admin0=adm0).values())
+    response_pks = [responseoption_pk]
+    scenario_pks = [scenario_pk]
 
-    # setup to run model
-    model_env = bptk()
-    model_env.register_model(model)
-    scenario_manager = {"scenario_manager": {"model": model}}
-    model_env.register_scenario_manager(scenario_manager)
+    household_constants = {}
+    if not household_cv_df.empty:
+        household_constants.update({
+            str(row.element_id): row.value
+            for row in household_cv_df.itertuples()
+        })
 
-    # run model
-    # for purposes of running bptk, just set scenario to "base"
-    # TODO: loop over scenarios and responses here with bptk constants instead of outside function
-    bptk_scenario = "base"
-    model_env.register_scenarios(scenarios={bptk_scenario: {"constants": constants_values}},
-                                 scenario_manager="scenario_manager")
-    # ignore pandas PerformanceWarnings since bptk will always throw these up if given enough variables to output
-    with warnings.catch_warnings():
-        warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
-        df = model_env.plot_scenarios(scenarios=bptk_scenario, scenario_managers="scenario_manager",
-                                      equations=model_output_pks, return_df=True).reset_index()
-    stop = time.time()
-    print(f"run model took {stop - start} s")
-    start = time.time()
+    for scenario_pk in scenario_pks:
+        scenario_constants = {}
+        if not scenario_cv_df.empty:
+            scenario_cv_dff = scenario_cv_df[scenario_cv_df['scenario_id'] == scenario_pk]
+            if not scenario_cv_dff.empty:
+                scenario_constants.update({
+                    str(row.element_id): row.value
+                    for row in scenario_cv_dff.itertuples()
+                })
+        for responseoption_pk in response_pks:
+            response_constants = {}
+            if not response_cv_df.empty:
+                response_cv_dff = response_cv_df[response_cv_df['responseoption_id'] == responseoption_pk]
+                if not response_cv_dff.empty:
+                    response_constants.update({
+                        str(row.element_id): row.value
+                        for row in response_cv_dff.itertuples()
+                    })
 
-    df["date"] = df["t"].apply(datetime.fromordinal)
-    df = df.drop(columns=['t'])
-    df = pd.melt(df, id_vars=["date"])
+            # check that constants are all there
+            constants = household_constants | scenario_constants | response_constants
+            for element in elements:
+                if element.sd_type in Variable.CONSTANTS:
+                    if str(element.pk) not in constants:
+                        print(f"couldn't find constant for {element}, setting to 0.0")
+                        household_constants.update({str(element.pk): 0.0})
+            stop = time.time()
+            print(f"setup constants took {stop - start} s")
+            start = time.time()
 
-    stop = time.time()
-    print(f"format results took {stop - start} s")
-    start = time.time()
+            # setup to run model
+            model_env = bptk()
+            model_env.register_model(model)
+            scenario_manager = {"scenario_manager": {"model": model}}
+            model_env.register_scenario_manager(scenario_manager)
 
-    if DATABASES['default']['ENGINE'] == 'mssql':
-        # if using MSSQL, use Django ORM because there's a problem with using the raw SQL
-        # TODO: add admin0-2 functionality
-        objs = [
-            SimulatedDataPoint(
-                element_id=row.variable,
-                value=row.value,
-                date=row.date,
-                scenario_id=scenario_pk,
-                responseoption_id=responseoption_pk
-            )
-            for row in df.itertuples()
-        ]
+            # run model
+            # for purposes of running bptk, just set scenario to "base"
+            # TODO: loop over scenarios and responses here with bptk constants instead of outside function
+            bptk_scenario = "base"
+            model_env.register_scenarios(scenarios={bptk_scenario: {"constants": constants}},
+                                         scenario_manager="scenario_manager")
+            # ignore pandas PerformanceWarnings since bptk will always throw these up if given enough variables to output
+            with warnings.catch_warnings():
+                warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+                df = model_env.plot_scenarios(scenarios=bptk_scenario, scenario_managers="scenario_manager",
+                                              equations=model_output_pks, return_df=True).reset_index()
+            stop = time.time()
+            print(f"run model took {stop - start} s")
+            start = time.time()
 
-        print(f"df iterrows took {time.time() - start} s")
-        start = time.time()
+            df["date"] = df["t"].apply(datetime.fromordinal)
+            df = df.drop(columns=['t'])
+            df = pd.melt(df, id_vars=["date"])
 
-        SimulatedDataPoint.objects.filter(scenario_id=scenario_pk, responseoption_id=responseoption_pk).delete()
-        SimulatedDataPoint.objects.bulk_create(objs)
+            pks_in_result = df['variable'].unique()
+            missing_pks = []
+            for pk in model_output_pks:
+                if pk not in pks_in_result:
+                    missing_pks.append(pk)
 
-        print(f"bulk_create took {time.time() - start} s")
-        start = time.time()
-    else:
-        # delete and save done with raw SQL delete and insert (twice as fast as built-in bulk_create)
-        # TODO: add admin1-2 functionality
-        data = []
-        for row in df.itertuples():
-            data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk, adm0])
+            missing_variables = Variable.objects.filter(pk__in=missing_pks)
+            print(missing_variables)
 
-        print(f"SQL iterrows took {time.time() - start} s")
-        start = time.time()
+            stop = time.time()
+            print(f"format results took {stop - start} s")
+            start = time.time()
 
-        insert_stmt = (
-            "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id, admin0) "
-            f"VALUES {', '.join(['(' + ', '.join(['%s'] * 6) + ')'] * len(df))}"
-        )
-        delete_stmt = (
-            f"DELETE FROM sahel_simulateddatapoint WHERE "
-            f"scenario_id = {scenario_pk} AND responseoption_id = {responseoption_pk} AND admin0 = '{adm0}';"
-        )
-        with closing(connection.cursor()) as cursor:
-            cursor.execute(delete_stmt)
-            cursor.execute(insert_stmt, data)
+            if DATABASES['default']['ENGINE'] == 'mssql':
+                # if using MSSQL, use Django ORM because there's a problem with using the raw SQL
+                # TODO: add admin0-2 functionality
+                objs = [
+                    SimulatedDataPoint(
+                        element_id=row.variable,
+                        value=row.value,
+                        date=row.date,
+                        scenario_id=scenario_pk,
+                        responseoption_id=responseoption_pk
+                    )
+                    for row in df.itertuples()
+                ]
 
-        print(f"SQL bulk delete and insert took {time.time() - start} s")
+                print(f"df iterrows took {time.time() - start} s")
+                start = time.time()
 
-    return df
+                SimulatedDataPoint.objects.filter(scenario_id=scenario_pk, responseoption_id=responseoption_pk).delete()
+                SimulatedDataPoint.objects.bulk_create(objs)
+
+                print(f"bulk_create took {time.time() - start} s")
+                start = time.time()
+            else:
+                # delete and save done with raw SQL delete and insert (twice as fast as built-in bulk_create)
+                # TODO: add admin1-2 functionality
+                data = []
+                for row in df.itertuples():
+                    data.extend([row.variable, row.value, row.date, scenario_pk, responseoption_pk, adm0])
+
+                print(f"SQL iterrows took {time.time() - start} s")
+                start = time.time()
+
+                insert_stmt = (
+                    "INSERT INTO sahel_simulateddatapoint (element_id, value, date, scenario_id, responseoption_id, admin0) "
+                    f"VALUES {', '.join(['(' + ', '.join(['%s'] * 6) + ')'] * len(df))}"
+                )
+                delete_stmt = (
+                    f"DELETE FROM sahel_simulateddatapoint WHERE "
+                    f"scenario_id = {scenario_pk} AND responseoption_id = {responseoption_pk} AND admin0 = '{adm0}';"
+                )
+                with closing(connection.cursor()) as cursor:
+                    cursor.execute(delete_stmt)
+                    cursor.execute(insert_stmt, data)
+
+                print(f"SQL bulk delete and insert took {time.time() - start} s")
+
+    return None
 
 
 def smooth(model, input_var, time_constant, initial_value=None):

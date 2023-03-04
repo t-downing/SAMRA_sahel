@@ -119,6 +119,7 @@ def update_mrt_wfp():
 
 
 def update_mrt_prixmarche():
+    alimentation_pks = [248, 249, 250]
     markets = (
         ('Bassikounou', 'BDD PM_BKN'),
         ('Fassala', 'BDD PM_fass'),
@@ -145,6 +146,7 @@ def update_mrt_prixmarche():
     variables = Variable.objects.filter(mrt_prixmarche_name__isnull=False)
     for variable in variables:
         dff = df_all[df_all['Aliment de base'] == variable.mrt_prixmarche_name]
+        unit = 50.0 if variable.pk in alimentation_pks else 1.0
         print(f"{variable.label}: {len(dff)} data points")
         for _, row in dff.iterrows():
             objs.append(MeasuredDataPoint(
@@ -154,7 +156,7 @@ def update_mrt_prixmarche():
                 admin1='Hodh Ech Chargui',
                 admin2='Bassikounou',
                 market=row["market"],
-                value=row["value"],
+                value=row["value"]/unit,
                 source_id=12,
             ))
     MeasuredDataPoint.objects.filter(source_id=12).delete()
@@ -412,6 +414,6 @@ class Command(BaseCommand):
         # update_acled()
         # update_ndvi('Mauritanie')
         # read_ven_producerprices()
-        update_mrt_wfp()
-        # update_mrt_prixmarche()
+        # update_mrt_wfp()
+        update_mrt_prixmarche()
         pass
