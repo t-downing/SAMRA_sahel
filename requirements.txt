@@ -31,7 +31,7 @@ cryptography==37.0.4
 cycler==0.11.0
 Cython==0.29.32
 daphne==2.5.0
-dash==2.8.1
+dash==2.5.1
 dash-bootstrap-components==0.13.1
 dash-core-components==2.0.0
 dash-cytoscape==0.3.0
