@@ -19,7 +19,9 @@ class Command(BaseCommand):
         #         count += 1
         #         eta = duration * (total - count)
         #         print(f"Progress: {round(count / total, 3)}; ETA: {round(eta)} s")
-        run_model([1, 2, 3], [1, 5], 1, 'Mauritanie')
+        # PROD FOURRAGE
+        # run_model([1, 2, 3], [2, 3, 12, 13], 1, 'Mauritanie')
+        run_model([1, 2, 3], [12 ,13], 1, 'Mauritanie')
         pass
 
 

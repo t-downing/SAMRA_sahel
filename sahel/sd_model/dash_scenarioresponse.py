@@ -6,7 +6,7 @@ from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario, ADMIN0S
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario, ADMIN0S, CURRENCY
 from sahel.sd_model.model_operations import run_model, timer, read_results
 
 import plotly.graph_objects as go
@@ -239,7 +239,7 @@ def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks):
     scatter_fig.update_layout(
         showlegend=True, title_text="Comparaison avec coûts",
     )
-    scatter_fig.update_xaxes(title_text="Coûts totaux CICR (FCFA)")
+    scatter_fig.update_xaxes(title_text=f"Coûts totaux CICR ({CURRENCY.get(adm0)})")
     scatter_fig.update_yaxes(title_text=f"{element.label} {agg_text} ({agg_unit})")
 
     # efficiency graph
@@ -263,7 +263,7 @@ def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks):
                           title_text=f"Rapport coût-efficacité contre {ResponseOption.objects.get(pk=baseline_response_pk)}"
                                      f" pour {element.label}",
                           )
-    y_title = "1" if agg_unit == "1000 FCFA" else f"{agg_unit} / {divider_text} FCFA"
+    y_title = "1" if agg_unit == f"1000 {CURRENCY.get(adm0)}" else f"{agg_unit} / {divider_text} {CURRENCY.get(adm0)}"
     eff_fig.update_yaxes(title_text=y_title)
     eff_fig.update_xaxes(ticklen=0, showline=False, tickfont_size=14)
     eff_fig.add_hline(y=0, line_width=1, line_color="black", opacity=1)

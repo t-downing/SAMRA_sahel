@@ -555,7 +555,7 @@ def show_layers(layers, colorbody_field, colorborder_field):
                  "background-opacity": "0",
                  "border-width": "0",
                  "text-opacity": "0",
-                 'line-width': '0',
+                 'width': '0',
              }},
         ])
     if "variable" not in layers:
@@ -1500,6 +1500,7 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
             ))
 
         # measured DPs
+        # TODO: disagg by admin2
         mdps = MeasuredDataPoint.objects.filter(element=variable, admin0=adm0)
         if admin1 is not None:
             mdps = mdps.filter(admin1=admin1)

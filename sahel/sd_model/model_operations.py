@@ -411,7 +411,7 @@ def read_results(adm0, element_pk, scenario_pks, response_pks, agg_value: str = 
         responseoption_id__in=response_pks_filter,
     ).values("responseoption_id", "scenario_id", "value",
              "responseoption__name", "scenario__name", "date"))
-    if "FCFA" in element.unit:
+    if "LCY" in element.unit:
         df["value"] /= 1000
         element.unit = "1000 " + element.unit
     # must be sorted by date last

@@ -13,8 +13,8 @@ class Command(BaseCommand):
         # df = pd.DataFrame(ForecastedDataPoint.objects.filter(admin0=admin0).values())
         # forecasted_pks = df['element_id'].unique()
         # print(forecasted_pks)
-        alimentation_pks = [248, 249, 250]
-        for variable in Variable.objects.filter(sd_type='Input', pk__in=alimentation_pks):
+        pks = [119]
+        for variable in Variable.objects.filter(sd_type='Input', pk__in=pks):
             forecast_element(variable.pk, admin0)
         # forecast_element(42, admin0)
 
