@@ -15,6 +15,7 @@ from django.db.models import Prefetch, Q
 import json
 from .translations import l
 
+LITE = True
 DEFAULT_SAMRAMODEL_PK = "1"
 DEFAULT_ADM0 = "Mauritanie"
 DEFAULT_STORY_PK = "1"
@@ -1226,6 +1227,8 @@ def draw_model(
 @timer
 def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, movement_allowed, samrammodel_pk):
     # TODO: admin1 and admin2 filtering on graph
+    # TODO: prefetch everything relevant to speed up
+    # TODO: add other constant types
     # INIT
     children = []
     if not selectednodedata or movement_allowed:
@@ -1451,33 +1454,34 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
                                 children=f"VARIABLE | {variable.get_sd_type_display()}"))
 
         # parent
-        children.append(
-            html.Div(className="mb-3", children=[
-                html.P(className="mb-1 mr-1 font-weight-bold d-inline", children="Élément:"),
-                dbc.ButtonGroup(className="mb-1", size="sm", children=[
-                    dbc.Button(
-                        id={"type": "select-node", "index": f"element_{variable.element_id}"},
-                        outline=True, color="secondary", children=variable.element.label,
-                    ),
-                    dbc.Button(
-                        id={"type": "remove-node",
-                            "index": f"element_{variable.element_id}-contains-variable_{variable.pk}"},
-                        outline=True, color="danger", children="x"
-                    )
+        if not LITE:
+            children.append(
+                html.Div(className="mb-3", children=[
+                    html.P(className="mb-1 mr-1 font-weight-bold d-inline", children="Élément:"),
+                    dbc.ButtonGroup(className="mb-1", size="sm", children=[
+                        dbc.Button(
+                            id={"type": "select-node", "index": f"element_{variable.element_id}"},
+                            outline=True, color="secondary", children=variable.element.label,
+                        ),
+                        dbc.Button(
+                            id={"type": "remove-node",
+                                "index": f"element_{variable.element_id}-contains-variable_{variable.pk}"},
+                            outline=True, color="danger", children="x"
+                        )
+                    ])
+                    if variable.element is not None else
+                    dbc.InputGroup(size="sm", children=[
+                        dbc.Select(
+                            id={"type": "parentchild-input", "index": "only_one"}, bs_size="sm",
+                            options=[{"label": element.label, "value": element.pk}
+                                     for element in Element.objects.all()],
+                        ),
+                        dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
+                            id={"type": "parentchild-submit", "index": f"child-variable_{variable.pk}"}, children="Saisir"
+                        ))
+                    ]),
                 ])
-                if variable.element is not None else
-                dbc.InputGroup(size="sm", children=[
-                    dbc.Select(
-                        id={"type": "parentchild-input", "index": "only_one"}, bs_size="sm",
-                        options=[{"label": element.label, "value": element.pk}
-                                 for element in Element.objects.all()],
-                    ),
-                    dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
-                        id={"type": "parentchild-submit", "index": f"child-variable_{variable.pk}"}, children="Saisir"
-                    ))
-                ]),
-            ])
-        )
+            )
 
         # graph
         fig = go.Figure(layout=go.Layout(template="simple_white", margin=go.layout.Margin(l=0, r=0, b=0, t=0)))
@@ -1526,61 +1530,65 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
 
         if variable.sd_type in ["Flow", "Variable"]:
             # connections
-            upstream_variables = Variable.objects.filter(downstream_connections__to_variable=variable)
-            upstream_list = dbc.ListGroup(
-                [
-                    dbc.ListGroupItem(className="p-1 justify-content-between", children=
-                    html.Div(className="d-flex justify-content-between", children=
+            if not LITE:
+                # upstream
+                upstream_variables = Variable.objects.filter(downstream_connections__to_variable=variable)
+                upstream_list = dbc.ListGroup(
                     [
-                        html.P(style={"font-size": "small"},
-                               children=f"{upstream_variable.label} _E{upstream_variable.pk}_"),
-                        dbc.Button("X",
-                                   id={"type": "element-detail-conn-del",
-                                       "index": f"{upstream_variable.pk}-to-{variable.pk}"},
-                                   size="sm",
-                                   color="danger",
-                                   className="p-1",
-                                   outline=True)
+                        dbc.ListGroupItem(className="p-1 justify-content-between", children=
+                        html.Div(className="d-flex justify-content-between", children=
+                        [
+                            html.P(style={"font-size": "small"},
+                                   children=f"{upstream_variable.label} _E{upstream_variable.pk}_"),
+                            dbc.Button("X",
+                                       id={"type": "element-detail-conn-del",
+                                           "index": f"{upstream_variable.pk}-to-{variable.pk}"},
+                                       size="sm",
+                                       color="danger",
+                                       className="p-1",
+                                       outline=True)
+                        ],
+
+                                 )
+                                          )
+                        for upstream_variable in upstream_variables
                     ],
-
-                             )
-                                      )
-                    for upstream_variable in upstream_variables
-                ],
-                flush=True,
-                style={"height": "150px", "overflow-y": "scroll"}
-            )
-
-            dropdown_options = Variable.objects.exclude(downstream_connections__to_variable=variable).exclude(
-                pk=variable.pk)
-            dropdown_list = [
-                {"label": possible_element.label, "value": possible_element.label}
-                for possible_element in dropdown_options
-            ]
-
-            upstream_card = dbc.Card(className="mb-2", children=[
-                dbc.CardHeader("Influencé par", className="p-1", style={"font-size": "small"}),
-                dbc.CardBody(
-                    [
-                        upstream_list,
-                        dbc.InputGroup(children=[
-                            dbc.Select(options=dropdown_list, id="element-detail-conn-input",
-                                       placeholder="Ajouter une influence", bs_size="sm"),
-                            dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-conn-submit", size="sm"),
-                                                addon_type="append")
-                        ]),
-                    ],
-                    style={"padding": "0px"},
+                    flush=True,
+                    style={"height": "150px", "overflow-y": "scroll"}
                 )
-            ])
-            children.append(upstream_card)
+
+                # downstream
+                dropdown_options = Variable.objects.exclude(downstream_connections__to_variable=variable).exclude(
+                    pk=variable.pk)
+                dropdown_list = [
+                    {"label": possible_element.label, "value": possible_element.label}
+                    for possible_element in dropdown_options
+                ]
+
+                upstream_card = dbc.Card(className="mb-2", children=[
+                    dbc.CardHeader("Influencé par", className="p-1", style={"font-size": "small"}),
+                    dbc.CardBody(
+                        [
+                            upstream_list,
+                            dbc.InputGroup(children=[
+                                dbc.Select(options=dropdown_list, id="element-detail-conn-input",
+                                           placeholder="Ajouter une influence", bs_size="sm"),
+                                dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-conn-submit", size="sm"),
+                                                    addon_type="append")
+                            ]),
+                        ],
+                        style={"padding": "0px"},
+                    )
+                ])
+                children.append(upstream_card)
 
             # equation
             equation_text = variable.equation
-            if equation_text is not None:
-                for key_element in Variable.objects.all():
-                    equation_text = equation_text.replace(f"_E{key_element.pk}_", key_element.label)
-                equation_text = f" = {equation_text}"
+            if not LITE:
+                if equation_text is not None:
+                    for key_element in Variable.objects.all():
+                        equation_text = equation_text.replace(f"_E{key_element.pk}_", key_element.label)
+                    equation_text = f" = {equation_text}"
 
             equation_card = dbc.Card([
                 dbc.CardHeader("Équation", className="p-1", style={"font-size": "small"}),
@@ -1600,83 +1608,86 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
             children.append(equation_card)
 
         elif variable.sd_type == "Stock":
-            # inflows
-            inflows_card = dbc.Card(className="mb-4", children=[
-                dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux intrants"),
-                dbc.CardBody(style={"padding": "0px"}, children=[
-                    dbc.ListGroup(
-                        [
-                            dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
-                                              style={"font-size": "small"}, children=[
-                                    inflow.label,
-                                    dbc.Button("X",
-                                               id={"type": "element-detail-inflow-del",
-                                                   "index": f"{variable.pk}-inflow-{inflow.pk}"},
-                                               size="sm", color="danger", className="p-1", outline=True)
-                                ])
-                            for inflow in variable.inflows.all()
-                        ],
-                        flush=True,
-                        style={"height": "100px", "overflow-y": "scroll"}
-                    ),
-                    dbc.InputGroup([
-                        dbc.Select(id="element-detail-inflow-input", bs_size="sm",
-                                   placeholder="Ajouter un flux entrant",
-                                   options=[
-                                       {"label": potential_inflow.label, "value": potential_inflow.pk}
-                                       for potential_inflow in Variable.objects.filter(sd_type="Flow")
-                                   .exclude(sd_sink__isnull=False).exclude(sd_source=variable)
-                                   ]),
-                        dbc.Button("Saisir", id="element-detail-inflow-submit", size="sm")
+            if not LITE:
+                # inflows
+                inflows_card = dbc.Card(className="mb-4", children=[
+                    dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux intrants"),
+                    dbc.CardBody(style={"padding": "0px"}, children=[
+                        dbc.ListGroup(
+                            [
+                                dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
+                                                  style={"font-size": "small"}, children=[
+                                        inflow.label,
+                                        dbc.Button("X",
+                                                   id={"type": "element-detail-inflow-del",
+                                                       "index": f"{variable.pk}-inflow-{inflow.pk}"},
+                                                   size="sm", color="danger", className="p-1", outline=True)
+                                    ])
+                                for inflow in variable.inflows.all()
+                            ],
+                            flush=True,
+                            style={"height": "100px", "overflow-y": "scroll"}
+                        ),
+                        dbc.InputGroup([
+                            dbc.Select(id="element-detail-inflow-input", bs_size="sm",
+                                       placeholder="Ajouter un flux entrant",
+                                       options=[
+                                           {"label": potential_inflow.label, "value": potential_inflow.pk}
+                                           for potential_inflow in Variable.objects.filter(sd_type="Flow")
+                                       .exclude(sd_sink__isnull=False).exclude(sd_source=variable)
+                                       ]),
+                            dbc.Button("Saisir", id="element-detail-inflow-submit", size="sm")
+                        ])
                     ])
                 ])
-            ])
-            children.append(inflows_card)
+                children.append(inflows_card)
 
-            outflows_card = dbc.Card(className="mb-4", children=[
-                dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux sortants"),
-                dbc.CardBody(style={"padding": "0px"}, children=[
-                    dbc.ListGroup(
-                        [
-                            dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
-                                              style={"font-size": "small"}, children=[
-                                    outflow.label,
-                                    dbc.Button("X",
-                                               id={"type": "element-detail-outflow-del",
-                                                   "index": f"{variable.pk}-outflow-{outflow.pk}"},
-                                               size="sm", color="danger", className="p-1", outline=True)
-                                ])
-                            for outflow in variable.outflows.all()
-                        ],
-                        flush=True,
-                        style={"height": "100px", "overflow-y": "scroll"}
-                    ),
-                    dbc.InputGroup([
-                        dbc.Select(id="element-detail-outflow-input", bs_size="sm",
-                                   placeholder="Ajouter un flux sortant",
-                                   options=[
-                                       {"label": potential_outflow.label, "value": potential_outflow.pk}
-                                       for potential_outflow in
-                                       Variable.objects.filter(sd_type="Flow").exclude(sd_sink=variable).exclude(
-                                           sd_source=variable)
-                                   ]),
-                        dbc.Button("Saisir", id="element-detail-outflow-submit", size="sm")
+                # outflows
+                outflows_card = dbc.Card(className="mb-4", children=[
+                    dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux sortants"),
+                    dbc.CardBody(style={"padding": "0px"}, children=[
+                        dbc.ListGroup(
+                            [
+                                dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
+                                                  style={"font-size": "small"}, children=[
+                                        outflow.label,
+                                        dbc.Button("X",
+                                                   id={"type": "element-detail-outflow-del",
+                                                       "index": f"{variable.pk}-outflow-{outflow.pk}"},
+                                                   size="sm", color="danger", className="p-1", outline=True)
+                                    ])
+                                for outflow in variable.outflows.all()
+                            ],
+                            flush=True,
+                            style={"height": "100px", "overflow-y": "scroll"}
+                        ),
+                        dbc.InputGroup([
+                            dbc.Select(id="element-detail-outflow-input", bs_size="sm",
+                                       placeholder="Ajouter un flux sortant",
+                                       options=[
+                                           {"label": potential_outflow.label, "value": potential_outflow.pk}
+                                           for potential_outflow in
+                                           Variable.objects.filter(sd_type="Flow").exclude(sd_sink=variable).exclude(
+                                               sd_source=variable)
+                                       ]),
+                            dbc.Button("Saisir", id="element-detail-outflow-submit", size="sm")
+                        ])
                     ])
                 ])
-            ])
-            children.append(outflows_card)
+                children.append(outflows_card)
 
         elif variable.sd_type == "Household Constant":
-            try:
-                value = variable.householdconstantvalues.get(admin0=adm0).value
-            except HouseholdConstantValue.DoesNotExist:
-                value = None
-            householdvalue_card = dbc.InputGroup([
-                dbc.InputGroupText("Value"),
-                dbc.Input(id="householdconstantvalue-input", value=value),
-                dbc.Button("Saisir", id="householdconstantvalue-submit")
-            ])
-            children.append(householdvalue_card)
+            if not LITE:
+                try:
+                    value = variable.householdconstantvalues.get(admin0=adm0).value
+                except HouseholdConstantValue.DoesNotExist:
+                    value = None
+                householdvalue_card = dbc.InputGroup([
+                    dbc.InputGroupText("Value"),
+                    dbc.Input(id="householdconstantvalue-input", value=value),
+                    dbc.Button("Saisir", id="householdconstantvalue-submit")
+                ])
+                children.append(householdvalue_card)
 
     if not children:
         return None

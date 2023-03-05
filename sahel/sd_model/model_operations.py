@@ -3,7 +3,7 @@ import pandas as pd
 from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
 from ..models import Variable, SimulatedDataPoint, MeasuredDataPoint, ResponseConstantValue, ResponseOption, \
-    SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue
+    SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue, PulseValue
 from datetime import datetime, date
 import time, functools, warnings
 from django.conf import settings
@@ -17,8 +17,8 @@ DAYS_IN_MONTH = 30.437
 
 
 def run_model(
-        scenario_pk: int,
-        responseoption_pk: int,
+        scenario_pks: list[int],
+        response_pks: list[int],
         samramodel_pk: int,
         adm0: str,
         adm1: str = None,
@@ -67,18 +67,10 @@ def run_model(
             model_locals.update({f'_E{element.pk}_': model.stock(pk)})
         elif element.sd_type in ["Constant", "Household Constant", "Scenario Constant"]:
             model_locals.update({f'_E{element.pk}_': model.constant(pk)})
+            # TODO: remove below line somehow
             model.constant(pk).equation = element.constant_default_value
         elif element.sd_type == "Pulse Input":
             model_locals.update({f'_E{element.pk}_': model.converter(pk)})
-            pulsevalues = element.pulsevalues.filter(responseoption_id=responseoption_pk)
-            if pulsevalues is None:
-                continue
-            model.converter(pk).equation = 0.0
-            for pulsevalue in pulsevalues:
-                pulse_start_ord = (pulsevalue.startdate - pd.DateOffset(days=15)).toordinal()
-                pulse_stop_ord = (pulsevalue.startdate + pd.DateOffset(days=15)).toordinal()
-                model.converter(pk).equation += sd.If(
-                    sd.And(sd.time() > pulse_start_ord, sd.time() < pulse_stop_ord), pulsevalue.value, 0.0)
     stop = time.time()
     print(f"set up elements took {stop - start} s")
     start = time.time()
@@ -220,10 +212,10 @@ def run_model(
     # set constant values
     constants_values = {}
     response_cv_df = pd.DataFrame(ResponseConstantValue.objects.filter(admin0=adm0).values())
+    response_pv_df = pd.DataFrame(PulseValue.objects.filter(admin0=adm0).values())
     scenario_cv_df = pd.DataFrame(ScenarioConstantValue.objects.filter().values())
     household_cv_df = pd.DataFrame(HouseholdConstantValue.objects.filter(admin0=adm0).values())
-    response_pks = [responseoption_pk]
-    scenario_pks = [scenario_pk]
+    print(f"{response_pv_df=}")
 
     household_constants = {}
     if not household_cv_df.empty:
@@ -233,6 +225,7 @@ def run_model(
         })
 
     for scenario_pk in scenario_pks:
+        print(f"SETTING UP SCENARIO {scenario_pk}")
         scenario_constants = {}
         if not scenario_cv_df.empty:
             scenario_cv_dff = scenario_cv_df[scenario_cv_df['scenario_id'] == scenario_pk]
@@ -242,6 +235,7 @@ def run_model(
                     for row in scenario_cv_dff.itertuples()
                 })
         for responseoption_pk in response_pks:
+            print(f"SETTING UP RESPONSE {responseoption_pk}")
             response_constants = {}
             if not response_cv_df.empty:
                 response_cv_dff = response_cv_df[response_cv_df['responseoption_id'] == responseoption_pk]
@@ -251,13 +245,32 @@ def run_model(
                         for row in response_cv_dff.itertuples()
                     })
 
-            # check that constants are all there
+            response_pv_dff = pd.DataFrame()
+            if not response_pv_df.empty:
+                response_pv_dff = response_pv_df[response_pv_df['responseoption_id'] == responseoption_pk]
+            print(f"{response_pv_dff=}")
+            # check that constants are all there and set pulses
             constants = household_constants | scenario_constants | response_constants
             for element in elements:
+                pk = str(element.pk)
                 if element.sd_type in Variable.CONSTANTS:
-                    if str(element.pk) not in constants:
+                    if pk not in constants:
                         print(f"couldn't find constant for {element}, setting to 0.0")
-                        household_constants.update({str(element.pk): 0.0})
+                        household_constants.update({pk: 0.0})
+                elif element.sd_type == Variable.RESPONSE_PULSE:
+                    model.converter(pk).equation = 0.0
+                    if not response_pv_dff.empty:
+                        response_pv_dfff = response_pv_dff[response_pv_dff['element_id'] == int(pk)]
+                        print(f"{response_pv_dfff=}")
+                        for row in response_pv_dfff.itertuples():
+                            pulse_start_ord = (row.startdate - pd.DateOffset(days=15)).toordinal()
+                            pulse_stop_ord = (row.startdate + pd.DateOffset(days=15)).toordinal()
+                            model.converter(pk).equation += sd.If(
+                                sd.And(sd.time() > pulse_start_ord, sd.time() < pulse_stop_ord), row.value, 0.0
+                            )
+                    else:
+                        print(f"couldn't find pulses for {element}, setting to 0.0")
+
             stop = time.time()
             print(f"setup constants took {stop - start} s")
             start = time.time()
@@ -270,7 +283,7 @@ def run_model(
 
             # run model
             # for purposes of running bptk, just set scenario to "base"
-            # TODO: loop over scenarios and responses here with bptk constants instead of outside function
+            # TODO: loop over admin0s and/or HH types
             bptk_scenario = "base"
             model_env.register_scenarios(scenarios={bptk_scenario: {"constants": constants}},
                                          scenario_manager="scenario_manager")
@@ -345,6 +358,7 @@ def run_model(
                     cursor.execute(insert_stmt, data)
 
                 print(f"SQL bulk delete and insert took {time.time() - start} s")
+                start = time.time()
 
     return None
 
