@@ -9,7 +9,6 @@ from .model_operations import timer
 import time
 import pandas as pd
 import plotly.graph_objects as go
-from pprint import pprint
 from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
 from django.db.models import Prefetch, Q
 import json

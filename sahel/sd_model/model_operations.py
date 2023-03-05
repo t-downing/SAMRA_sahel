@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
@@ -6,8 +5,6 @@ from ..models import Variable, SimulatedDataPoint, MeasuredDataPoint, ResponseCo
     SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue, PulseValue
 from datetime import datetime, date
 import time, functools, warnings
-from django.conf import settings
-from sqlalchemy import create_engine
 from django.db.models import Q
 from django.db import connection
 from contextlib import closing
