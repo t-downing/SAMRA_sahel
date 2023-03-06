@@ -74,6 +74,7 @@ class Element(Node):
     kumu_id = models.CharField(max_length=100, null=True, blank=True)
 
 
+# TODO: check if used and delete if needed
 class Region(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -269,10 +270,14 @@ class Variable(Node):
     sim_input_var = models.BooleanField(default=False)
     unit = models.CharField(max_length=100, null=True, choices=UNIT_OPTIONS)
     sd_type = models.CharField(max_length=100, choices=SD_TYPES, null=True)
-    sd_source = models.ForeignKey("self", related_name="outflows", null=True, blank=True, on_delete=models.SET_NULL)
-    sd_sink = models.ForeignKey("self", related_name="inflows", null=True, blank=True, on_delete=models.SET_NULL)
-    # element_group = models.ForeignKey("elementgroup", related_name="variables", null=True, blank=True,
-    #                                   on_delete=models.SET_NULL)
+    sd_source = models.ForeignKey(
+        "self", related_name="outflows", null=True, blank=True, on_delete=models.SET_NULL,
+        limit_choices_to={'sd_type': STOCK}
+    )
+    sd_sink = models.ForeignKey(
+        "self", related_name="inflows", null=True, blank=True, on_delete=models.SET_NULL,
+        limit_choices_to={'sd_type': STOCK}
+    )
     vam_commodity = models.CharField(max_length=200, null=True, blank=True)
     mid_threshold = models.FloatField(null=True, blank=True)
     high_threshold = models.FloatField(null=True, blank=True)
@@ -287,7 +292,9 @@ class Variable(Node):
     dm_globalform_field_highvalue = models.CharField(max_length=200, null=True, blank=True)
     dm_globalform_field_midvalue = models.CharField(max_length=200, null=True, blank=True)
     dm_globalform_field_lowvalue = models.CharField(max_length=200, null=True, blank=True)
-    source_for_model = models.ForeignKey("source", related_name="model_element_uses", null=True, blank=True, on_delete=models.SET_NULL)
+    source_for_model = models.ForeignKey(
+        "source", related_name="model_element_uses", null=True, blank=True, on_delete=models.SET_NULL
+    )
     kcal_per_kg = models.IntegerField(null=True, blank=True)
     model_output_variable = models.BooleanField(default=True)
     stock_initial_value = models.FloatField(null=True, blank=True)
