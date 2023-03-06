@@ -1528,6 +1528,7 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
         fig_div = dcc.Graph(figure=fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2")
         children.append(fig_div)
 
+        # TODO: show seasonal values
         if variable.sd_type in ["Flow", "Variable"]:
             # connections
             if not LITE:

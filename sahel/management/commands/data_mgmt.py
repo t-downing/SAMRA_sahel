@@ -7,11 +7,16 @@ import pandas as pd
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        pks = [248, 249, 250]
-        mdps = MeasuredDataPoint.objects.filter(pk__in=pks)
-        for mdp in mdps:
-            value = mdp.value / 50
-
+        sdps = SeasonalInputDataPoint.objects.all()
+        objs = []
+        for sdp in sdps:
+            objs.append(SeasonalInputDataPoint(
+                value=sdp.value,
+                date=sdp.date,
+                admin0='Mauritanie',
+                element_id=sdp.element_id
+            ))
+        # SeasonalInputDataPoint.objects.bulk_create(objs)
         pass
 
 

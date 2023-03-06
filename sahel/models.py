@@ -449,6 +449,9 @@ class ForecastedDataPoint(models.Model):
 class SeasonalInputDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField()
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
+    admin1 = models.CharField(max_length=200, null=True, blank=True)
+    admin2 = models.CharField(max_length=200, null=True, blank=True)
     element = models.ForeignKey(
         "variable", related_name="seasonalinputdatapoints", on_delete=models.CASCADE,
         limit_choices_to={'sd_type': Variable.SEASONAL_INPUT}

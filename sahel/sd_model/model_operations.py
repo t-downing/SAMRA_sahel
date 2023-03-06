@@ -123,14 +123,18 @@ def run_model(
     # read inputs
     mdps = MeasuredDataPoint.objects.filter(date__gte=startdate, date__lte=enddate, admin0=adm0)
     fdps = ForecastedDataPoint.objects.filter(date__gte=startdate, date__lte=enddate, admin0=adm0)
+    sdps = SeasonalInputDataPoint.objects.filter(admin0=adm0)
     if adm1 is not None:
         mdps = mdps.filter(admin1=adm1)
         fdps = fdps.filter(admin1=adm1)
+        sdps = sdps.filter(admin1=adm1)
         if adm2 is not None:
             mdps = mdps.filter(admin2=adm2)
             fdps = fdps.filter(admin2=adm2)
+            sdps = sdps.filter(admin2=adm2)
     df_m_all = pd.DataFrame(mdps.values())
     df_f_all = pd.DataFrame(fdps.values())
+    df_s_all = pd.DataFrame(sdps.values())
 
     m_time = 0.0
     f_time = 0.0
@@ -165,7 +169,9 @@ def run_model(
                         model.converter(pk).equation = default_value
                         continue
                 else:
-                    df = pd.DataFrame(SeasonalInputDataPoint.objects.filter(element=element).values())
+                    df = pd.DataFrame()
+                    if not df_s_all.empty:
+                        df = df_s_all[df_s_all['element_id'] == int(pk)]
                     if df.empty:
                         model.converter(str(element.pk)).equation = 1.0
                         print(f"couldn't find seasonal values for {element}, setting eq to 1.0")
@@ -173,7 +179,7 @@ def run_model(
                     df["date"] = pd.to_datetime(df["date"])
                     df["month"] = df["date"].dt.month
                     df["day"] = df["date"].dt.day
-                    df = df.drop(columns=["date", "element_id", "id"])
+                    df = df[['month', 'day', 'value']]
                     for yearnum in range(startdate.year - 1, enddate.year + 2):
                         df[f"year_{yearnum}"] = yearnum
                     df = pd.melt(df, id_vars=["value", "month", "day"], value_name="year")
