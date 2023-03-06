@@ -26,6 +26,10 @@ def run_model(
 ):
     start = time.time()
 
+    scenario_pks = [int(pk) for pk in scenario_pks]
+    response_pks = [int(pk) for pk in response_pks]
+    samramodel_pk = int(samramodel_pk)
+
     model = Model(starttime=startdate.toordinal(), stoptime=enddate.toordinal(), dt=timestep)
     zero_flow = model.flow("Zero Flow")
     zero_flow.equation = 0.0

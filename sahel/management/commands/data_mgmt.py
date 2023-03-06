@@ -7,16 +7,9 @@ import pandas as pd
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        sdps = SeasonalInputDataPoint.objects.all()
-        objs = []
-        for sdp in sdps:
-            objs.append(SeasonalInputDataPoint(
-                value=sdp.value,
-                date=sdp.date,
-                admin0='Mauritanie',
-                element_id=sdp.element_id
-            ))
-        # SeasonalInputDataPoint.objects.bulk_create(objs)
+
+        print(Variable.objects.filter(pk__in=[175, 77, 193, 13, 160]))
+
         pass
 
 

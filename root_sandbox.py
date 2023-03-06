@@ -1,7 +1,1 @@
-import time
-
-start = time.time()
-
-n = 1000
-for i in range(n):
-    pass
+print([int(str) for str in [1, 2]])

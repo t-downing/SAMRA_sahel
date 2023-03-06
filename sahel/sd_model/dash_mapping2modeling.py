@@ -5,7 +5,7 @@ from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import *
-from .model_operations import timer
+from sahel.sd_model.model_operations import timer, run_model
 import time
 import pandas as pd
 import plotly.graph_objects as go
@@ -39,10 +39,10 @@ app.layout = html.Div(children=[
     # (cannot click through divs in Dash for some reason, z-index not working either)
     html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute", "width": "200px"}, children=[
         # samramodel
-        dbc.Select(id="samramodel-input", className=""),
-        dbc.Select(id="adm0-input", className="", bs_size="sm"),
-        dbc.Select(id="adm1-input", className="", bs_size="sm"),
-        dbc.Select(id="adm2-input", className="mb-3", bs_size="sm"),
+        dbc.Select(id=(SAMRAMODEL_INPUT := "samramodel-input"), className=""),
+        dbc.Select(id=(ADM0_INPUT := "adm0-input"), className="", bs_size="sm"),
+        dbc.Select(id=(ADM1_INPUT := "adm1-input"), className="", bs_size="sm"),
+        dbc.Select(id=(ADM2_INPUT := "adm2-input"), className="mb-3", bs_size="sm"),
 
         # layers
         dbc.Card(className="mb-3", children=[
@@ -66,8 +66,11 @@ app.layout = html.Div(children=[
         # mapping / modeling tabs
         dbc.Tabs([
             dbc.Tab(label='Modeling', children=[
-                dbc.Select(id="scenario-input", placeholder="Scénario", className="mb-2"),
-                dbc.Select(id="responseoption-input", placeholder="Réponse", className="mb-2"),
+                dbc.Select(id=(SCENARIO_INPUT := "scenario-input"), placeholder="Scénario", className="mb-2"),
+                dbc.Select(id=(RESPONSE_INPUT := "responseoption-input"), placeholder="Réponse", className="mb-2"),
+                dbc.Button(
+                    id=(RUN_SUBMIT := 'run-submit'), children="Exécuter modèle", className="mb-2", size='sm', color='primary',
+                ),
             ]),
             dbc.Tab(label='Mapping', children=[
                 # colors
@@ -204,6 +207,7 @@ app.layout = html.Div(children=[
 
     # READOUTS
     html.P(id="current-story", hidden=True, children="init"),
+    html.P(id=(RUN_READOUT := 'run-readout'), hidden=True),
     # store contains positions of elements BEFORE being moved around, and is None if not moving elements around
     dcc.Store(id="store"),
 ])
@@ -228,8 +232,8 @@ def populate_initial(_):
 
     # samramodel
     samramodel_options = [
-        {"value": model.pk, "label": model.name}
-        for model in SamraModel.objects.all()
+        {"value": model.get('id'), "label": model.get('name')}
+        for model in SamraModel.objects.all().values()
     ]
     samramodel_value = DEFAULT_SAMRAMODEL_PK
 
@@ -255,15 +259,15 @@ def adm0_scenarioresponse_input(samramodel_pk):
             for adm0 in ADMIN0S
         ]
         scenario_options = [
-            {'value': scenario.pk, 'label': scenario.name}
-            for scenario in Scenario.objects.filter(samramodel_id=samramodel_pk)
+            {'value': scenario.get('id'), 'label': scenario.get('name')}
+            for scenario in Scenario.objects.filter(samramodel_id=samramodel_pk).values()
         ]
         scenario_value = scenario_options[0].get('value')
         response_options = [
-            {'value': response.pk, 'label': response.name}
-            for response in ResponseOption.objects.filter(samramodel_id=samramodel_pk)
+            {'value': response.get('id'), 'label': response.get('name')}
+            for response in ResponseOption.objects.filter(samramodel_id=samramodel_pk).values()
         ]
-        response_value = 1
+        response_value = '1'
         return (
             sahel_adm0s, DEFAULT_ADM0, False,
             scenario_options, scenario_value, False,
@@ -513,6 +517,21 @@ def add_eb_elements(samramodel_pk):
     ]
     print(f"{source_options}")
     return element_options, source_options
+
+
+@app.callback(
+    Output(RUN_READOUT, 'children'),
+    Input(RUN_SUBMIT, 'n_clicks'),
+    State(SAMRAMODEL_INPUT, 'value'),
+    State(ADM0_INPUT, 'value'),
+    State(SCENARIO_INPUT, 'value'),
+    State(RESPONSE_INPUT, 'value'),
+)
+def run_model_from_dash(n_clicks, samramodel_pk, adm0, scenario_pk, response_pk):
+    if n_clicks is None:
+        raise PreventUpdate
+    run_model([scenario_pk], [response_pk], samramodel_pk, adm0)
+    return f"ran model for scenario {scenario_pk}, response {response_pk}, model {samramodel_pk}, admin0 {adm0}"
 
 
 @app.callback(
