@@ -6,16 +6,16 @@ import pandas as pd
 
 
 class Command(BaseCommand):
-    def handle(self, *args, **options):
-        admin0 = 'Mauritanie'
-        # 42 - prix de bovin
-        # 169 - pluv réel
-        # df = pd.DataFrame(ForecastedDataPoint.objects.filter(admin0=admin0).values())
-        # forecasted_pks = df['element_id'].unique()
-        # print(forecasted_pks)
-        pks = [119]
-        for variable in Variable.objects.filter(sd_type='Input', pk__in=pks):
-            forecast_element(variable.pk, admin0)
-        # forecast_element(42, admin0)
+    help = 'Updates forecasts for given variable'
 
-        pass
+    def add_arguments(self, parser):
+        parser.add_argument('-e', '--variablepks', nargs='+', type=int, help="variable pks to be forecasted")
+        parser.add_argument('-a', '--admin0', nargs='?', type=str, help="admin0 to be forecasted")
+
+    def handle(self, *args, **options):
+        variable_pks = options['variablepks']
+        admin0 = options['admin0'] if options['admin0'] is not None else 'Mauritanie'
+        if variable_pks is not None:
+            for variable_pk in variable_pks:
+                forecast_element(variable_pk, admin0)
+        return

@@ -430,8 +430,6 @@ def update_dm_phm_bkn_maraichange():
     HouseholdConstantValue.objects.bulk_create(objs)
 
 
-
-
 # other 3rd party
 def update_acled():
     source = Source.objects.get(pk=6)

@@ -2,7 +2,7 @@ import pandas as pd
 from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
 from ..models import Variable, SimulatedDataPoint, MeasuredDataPoint, ResponseConstantValue, ResponseOption, \
-    SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue, PulseValue
+    SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue, PulseValue, ADMIN0S
 from datetime import datetime, date
 import time, functools, warnings
 from django.db.models import Q
@@ -24,6 +24,10 @@ def run_model(
         enddate: date = date(2024, 7, 1),
         timestep: int = 2,
 ):
+    if adm0 not in ADMIN0S:
+        print("invalid admin0")
+        return
+
     start = time.time()
 
     scenario_pks = [int(pk) for pk in scenario_pks]

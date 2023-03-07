@@ -21,6 +21,7 @@ def forecast_element(element_pk, adm0, sarima_params=None):
     print(f"forecasting for {variable} now")
 
     # determine correct periodicity
+    # TODO: deal with periodicity for non-seasonal data sources
     if variable.source_for_model is not None:
         df = df[df["source_id"] == variable.source_for_model.pk]
         number_of_periods = variable.source_for_model.number_of_periods
@@ -93,6 +94,9 @@ def forecast_element(element_pk, adm0, sarima_params=None):
         print(message)
 
         dateoffset = pd.DateOffset(months=2 if period == "QS" else 0, days=14 if period in ["QS", "MS"] else 10)
+
+        if 'pi_upper' not in forecast_points.columns:
+            forecast_points = forecast_points.rename(columns={'mean_ci_upper': 'pi_upper', 'mean_ci_lower': 'pi_lower'})
 
         # record and re-shift forward to 15th of month
         objs += [
