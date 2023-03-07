@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Variable, ConstantValue, PulseValue
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, ResponseConstantValue, PulseValue
 
 from sahel.sd_model.model_operations import run_model, timer
 
@@ -136,7 +136,7 @@ def create_constantvalue(n_clicks, element_pk, value, date, response_pk):
         raise PreventUpdate
     element = Variable.objects.get(pk=element_pk)
     if element.sd_type == "Constant":
-        ConstantValue(responseoption_id=response_pk, element_id=element_pk, value=value).save()
+        ResponseConstantValue(responseoption_id=response_pk, element_id=element_pk, value=value).save()
     elif element.sd_type == "Pulse Input":
         print(date)
         PulseValue(responseoption_id=response_pk, element_id=element_pk, value=value, startdate=date).save()
@@ -152,7 +152,7 @@ def create_constantvalue(n_clicks, element_pk, value, date, response_pk):
 def delete_constantvalue(n_clicks, ids):
     for n_click, id in zip(n_clicks, ids):
         if n_click is not None:
-            constantvalue = ConstantValue.objects.get(pk=id.get("index"))
+            constantvalue = ResponseConstantValue.objects.get(pk=id.get("index"))
             constantvalue.delete()
             run_model(responseoption_pk=constantvalue.responseoption.pk)
             return f"{id} deleted, RERUN MODEL"
@@ -184,7 +184,7 @@ def change_constantvalue(n_clicks, ids, values):
     for n_click, id, value in zip(n_clicks, ids, values):
         if n_click is not None:
             if value is not None:
-                constantvalue = ConstantValue.objects.get(pk=id.get("index"))
+                constantvalue = ResponseConstantValue.objects.get(pk=id.get("index"))
                 constantvalue.value = value
                 constantvalue.save()
                 run_model(responseoption_pk=constantvalue.responseoption.pk)

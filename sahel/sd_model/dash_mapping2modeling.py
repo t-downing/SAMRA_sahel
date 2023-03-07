@@ -5,20 +5,27 @@ from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 from sahel.models import *
-from .model_operations import timer
+from sahel.sd_model.model_operations import timer, run_model
 import time
 import pandas as pd
 import plotly.graph_objects as go
-from pprint import pprint
 from .mapping_styles import stylesheet, fieldvalue2color, partname2cytokey
 from django.db.models import Prefetch, Q
 import json
 from .translations import l
 
-DEFAULT_SAMRAMODEL_PK = "2"
+LITE = True
+DEFAULT_SAMRAMODEL_PK = "1"
+DEFAULT_ADM0 = "Mauritanie"
 DEFAULT_STORY_PK = "1"
-DEFAULT_LAYERS = ["element", "variable"]
+DEFAULT_LAYERS = [
+    'group',
+    # 'element',
+    'variable',
+]
 LANG = "EN"
+MALI_ADM1S = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
+MRT_ADM1S = ['Hodh Ech Chargi']
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -32,7 +39,10 @@ app.layout = html.Div(children=[
     # (cannot click through divs in Dash for some reason, z-index not working either)
     html.Div(id="left-sidebar", className="mt-4 ml-4", style={"position": "absolute", "width": "200px"}, children=[
         # samramodel
-        dbc.Select(id="samramodel-input", className="mb-3"),
+        dbc.Select(id=(SAMRAMODEL_INPUT := "samramodel-input"), className=""),
+        dbc.Select(id=(ADM0_INPUT := "adm0-input"), className="", bs_size="sm"),
+        dbc.Select(id=(ADM1_INPUT := "adm1-input"), className="", bs_size="sm"),
+        dbc.Select(id=(ADM2_INPUT := "adm2-input"), className="mb-3", bs_size="sm"),
 
         # layers
         dbc.Card(className="mb-3", children=[
@@ -53,34 +63,45 @@ app.layout = html.Div(children=[
             ])
         ]),
 
-        # colors
-        dbc.Card(className="mb-3", children=[
-            dbc.CardBody(className="p-2", children=[
-                html.P(className="mb-1", children="Couleurs"),
-                *[
-                    dbc.InputGroup(className="mt-1", size="sm", children=[
-                        dbc.InputGroupAddon(addon_type="prepend", children=part.capitalize()),
-                        dbc.Select(id=f"color{part}-input")
+        # mapping / modeling tabs
+        dbc.Tabs([
+            dbc.Tab(label='Modeling', children=[
+                dbc.Select(id=(SCENARIO_INPUT := "scenario-input"), placeholder="Scénario", className="mb-2"),
+                dbc.Select(id=(RESPONSE_INPUT := "responseoption-input"), placeholder="Réponse", className="mb-2"),
+                dbc.Button(
+                    id=(RUN_SUBMIT := 'run-submit'), children="Exécuter modèle", className="mb-2", size='sm', color='primary',
+                ),
+            ]),
+            dbc.Tab(label='Mapping', children=[
+                # colors
+                dbc.Card(className="mb-3", children=[
+                    dbc.CardBody(className="p-2", children=[
+                        html.P(className="mb-1", children="Couleurs"),
+                        *[
+                            dbc.InputGroup(className="mt-1", size="sm", children=[
+                                dbc.InputGroupAddon(addon_type="prepend", children=part.capitalize()),
+                                dbc.Select(id=f"color{part}-input")
+                            ])
+                            for part in ["body", "border"]
+                        ],
                     ])
-                    for part in ["body", "border"]
-                ],
-            ])
-        ]),
+                ]),
 
-        # storylines
-        dbc.Card(className="mb-3", children=[
-            dbc.CardBody(className="p-2", children=[
-                html.P(className="mb-1", children="Histoires"),
-                dbc.Select(id="story-input", className="mb-1", bs_size="sm"),
-            ])
-        ]),
+                # storylines
+                dbc.Card(className="mb-3", children=[
+                    dbc.CardBody(className="p-2", children=[
+                        html.P(className="mb-1", children="Histoires"),
+                        dbc.Select(id="story-input", className="mb-1", bs_size="sm"),
+                    ])
+                ]),
 
+                dbc.Button(className="mb-3", id="add-eb-open", children="Add an EB", size="sm", color="primary"),
+            ]),
+        ]),
         # other
         dbc.Button(className="mb-3", id="download-submit", children="Télécharger SVG", size="sm", color="primary"),
         html.Br(),
         dbc.Button(className="mb-3", id="add-node-open", children="Ajouter un objet", size="sm", color="primary"),
-        html.Br(),
-        dbc.Button(className="mb-3", id="add-eb-open", children="Add an EB", size="sm", color="primary"),
         html.Br(),
         dbc.FormGroup([
             dbc.Checklist(id="allow-movement-switch",
@@ -186,6 +207,7 @@ app.layout = html.Div(children=[
 
     # READOUTS
     html.P(id="current-story", hidden=True, children="init"),
+    html.P(id=(RUN_READOUT := 'run-readout'), hidden=True),
     # store contains positions of elements BEFORE being moved around, and is None if not moving elements around
     dcc.Store(id="store"),
 ])
@@ -210,12 +232,87 @@ def populate_initial(_):
 
     # samramodel
     samramodel_options = [
-        {"value": model.pk, "label": model.name}
-        for model in SamraModel.objects.all()
+        {"value": model.get('id'), "label": model.get('name')}
+        for model in SamraModel.objects.all().values()
     ]
     samramodel_value = DEFAULT_SAMRAMODEL_PK
 
     return color_options, color_value, color_options, color_value, samramodel_options, samramodel_value
+
+
+@app.callback(
+    Output("adm0-input", "options"),
+    Output("adm0-input", "value"),
+    Output("adm0-input", "disabled"),
+    Output("scenario-input", "options"),
+    Output("scenario-input", "value"),
+    Output("scenario-input", "disabled"),
+    Output("responseoption-input", "options"),
+    Output("responseoption-input", "value"),
+    Output("responseoption-input", "disabled"),
+    Input("samramodel-input", "value")
+)
+def adm0_scenarioresponse_input(samramodel_pk):
+    if samramodel_pk == "1":
+        sahel_adm0s = [
+            {'value': adm0, 'label': adm0}
+            for adm0 in ADMIN0S
+        ]
+        scenario_options = [
+            {'value': scenario.get('id'), 'label': scenario.get('name')}
+            for scenario in Scenario.objects.filter(samramodel_id=samramodel_pk).values()
+        ]
+        scenario_value = scenario_options[0].get('value')
+        response_options = [
+            {'value': response.get('id'), 'label': response.get('name')}
+            for response in ResponseOption.objects.filter(samramodel_id=samramodel_pk).values()
+        ]
+        response_value = '1'
+        return (
+            sahel_adm0s, DEFAULT_ADM0, False,
+            scenario_options, scenario_value, False,
+            response_options, response_value, False,
+        )
+    else:
+        return None, None, True, \
+               None, None, True, \
+               None, None, True
+
+
+@app.callback(
+    Output("adm1-input", "options"),
+    Output("adm1-input", "value"),
+    Output("adm1-input", "disabled"),
+    Input("adm0-input", "value")
+)
+def adm1_input(adm0_input):
+    mali_adm1s = [
+        {'value': adm1, 'label': adm1}
+        for adm1 in MALI_ADM1S
+    ]
+    mrt_adm1s = [
+        {'value': adm1, 'label': adm1}
+        for adm1 in MRT_ADM1S
+    ]
+    if adm0_input == "Mali":
+        return mali_adm1s, None, False
+    elif adm0_input == "Mauritanie":
+        return mrt_adm1s, 'Hodh Ech Chargi', False
+    else:
+        return None, None, True
+
+
+@app.callback(
+    Output("adm2-input", "options"),
+    Output("adm2-input", "value"),
+    Output("adm2-input", "disabled"),
+    Input("adm1-input", "value")
+)
+def adm2_input(adm1_input):
+    if adm1_input == "Hodh Ech Chargi":
+        return [{'value': 'Bassikounou', 'label': 'Bassikounou'}], 'Bassikounou', False
+    else:
+        return None, None, True
 
 
 @app.callback(
@@ -423,6 +520,21 @@ def add_eb_elements(samramodel_pk):
 
 
 @app.callback(
+    Output(RUN_READOUT, 'children'),
+    Input(RUN_SUBMIT, 'n_clicks'),
+    State(SAMRAMODEL_INPUT, 'value'),
+    State(ADM0_INPUT, 'value'),
+    State(SCENARIO_INPUT, 'value'),
+    State(RESPONSE_INPUT, 'value'),
+)
+def run_model_from_dash(n_clicks, samramodel_pk, adm0, scenario_pk, response_pk):
+    if n_clicks is None:
+        raise PreventUpdate
+    run_model([scenario_pk], [response_pk], samramodel_pk, adm0)
+    return f"ran model for scenario {scenario_pk}, response {response_pk}, model {samramodel_pk}, admin0 {adm0}"
+
+
+@app.callback(
     Output("cyto", "generateImage"),
     Input("download-submit", "n_clicks"),
 )
@@ -444,7 +556,6 @@ def download_svg(n_clicks):
 def show_layers(layers, colorbody_field, colorborder_field):
     # LAYERS
     layers.sort()
-    print(layers)
     added_stylesheet = []
     if "group" not in layers:
         added_stylesheet.extend([
@@ -462,6 +573,7 @@ def show_layers(layers, colorbody_field, colorborder_field):
                  "background-opacity": "0",
                  "border-width": "0",
                  "text-opacity": "0",
+                 'width': '0',
              }},
         ])
     if "variable" not in layers:
@@ -1124,18 +1236,22 @@ def draw_model(
     Output("right-sidebar", "children"),
     Input("cyto", "selectedNodeData"),
     Input("cyto", "elements"),
+    Input("adm0-input", "value"),
+    Input('scenario-input', 'value'),
+    Input('responseoption-input', 'value'),
     State("allow-movement-switch", "value"),
     State("samramodel-input", "value")
 )
 @timer
-def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
+def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, movement_allowed, samrammodel_pk):
+    # TODO: admin1 and admin2 filtering on graph
+    # TODO: prefetch everything relevant to speed up
+    # TODO: add other constant types
     # INIT
     children = []
     if not selectednodedata or movement_allowed:
         return children
     nodedata = selectednodedata[-1]
-    scenario_pk = "1"
-    responseoption_pk = "1"
     admin1 = None
 
     # GROUP
@@ -1356,40 +1472,43 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
                                 children=f"VARIABLE | {variable.get_sd_type_display()}"))
 
         # parent
-        children.append(
-            html.Div(className="mb-3", children=[
-                html.P(className="mb-1 mr-1 font-weight-bold d-inline", children="Élément:"),
-                dbc.ButtonGroup(className="mb-1", size="sm", children=[
-                    dbc.Button(
-                        id={"type": "select-node", "index": f"element_{variable.element_id}"},
-                        outline=True, color="secondary", children=variable.element.label,
-                    ),
-                    dbc.Button(
-                        id={"type": "remove-node",
-                            "index": f"element_{variable.element_id}-contains-variable_{variable.pk}"},
-                        outline=True, color="danger", children="x"
-                    )
+        if not LITE:
+            children.append(
+                html.Div(className="mb-3", children=[
+                    html.P(className="mb-1 mr-1 font-weight-bold d-inline", children="Élément:"),
+                    dbc.ButtonGroup(className="mb-1", size="sm", children=[
+                        dbc.Button(
+                            id={"type": "select-node", "index": f"element_{variable.element_id}"},
+                            outline=True, color="secondary", children=variable.element.label,
+                        ),
+                        dbc.Button(
+                            id={"type": "remove-node",
+                                "index": f"element_{variable.element_id}-contains-variable_{variable.pk}"},
+                            outline=True, color="danger", children="x"
+                        )
+                    ])
+                    if variable.element is not None else
+                    dbc.InputGroup(size="sm", children=[
+                        dbc.Select(
+                            id={"type": "parentchild-input", "index": "only_one"}, bs_size="sm",
+                            options=[{"label": element.label, "value": element.pk}
+                                     for element in Element.objects.all()],
+                        ),
+                        dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
+                            id={"type": "parentchild-submit", "index": f"child-variable_{variable.pk}"}, children="Saisir"
+                        ))
+                    ]),
                 ])
-                if variable.element is not None else
-                dbc.InputGroup(size="sm", children=[
-                    dbc.Select(
-                        id={"type": "parentchild-input", "index": "only_one"}, bs_size="sm",
-                        options=[{"label": element.label, "value": element.pk}
-                                 for element in Element.objects.all()],
-                    ),
-                    dbc.InputGroupAddon(addon_type="append", children=dbc.Button(
-                        id={"type": "parentchild-submit", "index": f"child-variable_{variable.pk}"}, children="Saisir"
-                    ))
-                ]),
-            ])
-        )
+            )
 
         # graph
         fig = go.Figure(layout=go.Layout(template="simple_white", margin=go.layout.Margin(l=0, r=0, b=0, t=0)))
         fig.update_xaxes(title_text="Date")
 
+        # simulated DPs
+        # TODO: disagg by admin1-2
         df = pd.DataFrame(SimulatedDataPoint.objects
-                          .filter(element=variable, scenario_id=scenario_pk, responseoption_id=responseoption_pk)
+                          .filter(element=variable, scenario_id=scenario_pk, responseoption_id=responseoption_pk, admin0=adm0)
                           .values("date", "value"))
         if not df.empty:
             fig.add_trace(go.Scatter(
@@ -1398,10 +1517,12 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
                 name="Simulé",
             ))
 
-        if admin1 is None:
-            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable).values())
-        else:
-            df = pd.DataFrame(MeasuredDataPoint.objects.filter(element=variable, admin1=admin1).values())
+        # measured DPs
+        # TODO: disagg by admin2
+        mdps = MeasuredDataPoint.objects.filter(element=variable, admin0=adm0)
+        if admin1 is not None:
+            mdps = mdps.filter(admin1=admin1)
+        df = pd.DataFrame(mdps.values())
 
         if not df.empty:
             source_ids = df["source_id"].drop_duplicates()
@@ -1421,68 +1542,73 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
         fig.update_layout(
             legend=dict(yanchor="bottom", x=0, y=1),
             showlegend=True,
-            yaxis=dict(title=variable.unit + unit_append),
+            yaxis=dict(title=variable.unit.replace("LCY", CURRENCY.get(adm0)) + unit_append),
         )
         fig_div = dcc.Graph(figure=fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2")
         children.append(fig_div)
 
+        # TODO: show seasonal values
         if variable.sd_type in ["Flow", "Variable"]:
             # connections
-            upstream_variables = Variable.objects.filter(downstream_connections__to_variable=variable)
-            upstream_list = dbc.ListGroup(
-                [
-                    dbc.ListGroupItem(className="p-1 justify-content-between", children=
-                    html.Div(className="d-flex justify-content-between", children=
+            if not LITE:
+                # upstream
+                upstream_variables = Variable.objects.filter(downstream_connections__to_variable=variable)
+                upstream_list = dbc.ListGroup(
                     [
-                        html.P(style={"font-size": "small"},
-                               children=f"{upstream_variable.label} _E{upstream_variable.pk}_"),
-                        dbc.Button("X",
-                                   id={"type": "element-detail-conn-del",
-                                       "index": f"{upstream_variable.pk}-to-{variable.pk}"},
-                                   size="sm",
-                                   color="danger",
-                                   className="p-1",
-                                   outline=True)
+                        dbc.ListGroupItem(className="p-1 justify-content-between", children=
+                        html.Div(className="d-flex justify-content-between", children=
+                        [
+                            html.P(style={"font-size": "small"},
+                                   children=f"{upstream_variable.label} _E{upstream_variable.pk}_"),
+                            dbc.Button("X",
+                                       id={"type": "element-detail-conn-del",
+                                           "index": f"{upstream_variable.pk}-to-{variable.pk}"},
+                                       size="sm",
+                                       color="danger",
+                                       className="p-1",
+                                       outline=True)
+                        ],
+
+                                 )
+                                          )
+                        for upstream_variable in upstream_variables
                     ],
-
-                             )
-                                      )
-                    for upstream_variable in upstream_variables
-                ],
-                flush=True,
-                style={"height": "150px", "overflow-y": "scroll"}
-            )
-
-            dropdown_options = Variable.objects.exclude(downstream_connections__to_variable=variable).exclude(
-                pk=variable.pk)
-            dropdown_list = [
-                {"label": possible_element.label, "value": possible_element.label}
-                for possible_element in dropdown_options
-            ]
-
-            upstream_card = dbc.Card(className="mb-2", children=[
-                dbc.CardHeader("Influencé par", className="p-1", style={"font-size": "small"}),
-                dbc.CardBody(
-                    [
-                        upstream_list,
-                        dbc.InputGroup(children=[
-                            dbc.Select(options=dropdown_list, id="element-detail-conn-input",
-                                       placeholder="Ajouter une influence", bs_size="sm"),
-                            dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-conn-submit", size="sm"),
-                                                addon_type="append")
-                        ]),
-                    ],
-                    style={"padding": "0px"},
+                    flush=True,
+                    style={"height": "150px", "overflow-y": "scroll"}
                 )
-            ])
-            children.append(upstream_card)
+
+                # downstream
+                dropdown_options = Variable.objects.exclude(downstream_connections__to_variable=variable).exclude(
+                    pk=variable.pk)
+                dropdown_list = [
+                    {"label": possible_element.label, "value": possible_element.label}
+                    for possible_element in dropdown_options
+                ]
+
+                upstream_card = dbc.Card(className="mb-2", children=[
+                    dbc.CardHeader("Influencé par", className="p-1", style={"font-size": "small"}),
+                    dbc.CardBody(
+                        [
+                            upstream_list,
+                            dbc.InputGroup(children=[
+                                dbc.Select(options=dropdown_list, id="element-detail-conn-input",
+                                           placeholder="Ajouter une influence", bs_size="sm"),
+                                dbc.InputGroupAddon(dbc.Button("Saisir", id="element-detail-conn-submit", size="sm"),
+                                                    addon_type="append")
+                            ]),
+                        ],
+                        style={"padding": "0px"},
+                    )
+                ])
+                children.append(upstream_card)
 
             # equation
             equation_text = variable.equation
-            if equation_text is not None:
-                for key_element in Variable.objects.all():
-                    equation_text = equation_text.replace(f"_E{key_element.pk}_", key_element.label)
-                equation_text = f" = {equation_text}"
+            if not LITE:
+                if equation_text is not None:
+                    for key_element in Variable.objects.all():
+                        equation_text = equation_text.replace(f"_E{key_element.pk}_", key_element.label)
+                    equation_text = f" = {equation_text}"
 
             equation_card = dbc.Card([
                 dbc.CardHeader("Équation", className="p-1", style={"font-size": "small"}),
@@ -1502,83 +1628,86 @@ def right_sidebar(selectednodedata, _, movement_allowed, samrammodel_pk):
             children.append(equation_card)
 
         elif variable.sd_type == "Stock":
-            # inflows
-            inflows_card = dbc.Card(className="mb-4", children=[
-                dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux intrants"),
-                dbc.CardBody(style={"padding": "0px"}, children=[
-                    dbc.ListGroup(
-                        [
-                            dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
-                                              style={"font-size": "small"}, children=[
-                                    inflow.label,
-                                    dbc.Button("X",
-                                               id={"type": "element-detail-inflow-del",
-                                                   "index": f"{variable.pk}-inflow-{inflow.pk}"},
-                                               size="sm", color="danger", className="p-1", outline=True)
-                                ])
-                            for inflow in variable.inflows.all()
-                        ],
-                        flush=True,
-                        style={"height": "100px", "overflow-y": "scroll"}
-                    ),
-                    dbc.InputGroup([
-                        dbc.Select(id="element-detail-inflow-input", bs_size="sm",
-                                   placeholder="Ajouter un flux entrant",
-                                   options=[
-                                       {"label": potential_inflow.label, "value": potential_inflow.pk}
-                                       for potential_inflow in Variable.objects.filter(sd_type="Flow")
-                                   .exclude(sd_sink__isnull=False).exclude(sd_source=variable)
-                                   ]),
-                        dbc.Button("Saisir", id="element-detail-inflow-submit", size="sm")
+            if not LITE:
+                # inflows
+                inflows_card = dbc.Card(className="mb-4", children=[
+                    dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux intrants"),
+                    dbc.CardBody(style={"padding": "0px"}, children=[
+                        dbc.ListGroup(
+                            [
+                                dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
+                                                  style={"font-size": "small"}, children=[
+                                        inflow.label,
+                                        dbc.Button("X",
+                                                   id={"type": "element-detail-inflow-del",
+                                                       "index": f"{variable.pk}-inflow-{inflow.pk}"},
+                                                   size="sm", color="danger", className="p-1", outline=True)
+                                    ])
+                                for inflow in variable.inflows.all()
+                            ],
+                            flush=True,
+                            style={"height": "100px", "overflow-y": "scroll"}
+                        ),
+                        dbc.InputGroup([
+                            dbc.Select(id="element-detail-inflow-input", bs_size="sm",
+                                       placeholder="Ajouter un flux entrant",
+                                       options=[
+                                           {"label": potential_inflow.label, "value": potential_inflow.pk}
+                                           for potential_inflow in Variable.objects.filter(sd_type="Flow")
+                                       .exclude(sd_sink__isnull=False).exclude(sd_source=variable)
+                                       ]),
+                            dbc.Button("Saisir", id="element-detail-inflow-submit", size="sm")
+                        ])
                     ])
                 ])
-            ])
-            children.append(inflows_card)
+                children.append(inflows_card)
 
-            outflows_card = dbc.Card(className="mb-4", children=[
-                dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux sortants"),
-                dbc.CardBody(style={"padding": "0px"}, children=[
-                    dbc.ListGroup(
-                        [
-                            dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
-                                              style={"font-size": "small"}, children=[
-                                    outflow.label,
-                                    dbc.Button("X",
-                                               id={"type": "element-detail-outflow-del",
-                                                   "index": f"{variable.pk}-outflow-{outflow.pk}"},
-                                               size="sm", color="danger", className="p-1", outline=True)
-                                ])
-                            for outflow in variable.outflows.all()
-                        ],
-                        flush=True,
-                        style={"height": "100px", "overflow-y": "scroll"}
-                    ),
-                    dbc.InputGroup([
-                        dbc.Select(id="element-detail-outflow-input", bs_size="sm",
-                                   placeholder="Ajouter un flux sortant",
-                                   options=[
-                                       {"label": potential_outflow.label, "value": potential_outflow.pk}
-                                       for potential_outflow in
-                                       Variable.objects.filter(sd_type="Flow").exclude(sd_sink=variable).exclude(
-                                           sd_source=variable)
-                                   ]),
-                        dbc.Button("Saisir", id="element-detail-outflow-submit", size="sm")
+                # outflows
+                outflows_card = dbc.Card(className="mb-4", children=[
+                    dbc.CardHeader(className="p-1", style={"font-size": "small"}, children="Flux sortants"),
+                    dbc.CardBody(style={"padding": "0px"}, children=[
+                        dbc.ListGroup(
+                            [
+                                dbc.ListGroupItem(className="p-1 d-flex justify-content-between",
+                                                  style={"font-size": "small"}, children=[
+                                        outflow.label,
+                                        dbc.Button("X",
+                                                   id={"type": "element-detail-outflow-del",
+                                                       "index": f"{variable.pk}-outflow-{outflow.pk}"},
+                                                   size="sm", color="danger", className="p-1", outline=True)
+                                    ])
+                                for outflow in variable.outflows.all()
+                            ],
+                            flush=True,
+                            style={"height": "100px", "overflow-y": "scroll"}
+                        ),
+                        dbc.InputGroup([
+                            dbc.Select(id="element-detail-outflow-input", bs_size="sm",
+                                       placeholder="Ajouter un flux sortant",
+                                       options=[
+                                           {"label": potential_outflow.label, "value": potential_outflow.pk}
+                                           for potential_outflow in
+                                           Variable.objects.filter(sd_type="Flow").exclude(sd_sink=variable).exclude(
+                                               sd_source=variable)
+                                       ]),
+                            dbc.Button("Saisir", id="element-detail-outflow-submit", size="sm")
+                        ])
                     ])
                 ])
-            ])
-            children.append(outflows_card)
+                children.append(outflows_card)
 
         elif variable.sd_type == "Household Constant":
-            try:
-                value = variable.householdconstantvalues.get().value
-            except HouseholdConstantValue.DoesNotExist:
-                value = None
-            householdvalue_card = dbc.InputGroup([
-                dbc.InputGroupText("Value"),
-                dbc.Input(id="householdconstantvalue-input", value=value),
-                dbc.Button("Saisir", id="householdconstantvalue-submit")
-            ])
-            children.append(householdvalue_card)
+            if not LITE:
+                try:
+                    value = variable.householdconstantvalues.get(admin0=adm0).value
+                except HouseholdConstantValue.DoesNotExist:
+                    value = None
+                householdvalue_card = dbc.InputGroup([
+                    dbc.InputGroupText("Value"),
+                    dbc.Input(id="householdconstantvalue-input", value=value),
+                    dbc.Button("Saisir", id="householdconstantvalue-submit")
+                ])
+                children.append(householdvalue_card)
 
     if not children:
         return None

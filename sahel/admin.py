@@ -33,8 +33,22 @@ class SituationalAnalysisAdmin(ImportExportModelAdmin):
     ]
 
 
+class VariableResource(resources.ModelResource):
+    class Meta:
+        model = models.Variable
+
+
+class VariableAdmin(ImportExportModelAdmin):
+    resource_class =  VariableResource
+
+    list_filter = [
+        'samramodel',
+        'sd_type'
+    ]
+
+
 # REGISTRATION
-admin.site.register(models.Variable)
+admin.site.register(models.Variable, VariableAdmin)
 admin.site.register(models.SimulatedDataPoint)
 admin.site.register(models.VariableConnection)
 admin.site.register(models.ElementGroup)
@@ -42,7 +56,7 @@ admin.site.register(models.Source)
 admin.site.register(models.RegularDataset)
 admin.site.register(models.MeasuredDataPoint)
 admin.site.register(models.ResponseOption)
-admin.site.register(models.ConstantValue)
+admin.site.register(models.ResponseConstantValue)
 admin.site.register(models.SeasonalInputDataPoint)
 admin.site.register(models.ForecastedDataPoint)
 admin.site.register(models.PulseValue)

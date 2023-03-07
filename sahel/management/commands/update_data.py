@@ -13,10 +13,15 @@ import time
 from pathlib import Path
 from dotenv import load_dotenv
 from unidecode import unidecode
+from itertools import chain
 
-admin1s = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
+MALI_ADMIN1S = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
+MRT_ADMIN1 = 'Hodh Ech Chargi'
+MRT_ADMIN2 = 'Bassikounou'
+DAYS_IN_MONTH = 30.437
 
 
+# HDX
 def download_from_hdx(hdx_identifier, last_updated_date, resource_number=0):
     setup_logging()
     Configuration.create(hdx_site="prod", user_agent="SAMRA", hdx_read_only=True)
@@ -33,7 +38,8 @@ def download_from_hdx(hdx_identifier, last_updated_date, resource_number=0):
     return df
 
 
-def update_wfp_price_data():
+# WFP
+def update_mali_wfp_price_data():
     regulardataset = RegularDataset.objects.get(pk=1)
     serve_locally = True
     if serve_locally:
@@ -46,7 +52,7 @@ def update_wfp_price_data():
     if df is None:
         return
 
-    df = df[df["admin1"].isin(admin1s)]
+    df = df[df["admin1"].isin(MALI_ADMIN1S)]
     df["price"] = df["price"].replace({0: np.nan})
 
     elements = Variable.objects.filter(vam_commodity__isnull=False)
@@ -80,6 +86,90 @@ def update_wfp_price_data():
     MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=42).delete()
 
 
+def update_mrt_wfp():
+    # TODO: consolidate with other VAM function
+    # TODO: actually set up proper automation
+    mrt_adm1s = ['Hodh Ech Chargi']
+    mrt_adm2s = ['Bassikounou']
+    df = pd.read_csv('data/wfp_food_prices_mrt.csv', skiprows=[1])
+    df = df[(df['admin1'].isin(mrt_adm1s) & df['admin2'].isin(mrt_adm2s))]
+    df["price"] = df["price"].replace({0: np.nan})
+    df = df.dropna()
+    print(f'{len(df)} data points')
+
+    elements = Variable.objects.filter(vam_commodity__isnull=False)
+    objs = []
+    for element in elements:
+        dff = df[df["commodity"] == element.vam_commodity]
+        unit = dff["unit"].drop_duplicates()
+        if len(unit) > 1:
+            raise Exception(f"multiple units of measurement for {element.vam_commodity}")
+
+        print(f"{element.label}: {len(dff)} data points")
+
+        for _, row in dff.iterrows():
+            objs.append(MeasuredDataPoint(
+                element=element,
+                date=row["date"],
+                admin0="Mauritanie",
+                admin1=row["admin1"],
+                admin2=row["admin2"],
+                market=row["market"],
+                source_id=11,
+                value=row["price"],
+            ))
+
+    MeasuredDataPoint.objects.filter(source_id=11).delete()
+    MeasuredDataPoint.objects.bulk_create(objs)
+
+
+# BKN other
+def update_mrt_prixmarche():
+    alimentation_pks = [248, 249, 250]
+    markets = (
+        ('Bassikounou', 'BDD PM_BKN'),
+        ('Fassala', 'BDD PM_fass'),
+        ('Akor', 'BDD PM_Akor'),
+        ('Gneibe', 'BDD PM_Gneibe'),
+        ('Mberra', 'BDD PM_CpMberra'),
+    )
+    skiprange = list(chain(range(7), range(46, 100)))
+    df_all = pd.DataFrame()
+    for market in markets:
+        df = pd.read_excel('data/2_1_ BDD sur les prix Marché_ BKN.xls', sheet_name=market[1], skiprows=skiprange)
+        df = df.set_index('Aliment de base')
+        df = df.transpose()
+        df['date'] = pd.date_range(start='2022-01-01', periods=24, freq='MS')
+        df = pd.melt(df, id_vars=['date'])
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
+        df["value"] = df["value"].replace({0: np.nan})
+        df = df.dropna()
+        df['date'] = df['date'] + pd.DateOffset(months=2, days=14)
+        df['market'] = market[0]
+        df_all = pd.concat([df_all, df])
+    print(df_all['Aliment de base'].unique())
+    objs = []
+    variables = Variable.objects.filter(mrt_prixmarche_name__isnull=False)
+    for variable in variables:
+        dff = df_all[df_all['Aliment de base'] == variable.mrt_prixmarche_name]
+        unit = 50.0 if variable.pk in alimentation_pks else 1.0
+        print(f"{variable.label}: {len(dff)} data points")
+        for _, row in dff.iterrows():
+            objs.append(MeasuredDataPoint(
+                element_id=variable.pk,
+                date=row["date"],
+                admin0="Mauritanie",
+                admin1='Hodh Ech Chargui',
+                admin2='Bassikounou',
+                market=row["market"],
+                value=row["value"]/unit,
+                source_id=12,
+            ))
+    MeasuredDataPoint.objects.filter(source_id=12).delete()
+    MeasuredDataPoint.objects.bulk_create(objs)
+
+
+# DM
 def update_dm_suividesprix():
     # only for serving locally
     # needs rewrite to not iterate over df multiple times, this is probably pretty slow
@@ -191,9 +281,9 @@ def update_dm_globallivestock():
 
     df = pd.melt(df, id_vars=["date", "admin1", "admin2"],
                  value_vars=[element.pk for element in (multicol_elements | singlecol_elements).distinct()])
-    print(df)
     df = df.groupby(["variable", "admin1", "admin2", pd.Grouper(key="date", freq="QS")]).mean().reset_index()
     df["date"] = df["date"] + pd.DateOffset(months=2, days=14)
+    df = df.dropna()
     print(df)
 
     source = Source.objects.get(pk=4)
@@ -213,7 +303,93 @@ def update_dm_globallivestock():
     # delete problem points
 
 
+def update_dm_phm_bkn_maraichange():
+    df = pd.read_excel("data/MRT - PHM Maraichage 2023.xlsx")
+    source_pk = 15
+    admin0 = 'Mauritanie'
+    admin1 = MRT_ADMIN1
+    admin2 = MRT_ADMIN2
 
+    # sections and options
+    DATE = "Date"
+    PROFIL = 'Profil du ménage : '
+    NOMBRE_PER = 'Nombre de personnes totales dans le ménage'
+    CULT_ET_REND = 'Cultures et rendements : '
+    REND_ET_PERTE = CULT_ET_REND + 'Rendements et pertes-post récolte : '
+    SUPERFICIE1 = 'Quelle superficie de terre avez-vous cultivée pour cette culture au cours de la dernière saison avec les semences distribuées par le CICR? (metre carré'
+    SUPERFICIE2 = 'Quelle superficie de terre avez-vous cultivée pour cette culture au cours de la dernière saison avec les semences distribuées par le CICR? (mètre carré'
+    CONS = REND_ET_PERTE + 'Stock pour la consommation du ménage'
+    VEND = REND_ET_PERTE + 'Vendue'
+    DETTE_AG = REND_ET_PERTE + 'Remboursement de la dette liée à la production agricole (y compris la location des terres et les intrants agricoles)'
+    DETTE_AUTRE = REND_ET_PERTE + "Remboursement d'autres dettes"
+    STOCK = REND_ET_PERTE + "Stock de semences pour la prochaine saison"
+    DON = REND_ET_PERTE + "Donation"
+    AUTRE = REND_ET_PERTE + "Autre"
+    PERTES = REND_ET_PERTE + "Si oui, pouvez-vous estimer la proportion de votre récolte?"
+    PERTES_VALUES = {
+        "Une petite partie (25%)": 0.25,
+        "La moitié (50%)": 0.5,
+        "La plus grande partie (75%)": 0.75,
+        "La totalité (100%)": 1.0,
+    }
+    FREQ = REND_ET_PERTE + "À quelle fréquence vendez-vous cette culture?"
+    FREQ_VALUES = {
+        "Weekly": 7,
+        "Daily": 1,
+        "Monthly": DAYS_IN_MONTH
+    }
+    QUANT = REND_ET_PERTE + "En moyenne, quelle quantité vendez-vous par marché ? (en KILOS)"
+    REVENU = REND_ET_PERTE + "En général, la vente de la récolte de cette culture vous rapporte combien par marché ?"
+    MARCHE_ET_VENTE = "Marché et vente des produits : "
+    TRANS = MARCHE_ET_VENTE + "Quel est le cout éventuel du transport ?"
+    PRIX_TRANS = MARCHE_ET_VENTE + "Si argent, combien par trajet ? (aller/retour)"
+    RIEN = "Rien"
+
+    df = df.replace({
+        PERTES: PERTES_VALUES,
+        FREQ: FREQ_VALUES,
+    })
+
+    df[DATE] = pd.to_datetime(df[DATE])
+    df[PRIX_PER_KG := "prix_per_kg"] = df[REVENU] / df[QUANT]
+    df[PRIX_TRANS] = df.apply(lambda row: 0 if row[TRANS] == RIEN else row[PRIX_TRANS], axis=1)
+    df[COUT_TRANS_PER_KG := 'cout_trans_per_kg'] = df[PRIX_TRANS] / df[QUANT]
+
+    agg_cols = [DATE, PRIX_PER_KG, PERTES, COUT_TRANS_PER_KG]
+    df = df[agg_cols]
+
+    df = df.groupby(pd.Grouper(key=DATE, freq="MS")).mean().reset_index()
+    df = df.dropna()
+    df[DATE] = df[DATE] + pd.DateOffset(months=0, days=14)
+
+    print(df)
+    objs = []
+    pk2col = {
+        267: PRIX_PER_KG,
+        268: COUT_TRANS_PER_KG,
+        269: PERTES,
+    }
+
+    objs.extend([
+        MeasuredDataPoint(
+            element_id=pk,
+            value=row[col_name],
+            date=row[DATE],
+            admin0=admin0,
+            admin1=admin1,
+            admin2=admin2,
+            source_id=source_pk
+        )
+        for pk, col_name in pk2col.items()
+        for _, row in df.iterrows()
+    ])
+
+    MeasuredDataPoint.objects.filter(source_id=source_pk).delete()
+    MeasuredDataPoint.objects.bulk_create(objs)
+
+
+
+# other 3rd party
 def update_acled():
     source = Source.objects.get(pk=6)
     df = pd.read_csv("data/2019-08-06-2022-08-11-Mali.csv")
@@ -222,7 +398,7 @@ def update_acled():
     print(df["admin1"].unique())
 
     df = df.replace("Menaka", "Ménaka")
-    df = df[df["admin1"].isin(admin1s)]
+    df = df[df["admin1"].isin(MALI_ADMIN1S)]
     df["date"] = pd.to_datetime(df["event_date"], format="%d %B %Y")
     df["number_events"] = 1
     df = df.groupby(["admin1", "admin2", pd.Grouper(key="date", freq="MS")]).sum().reset_index()
@@ -252,21 +428,30 @@ def update_acled():
     MeasuredDataPoint.objects.bulk_create(objs)
 
 
-def update_ndvi():
+def update_ndvi(admin0):
     source = Source.objects.get(pk=7)
-    admin1_files = (
-        ("Mali - Gao_Pasture_", "Gao"),
-        ("Mali - Kidal__", "Kidal"),
-        ("Mali - Mopti_Pasture_", "Mopti"),
-        ("Mali - Tombouctou_Pasture_", "Tombouctou")
-    )
+    admin1_files = None
+    admin2 = None
+    min_year = None
+    if admin0 == 'Mali':
+        admin1_files = (
+            ("Mali - Gao_Pasture_", "Gao"),
+            ("Mali - Kidal__", "Kidal"),
+            ("Mali - Mopti_Pasture_", "Mopti"),
+            ("Mali - Tombouctou_Pasture_", "Tombouctou")
+        )
+        min_year = 2012
+    elif admin0 == 'Mauritanie':
+        admin1_files = (
+            ("Mauritania - Hodh Ech Chargi - Bassikounou__", "Hodh Ech Chargi"),
+        )
+        admin2 = 'Bassikounou'
+        min_year = 2015
     objs = []
     for admin1_file in admin1_files:
         for measure in ["NDVI-", "Rainfall"]:
             element_ids = [169, 170] if measure == "Rainfall" else [171, 172]
-            for year in range(2012, 2023):
-                if not (year == 2022 and admin1_file[1] == "Gao" and measure == "Rainfall"):
-                    pass
+            for year in range(min_year, 2023):
                 df = pd.read_csv(f"data/wfp seasonal explorer/{admin1_file[0]}{measure}{year}.csv")
                 df["Day"] = df["Dekad"] * 10 - 5
                 df["date"] = pd.to_datetime(df[["Year", "Month", "Day"]])
@@ -279,17 +464,21 @@ def update_ndvi():
                         source=source,
                         value=row[real_column],
                         date=row["date"],
+                        admin0=admin0,
                         admin1=admin1_file[1],
+                        admin2=admin2,
                     ))
                     objs.append(MeasuredDataPoint(
                         element_id=element_ids[1],
                         source=source,
                         value=row[avg_column],
                         date=row["date"],
+                        admin0=admin0,
                         admin1=admin1_file[1],
+                        admin2=admin2,
                     ))
 
-    MeasuredDataPoint.objects.filter(source=source).delete()
+    MeasuredDataPoint.objects.filter(source=source, admin0=admin0).delete()
     MeasuredDataPoint.objects.bulk_create(objs)
 
 
@@ -312,10 +501,13 @@ def read_ven_producerprices():
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        update_wfp_price_data()
+        # update_mali_wfp_price_data()
         # update_dm_suividesprix()
         # update_dm_globallivestock()
         # update_acled()
-        # update_ndvi()
+        # update_ndvi('Mauritanie')
         # read_ven_producerprices()
+        # update_mrt_wfp()
+        # update_mrt_prixmarche()
+        update_dm_phm_bkn_maraichange()
         pass

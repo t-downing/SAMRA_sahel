@@ -3,6 +3,17 @@ from model_utils.managers import InheritanceManager
 from colorfield.fields import ColorField
 import datetime
 
+# TODO: refactor element to variable
+# TODO: add admin0-2 as models
+
+
+ADMIN0S = ['Mali', 'Mauritanie']
+CURRENCY = {
+    'Mali': 'FCFA',
+    'Mauritanie': 'MRU'
+}
+
+
 class SamraModel(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -63,6 +74,7 @@ class Element(Node):
     kumu_id = models.CharField(max_length=100, null=True, blank=True)
 
 
+# TODO: check if used and delete if needed
 class Region(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -191,29 +203,43 @@ class Story(models.Model):
         return self.name
 
 
+# TODO: do types properly
 class Variable(Node):
+    STOCK = 'Stock'
+    FLOW = 'Flow'
+    VARIABLE = 'Variable'
+    INPUT = 'Input'
+    RESPONSE_CONSTANT = 'Constant'
+    SEASONAL_INPUT = 'Seasonal Input'
+    RESPONSE_PULSE = 'Pulse Input'
+    HOUSEHOLD_CONSTANT = 'Household Constant'
+    SCENARIO_CONSTANT = 'Scenario Constant'
+    GEOGRAPHIC_CONSTANT = 'Geographic Constant'
     SD_TYPES = (
-        ("Stock", "Stock"),
-        ("Flow", "Flow"),
-        ("Variable", "Variable"),
-        ("Input", "Input"),
-        ("Constant", "Constant"),
-        ("Seasonal Input", "Entrée Saisonnière"),
-        ("Pulse Input", "Entrée Impulsion"),
-        ("Household Constant", "Qualité Ménage"),
-        ("Scenario Constant", "Variation Scénario"),
+        (STOCK, "Stock"),
+        (FLOW, "Flow"),
+        (VARIABLE, "Variable"),
+        (INPUT, "Input"),
+        (RESPONSE_CONSTANT, "Constant"),
+        (SEASONAL_INPUT, "Entrée Saisonnière"),
+        (RESPONSE_PULSE, "Entrée Impulsion"),
+        (HOUSEHOLD_CONSTANT, "Qualité Ménage"),
+        (SCENARIO_CONSTANT, "Variation Scénario"),
+        (GEOGRAPHIC_CONSTANT, 'Constant Géographique')
     )
+    CONSTANTS = [RESPONSE_CONSTANT, HOUSEHOLD_CONSTANT, SCENARIO_CONSTANT, GEOGRAPHIC_CONSTANT]
     UNIT_OPTIONS = (
         ("tête", "tête"),
         ("tête / mois", "tête / mois"),
         ("tête / an", "tête / an"),
-        ("FCFA", "FCFA"),
-        ("FCFA / mois", "FCFA / mois"),
-        ("FCFA / jour", "FCFA / jour"),
-        ("FCFA / an", "FCFA / an"),
-        ("FCFA / tête", "FCFA / tête"),
-        ("FCFA / kg", "FCFA / kg"),
-        ("FCFA / L", "FCFA / L"),
+        ("LCY", "LCY"),
+        ("LCY / mois", "LCY / mois"),
+        ("LCY / jour", "LCY / jour"),
+        ("LCY / an", "LCY / an"),
+        ("LCY / tête", "LCY / tête"),
+        ("LCY / kg", "LCY / kg"),
+        ("LCY / L", "LCY / L"),
+        ("LCY / personne / mois", "LCY / personne / mois"),
         ("kg", "kg"),
         ("kg / mois", "kg / mois"),
         ("kg / jour", "kg / jour"),
@@ -242,12 +268,16 @@ class Variable(Node):
     y_pos = models.FloatField(null=True, blank=True)
     equation = models.CharField(max_length=500, null=True, blank=True)
     sim_input_var = models.BooleanField(default=False)
-    unit = models.CharField(max_length=100, null=True, blank=True, choices=UNIT_OPTIONS)
-    sd_type = models.CharField(max_length=100, choices=SD_TYPES, null=True, blank=True)
-    sd_source = models.ForeignKey("self", related_name="outflows", null=True, blank=True, on_delete=models.SET_NULL)
-    sd_sink = models.ForeignKey("self", related_name="inflows", null=True, blank=True, on_delete=models.SET_NULL)
-    # element_group = models.ForeignKey("elementgroup", related_name="variables", null=True, blank=True,
-    #                                   on_delete=models.SET_NULL)
+    unit = models.CharField(max_length=100, null=True, choices=UNIT_OPTIONS)
+    sd_type = models.CharField(max_length=100, choices=SD_TYPES, null=True)
+    sd_source = models.ForeignKey(
+        "self", related_name="outflows", null=True, blank=True, on_delete=models.SET_NULL,
+        limit_choices_to={'sd_type': STOCK}
+    )
+    sd_sink = models.ForeignKey(
+        "self", related_name="inflows", null=True, blank=True, on_delete=models.SET_NULL,
+        limit_choices_to={'sd_type': STOCK}
+    )
     vam_commodity = models.CharField(max_length=200, null=True, blank=True)
     mid_threshold = models.FloatField(null=True, blank=True)
     high_threshold = models.FloatField(null=True, blank=True)
@@ -262,10 +292,18 @@ class Variable(Node):
     dm_globalform_field_highvalue = models.CharField(max_length=200, null=True, blank=True)
     dm_globalform_field_midvalue = models.CharField(max_length=200, null=True, blank=True)
     dm_globalform_field_lowvalue = models.CharField(max_length=200, null=True, blank=True)
-    source_for_model = models.ForeignKey("source", related_name="model_element_uses", null=True, blank=True, on_delete=models.SET_NULL)
+    source_for_model = models.ForeignKey(
+        "source", related_name="model_element_uses", null=True, blank=True, on_delete=models.SET_NULL
+    )
     kcal_per_kg = models.IntegerField(null=True, blank=True)
     model_output_variable = models.BooleanField(default=True)
     stock_initial_value = models.FloatField(null=True, blank=True)
+    mrt_prixmarche_name = models.CharField(max_length=200, null=True, blank=True)
+    must_be_positive = models.BooleanField(default=True)
+    stock_initial_value_variable = models.OneToOneField(
+        'self', related_name='stock', null=True, blank=True, on_delete=models.SET_NULL,
+        limit_choices_to={'sd_type__in': CONSTANTS},
+    )
 
 
 class VariablePosition(models.Model):
@@ -366,8 +404,12 @@ class RegularDataset(models.Model):
 class MeasuredDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField(null=True)
-    element = models.ForeignKey("variable", related_name="measureddatapoints", on_delete=models.CASCADE)
+    element = models.ForeignKey(
+        "variable", related_name="measureddatapoints", on_delete=models.CASCADE,
+        limit_choices_to={'sd_type': Variable.INPUT},
+    )
     source = models.ForeignKey("source", related_name="measureddatapoints", null=True, on_delete=models.SET_NULL)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
     market = models.CharField(max_length=200, null=True, blank=True)
@@ -382,6 +424,7 @@ class SimulatedDataPoint(models.Model):
     element = models.ForeignKey("variable", related_name="simulateddatapoints", on_delete=models.CASCADE)
     scenario = models.ForeignKey("scenario", related_name="simulateddatapoints", null=True, on_delete=models.CASCADE)
     responseoption = models.ForeignKey("responseoption", related_name="simulateddatapoints", null=True, on_delete=models.CASCADE)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
 
@@ -393,8 +436,11 @@ class ForecastedDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField()
     element = models.ForeignKey("variable", related_name="forecasteddatapoints", on_delete=models.CASCADE)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     admin1 = models.CharField(max_length=200, null=True, blank=True)
     admin2 = models.CharField(max_length=200, null=True, blank=True)
+    upper_bound = models.FloatField(null=True, blank=True)
+    lower_bound = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return str(f"Element: {self.element}; Date: {self.date}; Forecasted Value: {self.value}")
@@ -403,7 +449,13 @@ class ForecastedDataPoint(models.Model):
 class SeasonalInputDataPoint(models.Model):
     date = models.DateField()
     value = models.FloatField()
-    element = models.ForeignKey("variable", related_name="seasonalinputdatapoints", on_delete=models.CASCADE)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
+    admin1 = models.CharField(max_length=200, null=True, blank=True)
+    admin2 = models.CharField(max_length=200, null=True, blank=True)
+    element = models.ForeignKey(
+        "variable", related_name="seasonalinputdatapoints", on_delete=models.CASCADE,
+        limit_choices_to={'sd_type': Variable.SEASONAL_INPUT}
+    )
 
     def __str__(self):
         return f"Element: {self.element}; Date: {self.date}; Seasonal Value: {self.value}"
@@ -427,9 +479,13 @@ class Scenario(models.Model):
         return self.name
 
 
-class ConstantValue(models.Model):
-    element = models.ForeignKey("variable", related_name="constantvalues", on_delete=models.CASCADE)
-    responseoption = models.ForeignKey("responseoption", related_name="constantvalues", on_delete=models.CASCADE)
+class ResponseConstantValue(models.Model):
+    element = models.ForeignKey(
+        "variable", related_name="responseconstantvalues", on_delete=models.CASCADE,
+        limit_choices_to={'sd_type': Variable.RESPONSE_CONSTANT}
+    )
+    responseoption = models.ForeignKey("responseoption", related_name="responseconstantvalues", on_delete=models.CASCADE)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     value = models.FloatField()
 
     def __str__(self):
@@ -437,7 +493,10 @@ class ConstantValue(models.Model):
 
 
 class ScenarioConstantValue(models.Model):
-    element = models.ForeignKey("variable", related_name="scenarioconstantvalues", on_delete=models.CASCADE)
+    element = models.ForeignKey(
+        "variable", related_name="scenarioconstantvalues", on_delete=models.CASCADE,
+        limit_choices_to={'sd_type': Variable.SCENARIO_CONSTANT}
+    )
     scenario = models.ForeignKey("scenario", related_name="scenarioconstantvalues", on_delete=models.CASCADE)
     value = models.FloatField()
 
@@ -446,16 +505,24 @@ class ScenarioConstantValue(models.Model):
 
 
 class HouseholdConstantValue(models.Model):
-    element = models.ForeignKey("variable", related_name="householdconstantvalues", on_delete=models.CASCADE)
+    element = models.ForeignKey(
+        "variable", related_name="householdconstantvalues", on_delete=models.CASCADE,
+        limit_choices_to={'sd_type': Variable.HOUSEHOLD_CONSTANT}
+    )
     value = models.FloatField(null=True)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
         return f"Element: {self.element}; Value: {self.value}"
 
 
 class PulseValue(models.Model):
-    element = models.ForeignKey("variable", related_name="pulsevalues", on_delete=models.CASCADE)
+    element = models.ForeignKey(
+        "variable", related_name="pulsevalues", on_delete=models.CASCADE,
+        limit_choices_to={'sd_type': Variable.RESPONSE_PULSE}
+    )
     responseoption = models.ForeignKey("responseoption", related_name="pulsevalues", on_delete=models.CASCADE)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
     value = models.FloatField()
     startdate = models.DateField()
     enddate = models.DateField(null=True, blank=True)
@@ -463,3 +530,15 @@ class PulseValue(models.Model):
     def __str__(self):
         return f"Element: {self.element}; ResponseOption: {self.responseoption}; Pulse Height: {self.value}"
 
+
+# NOTE: still not used, just using HH values for now
+class GeographicConstantValue(models.Model):
+    element = models.ForeignKey(
+        'variable', related_name='countryconstantvalues', on_delete=models.CASCADE,
+        limit_choices_to={'sd_type': Variable.GEOGRAPHIC_CONSTANT}
+    )
+    value = models.FloatField(null=True)
+    admin0 = models.CharField(max_length=200, null=True, blank=True)
+
+    def __str__(self):
+        return f"Element: {self.element}; Country: {self.admin0}; Value: {self.value}"
