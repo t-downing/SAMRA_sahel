@@ -102,15 +102,14 @@ DATABASES = {
     #     "HOST": "ec2-18-204-142-254.compute-1.amazonaws.com",
     #     "PORT": "5432",
     # },
-        "default": {
-            "ENGINE": "mssql",
-            "NAME": "SAMRA",
-            "USER": "l_samra_sql_t",
-            "PASSWORD": os.environ.get("MSSQL_PASSWORD"),
-            "HOST": "gvalabaidb03t.gva.icrc.priv",
-            "PORT": "1433",
-            "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server", }
-        }
+    "default": {
+        "ENGINE": "mssql",
+        "NAME": "SAMRA",
+        "USER": "l_samra_sql_t",
+        "PASSWORD": os.environ.get("MSSQL_PASSWORD"),
+        "HOST": "gvalabaidb03t.gva.icrc.priv",
+        "PORT": "1433",
+        "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server", }
     },
 }
 
