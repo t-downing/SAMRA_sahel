@@ -1243,7 +1243,7 @@ def draw_model(
     State("samramodel-input", "value")
 )
 @timer
-def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, movement_allowed, samrammodel_pk):
+def right_sidebar(selectednodedata, cyto_elements, adm0, scenario_pk, responseoption_pk, movement_allowed, samrammodel_pk):
     # TODO: admin1 and admin2 filtering on graph
     # TODO: prefetch everything relevant to speed up
     # TODO: add other constant types
@@ -1253,6 +1253,7 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
         return children
     nodedata = selectednodedata[-1]
     admin1 = None
+    variables = [cyto_element for cyto_element in cyto_elements if 'position' in cyto_element]
 
     # GROUP
     if "group" in nodedata.get("id"):
@@ -1604,11 +1605,13 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
 
             # equation
             equation_text = variable.equation
-            if not LITE:
-                if equation_text is not None:
-                    for key_element in Variable.objects.all():
-                        equation_text = equation_text.replace(f"_E{key_element.pk}_", key_element.label)
-                    equation_text = f" = {equation_text}"
+            if equation_text is not None:
+                for eq_variable in variables:
+                    equation_text = equation_text.replace(
+                        f"_E{eq_variable.get('data').get('id')}_",
+                        eq_variable.get('data').get('label')
+                    )
+                equation_text = f" = {equation_text}"
 
             equation_card = dbc.Card([
                 dbc.CardHeader("Équation", className="p-1", style={"font-size": "small"}),
@@ -1697,6 +1700,7 @@ def right_sidebar(selectednodedata, _, adm0, scenario_pk, responseoption_pk, mov
                 children.append(outflows_card)
 
         elif variable.sd_type == "Household Constant":
+
             if not LITE:
                 try:
                     value = variable.householdconstantvalues.get(admin0=adm0).value

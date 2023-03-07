@@ -256,6 +256,8 @@ class Variable(Node):
         ("mm / jour", "mm / jour"),
         ("NDVI", "NDVI"),
         ("USD / tonne", "USD / tonne"),
+        ('kg / hec', 'kg / hec'),
+        ('hec', 'hec'),
     )
     AGG_OPTIONS = (
         ("MEAN", "moyen"),
@@ -511,6 +513,9 @@ class HouseholdConstantValue(models.Model):
     )
     value = models.FloatField(null=True)
     admin0 = models.CharField(max_length=200, null=True, blank=True)
+    admin1 = models.CharField(max_length=200, null=True, blank=True)
+    admin2 = models.CharField(max_length=200, null=True, blank=True)
+    source = models.ForeignKey("source", related_name="householdconstantvalues", null=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return f"Element: {self.element}; Value: {self.value}"

@@ -5,7 +5,7 @@ from import_export.admin import ImportExportModelAdmin
 from import_export.fields import Field
 from import_export.widgets import ManyToManyWidget
 
-# RESOURCES
+
 class ElementResource(resources.ModelResource):
     class Meta:
         model = models.Element
@@ -27,7 +27,6 @@ class SituationalAnalysisResource(resources.ModelResource):
 
 class SituationalAnalysisAdmin(ImportExportModelAdmin):
     resource_class = SituationalAnalysisResource
-
     list_filter = [
         "samramodel"
     ]
@@ -39,11 +38,25 @@ class VariableResource(resources.ModelResource):
 
 
 class VariableAdmin(ImportExportModelAdmin):
-    resource_class =  VariableResource
-
+    resource_class = VariableResource
     list_filter = [
         'samramodel',
         'sd_type'
+    ]
+
+
+class MeasuredDataPointResource(resources.ModelResource):
+    class Meta:
+        model = models.MeasuredDataPoint
+
+
+class MeasuredDataPointAdmin(ImportExportModelAdmin):
+    resource_class = MeasuredDataPointResource
+    list_filter = [
+        'element',
+        'admin0',
+        'admin1',
+        'admin2',
     ]
 
 
@@ -54,7 +67,7 @@ admin.site.register(models.VariableConnection)
 admin.site.register(models.ElementGroup)
 admin.site.register(models.Source)
 admin.site.register(models.RegularDataset)
-admin.site.register(models.MeasuredDataPoint)
+admin.site.register(models.MeasuredDataPoint, MeasuredDataPointAdmin)
 admin.site.register(models.ResponseOption)
 admin.site.register(models.ResponseConstantValue)
 admin.site.register(models.SeasonalInputDataPoint)
