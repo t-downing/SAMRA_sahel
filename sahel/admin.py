@@ -97,7 +97,6 @@ class ScenarioConstantAdmin(ImportExportModelAdmin):
     list_filter = [
         'element',
         'scenario',
-        'admin0',
     ]
 
 
