@@ -5,6 +5,9 @@ from import_export.admin import ImportExportModelAdmin
 from import_export.fields import Field
 from import_export.widgets import ManyToManyWidget
 
+admin.site.site_header = "SAMRA administration"
+admin.site.site_title = "SAMRA site admin"
+
 
 class ElementResource(resources.ModelResource):
     class Meta:

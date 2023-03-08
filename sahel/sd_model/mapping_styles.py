@@ -117,6 +117,11 @@ stylesheet = [
          "shape": "triangle",
          "text-valign": "bottom",
      }},
+    {"selector": f"[sd_type = '{Variable.SCENARIO_CONSTANT}']",
+     "style": {
+         "shape": "triangle",
+         "text-valign": "bottom",
+     }},
     {"selector": "[!usable].variable",
      "style": {
          "background-color": "whitesmoke",

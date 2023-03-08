@@ -1,4 +1,5 @@
 import time
+import datetime
 
 from django_plotly_dash import DjangoDash
 from dash import html, dcc
@@ -17,6 +18,7 @@ import pandas as pd
 DASHES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
 DEFAULT_ADM0 = 'Mauritanie'
 DEFAULT_SAMRAMODEL_PK = 1
+DEFAULT_RESPONSE_PKS = [1, 2, 3, 5, 14]
 
 app = DjangoDash("scenarioresponse", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -30,11 +32,12 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
                     dbc.Select(id=(VARIABLE_INPUT := "variable-input"), className="mb-2", style={"font-size": "small"}),
                     dbc.Select(id=(AGG_INPUT := "agg-input"), className="mb-2", style={"font-size": "small"}),
                     html.H6("Scénarios:"),
-                    dbc.Checklist(id=(SCENARIO_INPUT := "scenario-input"), className="mb-2", style={"font-size": "small"}),
+                    dbc.Checklist(id=(SCENARIO_INPUT := "scenario-input"), className="mb-2",
+                                  style={"font-size": "small"}),
                     html.H6("Réponses:"),
                     dbc.Checklist(id=(RESPONSE_INPUT := "response-input"), className="mb-2",
                                   style={"height": "195px", "overflow-y": "scroll", "font-size": "small"}),
-                    dbc.Button("Réexécuter", id="rerun-submit", color="danger", size="sm", disabled=True),
+                    dbc.Button("Réexécuter", id="rerun-submit", color="danger", size="sm", disabled=False),
                 ])
             ])
         ]),
@@ -63,7 +66,7 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
             ])
         ])
     ]),
-    html.Div(id="rerun-readout")
+    html.Div(id=(RERUN_READOUT := "rerun-readout")),
 ])
 
 
@@ -83,17 +86,23 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
 def populate_initial(_):
     admin0_options = [{'label': adm0, 'value': adm0} for adm0 in ADMIN0S]
     admin0_value = DEFAULT_ADM0
-    included_types=["Stock", "Flow", "Variable"]
-    variable_options = [{"label": element.get("label"), "value": element.get("id")}
-                       for element in Variable.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types).values("id", "label")]
+    included_types = ["Stock", "Flow", "Variable"]
+    variable_options = [
+        {"label": element.get("label"), "value": element.get("id")}
+        for element in Variable.objects.exclude(simulateddatapoints=None).filter(sd_type__in=included_types).values("id", "label")
+    ]
     variable_value = 77
     agg_options = [{"label": agg[1], "value": agg[0]} for agg in Variable.AGG_OPTIONS]
-    scenario_options = [{"label": scenario.get("name"), "value": scenario.get("id")}
-                        for scenario in Scenario.objects.all().order_by("id").values("id", "name")]
+    scenario_options = [
+        {"label": scenario.get("name"), "value": scenario.get("id")}
+        for scenario in Scenario.objects.all().order_by("id").values("id", "name")
+    ]
     scenario_value = [scenario.get("value") for scenario in scenario_options]
-    response_options = [{"label": obj.get("name"), "value": obj.get("id")}
-                        for obj in ResponseOption.objects.all().order_by("id").values("id", "name")]
-    response_value = [obj.get("value") for obj in response_options[0:3]]
+    response_options = [
+        {"label": obj.get("name"), "value": obj.get("id")}
+        for obj in ResponseOption.objects.all().order_by("id").values("id", "name")
+    ]
+    response_value = DEFAULT_RESPONSE_PKS
     return (
         variable_options, variable_value, agg_options,
         admin0_options, admin0_value,
@@ -124,9 +133,9 @@ def rerun_model(n_clicks, adm0, scenario_pks, response_pks):
         raise PreventUpdate
     start = time.time()
     n = len(scenario_pks) * len(response_pks)
-    for scenario_pk in scenario_pks:
-        for response_pk in response_pks:
-            run_model(scenario_pk, response_pk, DEFAULT_SAMRAMODEL_PK, adm0)
+    startdate = datetime.date(2023, 3, 1)
+    enddate = datetime.date(2025, 3, 1)
+    run_model(scenario_pks, response_pks, DEFAULT_SAMRAMODEL_PK, adm0, startdate=startdate, enddate=enddate)
     stop = time.time()
     duration = stop - start
     duration_per = duration / n
@@ -142,10 +151,11 @@ def rerun_model(n_clicks, adm0, scenario_pks, response_pks):
     Input(VARIABLE_INPUT, "value"),
     Input(AGG_INPUT, "value"),
     Input(SCENARIO_INPUT, "value"),
-    Input(RESPONSE_INPUT, "value")
+    Input(RESPONSE_INPUT, "value"),
+    Input(RERUN_READOUT, 'children'),
 )
 @timer
-def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks):
+def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks, _):
     # set colors
     baseline_response_pk = 1
     scenario_pks.sort()

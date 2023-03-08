@@ -7,6 +7,7 @@ from statsmodels.tsa.forecasting.theta import ThetaModel
 from ..models import Variable, Source, ForecastedDataPoint
 
 # TODO: make this just trigger on data add, or somewhere else by admin
+# TODO: make sure this forecasts up to modeling time (for very old data)
 
 
 def forecast_element(element_pk, adm0, sarima_params=None):
