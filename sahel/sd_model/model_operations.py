@@ -235,6 +235,7 @@ def run_model(
             for row in household_cv_df.itertuples()
         })
 
+    # TODO: if value doesn't exist for specific admin1,2, just take one from admin0
     for scenario_pk in scenario_pks:
         print(f"SETTING UP SCENARIO {scenario_pk}")
         scenario_constants = {}
