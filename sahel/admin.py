@@ -110,7 +110,7 @@ class ResponsePulseAdmin(ImportExportModelAdmin):
     resource_class = ResponsePulseResource
     list_filter = [
         'element',
-        'response',
+        'responseoption',
         'admin0',
     ]
 
