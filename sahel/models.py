@@ -74,7 +74,6 @@ class Element(Node):
     kumu_id = models.CharField(max_length=100, null=True, blank=True)
 
 
-# TODO: check if used and delete if needed
 class Region(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -204,6 +203,7 @@ class Story(models.Model):
 
 
 # TODO: do types properly
+# TODO: make units their own model so all this isn't hardcoded
 class Variable(Node):
     STOCK = 'Stock'
     FLOW = 'Flow'
@@ -243,6 +243,7 @@ class Variable(Node):
         ("kg", "kg"),
         ("kg / mois", "kg / mois"),
         ("kg / jour", "kg / jour"),
+        ("kg / tête / mois", "kg / tête / mois"),
         ("L", "L"),
         ("L / mois", "L / mois"),
         ("L / jour", "L / jour"),

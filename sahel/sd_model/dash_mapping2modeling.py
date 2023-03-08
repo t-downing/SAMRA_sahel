@@ -1503,50 +1503,51 @@ def right_sidebar(selectednodedata, cyto_elements, adm0, scenario_pk, responseop
             )
 
         # graph
-        fig = go.Figure(layout=go.Layout(template="simple_white", margin=go.layout.Margin(l=0, r=0, b=0, t=0)))
-        fig.update_xaxes(title_text="Date")
+        if variable.sd_type in [Variable.STOCK, Variable.FLOW, Variable.VARIABLE, Variable.INPUT]:
+            fig = go.Figure(layout=go.Layout(template="simple_white", margin=go.layout.Margin(l=0, r=0, b=0, t=0)))
+            fig.update_xaxes(title_text="Date")
 
-        # simulated DPs
-        # TODO: disagg by admin1-2
-        df = pd.DataFrame(SimulatedDataPoint.objects
-                          .filter(element=variable, scenario_id=scenario_pk, responseoption_id=responseoption_pk, admin0=adm0)
-                          .values("date", "value"))
-        if not df.empty:
-            fig.add_trace(go.Scatter(
-                x=df["date"],
-                y=df["value"],
-                name="Simulé",
-            ))
-
-        # measured DPs
-        # TODO: disagg by admin2
-        mdps = MeasuredDataPoint.objects.filter(element=variable, admin0=adm0)
-        if admin1 is not None:
-            mdps = mdps.filter(admin1=admin1)
-        df = pd.DataFrame(mdps.values())
-
-        if not df.empty:
-            source_ids = df["source_id"].drop_duplicates()
-            for source_id in source_ids:
-                try:
-                    source = Source.objects.get(pk=source_id)
-                except Source.DoesNotExist:
-                    print(f"no source for datapoint in {variable}")
-                    continue
-                dff = df[df["source_id"] == source_id].groupby("date").mean().reset_index()
+            # simulated DPs
+            # TODO: disagg by admin1-2
+            df = pd.DataFrame(SimulatedDataPoint.objects
+                              .filter(element=variable, scenario_id=scenario_pk, responseoption_id=responseoption_pk, admin0=adm0)
+                              .values("date", "value"))
+            if not df.empty:
                 fig.add_trace(go.Scatter(
-                    x=dff["date"],
-                    y=dff["value"],
-                    name=source.title,
+                    x=df["date"],
+                    y=df["value"],
+                    name="Simulé",
                 ))
-        unit_append = " / mois" if variable.sd_type == "Pulse Input" else ""
-        fig.update_layout(
-            legend=dict(yanchor="bottom", x=0, y=1),
-            showlegend=True,
-            yaxis=dict(title=variable.unit.replace("LCY", CURRENCY.get(adm0)) + unit_append),
-        )
-        fig_div = dcc.Graph(figure=fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2")
-        children.append(fig_div)
+
+            # measured DPs
+            # TODO: disagg by admin2
+            mdps = MeasuredDataPoint.objects.filter(element=variable, admin0=adm0)
+            if admin1 is not None:
+                mdps = mdps.filter(admin1=admin1)
+            df = pd.DataFrame(mdps.values())
+
+            if not df.empty:
+                source_ids = df["source_id"].drop_duplicates()
+                for source_id in source_ids:
+                    try:
+                        source = Source.objects.get(pk=source_id)
+                    except Source.DoesNotExist:
+                        print(f"no source for datapoint in {variable}")
+                        continue
+                    dff = df[df["source_id"] == source_id].groupby("date").mean().reset_index()
+                    fig.add_trace(go.Scatter(
+                        x=dff["date"],
+                        y=dff["value"],
+                        name=source.title,
+                    ))
+            unit_append = " / mois" if variable.sd_type == "Pulse Input" else ""
+            fig.update_layout(
+                legend=dict(yanchor="bottom", x=0, y=1),
+                showlegend=True,
+                yaxis=dict(title=variable.unit.replace("LCY", CURRENCY.get(adm0)) + unit_append),
+            )
+            fig_div = dcc.Graph(figure=fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2")
+            children.append(fig_div)
 
         # TODO: show seasonal values
         if variable.sd_type in ["Flow", "Variable"]:
@@ -1700,18 +1701,16 @@ def right_sidebar(selectednodedata, cyto_elements, adm0, scenario_pk, responseop
                 children.append(outflows_card)
 
         elif variable.sd_type == "Household Constant":
-
-            if not LITE:
-                try:
-                    value = variable.householdconstantvalues.get(admin0=adm0).value
-                except HouseholdConstantValue.DoesNotExist:
-                    value = None
-                householdvalue_card = dbc.InputGroup([
-                    dbc.InputGroupText("Value"),
-                    dbc.Input(id="householdconstantvalue-input", value=value),
-                    dbc.Button("Saisir", id="householdconstantvalue-submit")
-                ])
-                children.append(householdvalue_card)
+            try:
+                value = variable.householdconstantvalues.get(admin0=adm0).value
+            except HouseholdConstantValue.DoesNotExist:
+                value = None
+            householdvalue_card = dbc.InputGroup([
+                dbc.InputGroupText("Value"),
+                dbc.Input(id="householdconstantvalue-input", value=value),
+                dbc.Button("Saisir", id="householdconstantvalue-submit")
+            ])
+            children.append(householdvalue_card)
 
     if not children:
         return None
