@@ -167,9 +167,10 @@ def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks, _):
     element = Variable.objects.get(pk=element_pk)
 
     # read results
-    df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text = read_results(
+    df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text, unit = read_results(
         adm0=adm0, element_pk=element_pk, scenario_pks=scenario_pks, response_pks=response_pks, agg_value=agg_value
     )
+    agg_unit = agg_unit.replace('LCY', CURRENCY.get(adm0))
 
     # bar graph
     decimals = 2 if element.unit == "1" else 1
@@ -210,7 +211,7 @@ def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks, _):
 
     time_fig.update_layout(showlegend=True, title_text=f"{element.label}: chronologie")
     time_fig.update_xaxes(title_text="Date")
-    time_fig.update_yaxes(title_text=f"{element.label} ({element.unit})")
+    time_fig.update_yaxes(title_text=f"{element.label} ({unit})")
 
     # scatter graph
     scatter_fig = go.Figure(layout=dict(template="simple_white"))

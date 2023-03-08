@@ -504,4 +504,4 @@ def read_results(adm0, element_pk, scenario_pks, response_pks, agg_value: str = 
     )
     df_agg["baseline_diff"] = df_agg["value"] - df_agg["baseline_value"]
 
-    return df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text
+    return df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text, element.unit
