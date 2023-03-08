@@ -11,14 +11,12 @@ class Command(BaseCommand):
         connections = VariableConnection.objects.all().values()
         objs = []
         for variable in variables:
-            print(variable)
             to_pk = variable.pk
             from_pks = list(set(re.findall(r'_E(.+?)_', variable.equation)))
             existing_from_pks = [conn.get('from_variable_id') for conn in connections if conn.get('to_variable_id') == to_pk]
-            print(from_pks)
-            print(existing_from_pks)
             for from_pk in from_pks:
                 if int(from_pk) not in existing_from_pks:
+                    print(f"was missing {from_pk} from {variable}")
                     objs.append(VariableConnection(
                         from_variable_id=from_pk,
                         to_variable_id=to_pk,

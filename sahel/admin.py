@@ -60,6 +60,74 @@ class MeasuredDataPointAdmin(ImportExportModelAdmin):
     ]
 
 
+class ResponseConstantResource(resources.ModelResource):
+    class Meta:
+        model = models.ResponseConstantValue
+
+
+class ResponseConstantAdmin(ImportExportModelAdmin):
+    resource_class = ResponseConstantResource
+    list_filter = [
+        'element',
+        'admin0',
+        'responseoption'
+    ]
+
+
+class HouseholdConstantResource(resources.ModelResource):
+    class Meta:
+        model = models.HouseholdConstantValue
+
+
+class HouseholdConstantAdmin(ImportExportModelAdmin):
+    resource_class = HouseholdConstantResource
+    list_filter = [
+        'element',
+        'admin0',
+    ]
+
+
+class ScenarioConstantResource(resources.ModelResource):
+    class Meta:
+        model = models.ScenarioConstantValue
+
+
+class ScenarioConstantAdmin(ImportExportModelAdmin):
+    resource_class = ScenarioConstantResource
+    list_filter = [
+        'element',
+        'scenario',
+        'admin0',
+    ]
+
+
+class ResponsePulseResource(resources.ModelResource):
+    class Meta:
+        model = models.PulseValue
+
+
+class ResponsePulseAdmin(ImportExportModelAdmin):
+    resource_class = ResponsePulseResource
+    list_filter = [
+        'element',
+        'response',
+        'admin0',
+    ]
+
+
+class SeasonalInputResource(resources.ModelResource):
+    class Meta:
+        model = models.SeasonalInputDataPoint
+
+
+class SeasonalInputAdmin(ImportExportModelAdmin):
+    resource_class = SeasonalInputResource
+    list_filter = [
+        'element',
+        'admin0',
+    ]
+
+
 # REGISTRATION
 admin.site.register(models.Variable, VariableAdmin)
 admin.site.register(models.SimulatedDataPoint)
@@ -69,13 +137,13 @@ admin.site.register(models.Source)
 admin.site.register(models.RegularDataset)
 admin.site.register(models.MeasuredDataPoint, MeasuredDataPointAdmin)
 admin.site.register(models.ResponseOption)
-admin.site.register(models.ResponseConstantValue)
-admin.site.register(models.SeasonalInputDataPoint)
+admin.site.register(models.ResponseConstantValue, ResponseConstantAdmin)
+admin.site.register(models.SeasonalInputDataPoint, SeasonalInputAdmin)
 admin.site.register(models.ForecastedDataPoint)
-admin.site.register(models.PulseValue)
-admin.site.register(models.HouseholdConstantValue)
+admin.site.register(models.PulseValue, ResponsePulseAdmin)
+admin.site.register(models.HouseholdConstantValue, HouseholdConstantAdmin)
 admin.site.register(models.Scenario)
-admin.site.register(models.ScenarioConstantValue)
+admin.site.register(models.ScenarioConstantValue, ScenarioConstantAdmin)
 admin.site.register(models.Element, ElementResourceAdmin)
 admin.site.register(models.SituationalAnalysis, SituationalAnalysisAdmin)
 admin.site.register(models.TheoryOfChange)

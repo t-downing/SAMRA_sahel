@@ -1,3 +1,5 @@
+import datetime
+
 from django_plotly_dash import DjangoDash
 from dash import html, dcc, ctx
 from dash.dependencies import Input, Output, State, MATCH, ALL
@@ -530,8 +532,11 @@ def add_eb_elements(samramodel_pk):
 def run_model_from_dash(n_clicks, samramodel_pk, adm0, scenario_pk, response_pk):
     if n_clicks is None:
         raise PreventUpdate
-    run_model([scenario_pk], [response_pk], samramodel_pk, adm0)
-    return f"ran model for scenario {scenario_pk}, response {response_pk}, model {samramodel_pk}, admin0 {adm0}"
+    startdate = datetime.date(2022, 3, 1)
+    enddate = datetime.date(2024, 3, 1)
+    run_model([scenario_pk], [response_pk], samramodel_pk, adm0, startdate=startdate, enddate=enddate)
+    return f"ran model for scenario {scenario_pk}, response {response_pk}, model {samramodel_pk}, admin0 {adm0}, " \
+           f"startdate {startdate}, enddate {enddate}"
 
 
 @app.callback(
