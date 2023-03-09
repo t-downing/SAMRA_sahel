@@ -470,7 +470,7 @@ class ResponseOption(models.Model):
     samramodel = models.ForeignKey("samramodel", related_name="responseoptions", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name}; pk {self.pk}"
 
 
 class Scenario(models.Model):
