@@ -31,21 +31,21 @@ app.layout = dbc.Container(style={"background-color": "#f8f9fc"}, fluid=True, ch
                 dbc.CardBody([
                     dbc.Select(id=(ADMIN0_INPUT := 'admin0-input')),
                     dbc.Select(id=(ELEMENT_INPUT := "element-input")),
-                    html.Hr(),
-                    html.H6("SARIMA parameters"),
-                    dbc.InputGroup([
-                        dbc.Input(id=f"{letter}-input", value=0)
-                        for letter in "pdq"
-                    ]),
-                    dbc.InputGroup([
-                        dbc.Input(id=f"{letter}-input", value=0)
-                        for letter in "PDQm"
-                    ]),
-                    dbc.Button("Re-forecast", id="forecast-test-submit", color="warning", disabled=True),
-                    html.Hr(),
-                    html.H5("Préviser avec les défauts"),
-                    dbc.Button("Préviser", id="forecast-submit", disabled=False),
-                    dbc.Button("Préviser TOUS", id="forecast-all-submit", color="danger", disabled=True),
+                    # html.Hr(),
+                    # html.H6("SARIMA parameters"),
+                    # dbc.InputGroup([
+                    #     dbc.Input(id=f"{letter}-input", value=0)
+                    #     for letter in "pdq"
+                    # ]),
+                    # dbc.InputGroup([
+                    #     dbc.Input(id=f"{letter}-input", value=0)
+                    #     for letter in "PDQm"
+                    # ]),
+                    # dbc.Button("Re-forecast", id="forecast-test-submit", color="warning", disabled=True),
+                    # html.Hr(),
+                    # html.H5("Préviser avec les défauts"),
+                    # dbc.Button("Préviser", id="forecast-submit", disabled=False),
+                    # dbc.Button("Préviser TOUS", id="forecast-all-submit", color="danger", disabled=True),
                 ]),
             ])
         ], width=2),
@@ -144,39 +144,39 @@ def update_graph(element_pk, adm0, *_):
     return fig
 
 
-@app.callback(
-    Output("forecast-test-readout", "children"),
-    Input("forecast-test-submit", "n_clicks"),
-    State("element-input", "value"),
-    [State(f"{letter}-input", "value") for letter in "pdqPDQm"],
-)
-@timer
-def update_test_forecast(n_clicks, element_pk, p, d, q, P, D, Q, m):
-    if n_clicks is None: raise PreventUpdate
-    sarima_params = {"p": p, "d": d, "q": q, "P": P, "D": D, "Q": Q, "m": m}
-    forecast_element(element_pk, sarima_params=sarima_params)
-    return f"forecasted {element_pk} with test params"
+# @app.callback(
+#     Output("forecast-test-readout", "children"),
+#     Input("forecast-test-submit", "n_clicks"),
+#     State("element-input", "value"),
+#     [State(f"{letter}-input", "value") for letter in "pdqPDQm"],
+# )
+# @timer
+# def update_test_forecast(n_clicks, element_pk, p, d, q, P, D, Q, m):
+#     if n_clicks is None: raise PreventUpdate
+#     sarima_params = {"p": p, "d": d, "q": q, "P": P, "D": D, "Q": Q, "m": m}
+#     forecast_element(element_pk, sarima_params=sarima_params)
+#     return f"forecasted {element_pk} with test params"
 
 
-@app.callback(
-    Output("forecast-readout", "children"),
-    Input("forecast-submit", "n_clicks"),
-    State("element-input", "value"),
-)
-def update_forecast(n_clicks, element_pk):
-    if n_clicks is None: raise PreventUpdate
-    forecast_element(element_pk)
-    return f"forecasted {element_pk} with default"
+# @app.callback(
+#     Output("forecast-readout", "children"),
+#     Input("forecast-submit", "n_clicks"),
+#     State("element-input", "value"),
+# )
+# def update_forecast(n_clicks, element_pk):
+#     if n_clicks is None: raise PreventUpdate
+#     forecast_element(element_pk)
+#     return f"forecasted {element_pk} with default"
 
 
-@app.callback(
-    Output("forecast-all-readout", "children"),
-    Input("forecast-all-submit", "n_clicks"),
-)
-def update_forecast_all(n_clicks):
-    if n_clicks is None:
-        raise PreventUpdate
-    start = time.time()
-    for element in Variable.objects.filter(sd_type="Input").exclude(measureddatapoints=None):
-        forecast_element(element.pk)
-    return f"forecasted all, took {time.time() - start} s"
+# @app.callback(
+#     Output("forecast-all-readout", "children"),
+#     Input("forecast-all-submit", "n_clicks"),
+# )
+# def update_forecast_all(n_clicks):
+#     if n_clicks is None:
+#         raise PreventUpdate
+#     start = time.time()
+#     for element in Variable.objects.filter(sd_type="Input").exclude(measureddatapoints=None):
+#         forecast_element(element.pk)
+#     return f"forecasted all, took {time.time() - start} s"

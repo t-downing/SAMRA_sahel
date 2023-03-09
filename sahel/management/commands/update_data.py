@@ -7,7 +7,7 @@ from hdx.data.dataset import Dataset
 from dateutil import parser
 import pandas as pd
 import numpy as np
-from ...models import RegularDataset, Variable, MeasuredDataPoint, Source, Element
+from ...models import RegularDataset, Variable, MeasuredDataPoint, Source, Element, HouseholdConstantValue
 from datetime import datetime, timezone, date
 import time
 from pathlib import Path
@@ -313,11 +313,11 @@ def update_dm_phm_bkn_maraichange():
     # sections and options
     DATE = "Date"
     PROFIL = 'Profil du ménage : '
-    NOMBRE_PER = 'Nombre de personnes totales dans le ménage'
+    NOMBRE_PER = PROFIL + 'Nombre de personnes totales dans le ménage'
     CULT_ET_REND = 'Cultures et rendements : '
     REND_ET_PERTE = CULT_ET_REND + 'Rendements et pertes-post récolte : '
-    SUPERFICIE1 = 'Quelle superficie de terre avez-vous cultivée pour cette culture au cours de la dernière saison avec les semences distribuées par le CICR? (metre carré'
-    SUPERFICIE2 = 'Quelle superficie de terre avez-vous cultivée pour cette culture au cours de la dernière saison avec les semences distribuées par le CICR? (mètre carré'
+    SUPERFICIE = REND_ET_PERTE + 'Quelle superficie de terre avez-vous cultivée pour cette culture au cours de la dernière saison avec les semences distribuées par le CICR? (metre carré'
+    QUANT_PROD = REND_ET_PERTE + 'Quelle superficie de terre avez-vous cultivée pour cette culture au cours de la dernière saison avec les semences distribuées par le CICR? (mètre carré'
     CONS = REND_ET_PERTE + 'Stock pour la consommation du ménage'
     VEND = REND_ET_PERTE + 'Vendue'
     DETTE_AG = REND_ET_PERTE + 'Remboursement de la dette liée à la production agricole (y compris la location des terres et les intrants agricoles)'
@@ -325,8 +325,9 @@ def update_dm_phm_bkn_maraichange():
     STOCK = REND_ET_PERTE + "Stock de semences pour la prochaine saison"
     DON = REND_ET_PERTE + "Donation"
     AUTRE = REND_ET_PERTE + "Autre"
-    PERTES = REND_ET_PERTE + "Si oui, pouvez-vous estimer la proportion de votre récolte?"
-    PERTES_VALUES = {
+    PERTE = REND_ET_PERTE + "Avez-vous eu des pertes après la récolte ?"
+    PERTE_FRAC = REND_ET_PERTE + "Si oui, pouvez-vous estimer la proportion de votre récolte?"
+    PERTE_FRAC_VALUES = {
         "Une petite partie (25%)": 0.25,
         "La moitié (50%)": 0.5,
         "La plus grande partie (75%)": 0.75,
@@ -338,36 +339,45 @@ def update_dm_phm_bkn_maraichange():
         "Daily": 1,
         "Monthly": DAYS_IN_MONTH
     }
-    QUANT = REND_ET_PERTE + "En moyenne, quelle quantité vendez-vous par marché ? (en KILOS)"
+    QUANT_VENDU = REND_ET_PERTE + "En moyenne, quelle quantité vendez-vous par marché ? (en KILOS)"
     REVENU = REND_ET_PERTE + "En général, la vente de la récolte de cette culture vous rapporte combien par marché ?"
     MARCHE_ET_VENTE = "Marché et vente des produits : "
     TRANS = MARCHE_ET_VENTE + "Quel est le cout éventuel du transport ?"
     PRIX_TRANS = MARCHE_ET_VENTE + "Si argent, combien par trajet ? (aller/retour)"
     RIEN = "Rien"
+    NO = "no"
 
     df = df.replace({
-        PERTES: PERTES_VALUES,
+        PERTE_FRAC: PERTE_FRAC_VALUES,
         FREQ: FREQ_VALUES,
+        SUPERFICIE: {0: np.nan}
     })
 
     df[DATE] = pd.to_datetime(df[DATE])
-    df[PRIX_PER_KG := "prix_per_kg"] = df[REVENU] / df[QUANT]
+    df[PRIX_PER_KG := "prix_per_kg"] = df[REVENU] / df[QUANT_VENDU]
+    df[PERTE_FRAC] = df.apply(lambda row: 0 if row[PERTE] == NO else row[PERTE_FRAC], axis=1)
     df[PRIX_TRANS] = df.apply(lambda row: 0 if row[TRANS] == RIEN else row[PRIX_TRANS], axis=1)
-    df[COUT_TRANS_PER_KG := 'cout_trans_per_kg'] = df[PRIX_TRANS] / df[QUANT]
+    df[COUT_TRANS_PER_KG := 'cout_trans_per_kg'] = df[PRIX_TRANS] / df[QUANT_VENDU]
+    df[SUPERFICIE] /= 10000
+    df[RENDEMENT := 'rendement'] = df[QUANT_PROD] / df[SUPERFICIE]
+    frac_cols = [CONS, VEND, DETTE_AG, DETTE_AUTRE, STOCK, DON, AUTRE]
+    df[frac_cols] /= 100
 
-    agg_cols = [DATE, PRIX_PER_KG, PERTES, COUT_TRANS_PER_KG]
-    df = df[agg_cols]
+    timeseries_cols = [PRIX_PER_KG, PERTE_FRAC, COUT_TRANS_PER_KG]
+    constant_cols = [*frac_cols, NOMBRE_PER, RENDEMENT, SUPERFICIE]
 
-    df = df.groupby(pd.Grouper(key=DATE, freq="MS")).mean().reset_index()
-    df = df.dropna()
-    df[DATE] = df[DATE] + pd.DateOffset(months=0, days=14)
+    dff = df[[DATE, *timeseries_cols]]
+    dff = dff.groupby(pd.Grouper(key=DATE, freq="QS")).mean().reset_index()
+    dff = dff.dropna()
+    dff[DATE] = dff[DATE] + pd.DateOffset(months=1, days=14)
 
-    print(df)
+    # timeseries inputs
+    print(dff)
     objs = []
     pk2col = {
         267: PRIX_PER_KG,
         268: COUT_TRANS_PER_KG,
-        269: PERTES,
+        269: PERTE_FRAC,
     }
 
     objs.extend([
@@ -381,12 +391,43 @@ def update_dm_phm_bkn_maraichange():
             source_id=source_pk
         )
         for pk, col_name in pk2col.items()
-        for _, row in df.iterrows()
+        for _, row in dff.iterrows()
     ])
 
     MeasuredDataPoint.objects.filter(source_id=source_pk).delete()
     MeasuredDataPoint.objects.bulk_create(objs)
 
+    # one-off inputs
+    dff = df[constant_cols]
+    dff = dff.mean()
+    print(dff)
+    pk2col = {
+        270: CONS,
+        271: VEND,
+        272: DETTE_AG,
+        273: DETTE_AUTRE,
+        274: STOCK,
+        275: DON,
+        276: AUTRE,
+        138: NOMBRE_PER,
+        277: RENDEMENT,
+        278: SUPERFICIE
+    }
+
+    objs.extend([
+        HouseholdConstantValue(
+            element_id=pk,
+            value=dff[col_name],
+            admin0=admin0,
+            admin1=admin1,
+            admin2=admin2,
+            source_id=source_pk,
+        )
+        for pk, col_name in pk2col.items()
+    ])
+
+    HouseholdConstantValue.objects.filter(source_id=source_pk).delete()
+    HouseholdConstantValue.objects.bulk_create(objs)
 
 
 # other 3rd party

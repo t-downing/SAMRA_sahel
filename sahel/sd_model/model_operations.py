@@ -2,7 +2,7 @@ import pandas as pd
 from BPTK_Py import Model, bptk
 from BPTK_Py import sd_functions as sd
 from ..models import Variable, SimulatedDataPoint, MeasuredDataPoint, ResponseConstantValue, ResponseOption, \
-    SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue, PulseValue
+    SeasonalInputDataPoint, ForecastedDataPoint, HouseholdConstantValue, ScenarioConstantValue, PulseValue, ADMIN0S
 from datetime import datetime, date
 import time, functools, warnings
 from django.db.models import Q
@@ -24,6 +24,10 @@ def run_model(
         enddate: date = date(2024, 7, 1),
         timestep: int = 2,
 ):
+    if adm0 not in ADMIN0S:
+        print("invalid admin0")
+        return
+
     start = time.time()
 
     scenario_pks = [int(pk) for pk in scenario_pks]
@@ -231,6 +235,7 @@ def run_model(
             for row in household_cv_df.itertuples()
         })
 
+    # TODO: if value doesn't exist for specific admin1,2, just take one from admin0
     for scenario_pk in scenario_pks:
         print(f"SETTING UP SCENARIO {scenario_pk}")
         scenario_constants = {}
@@ -499,4 +504,4 @@ def read_results(adm0, element_pk, scenario_pks, response_pks, agg_value: str = 
     )
     df_agg["baseline_diff"] = df_agg["value"] - df_agg["baseline_value"]
 
-    return df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text
+    return df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text, element.unit

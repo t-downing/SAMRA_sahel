@@ -74,7 +74,6 @@ class Element(Node):
     kumu_id = models.CharField(max_length=100, null=True, blank=True)
 
 
-# TODO: check if used and delete if needed
 class Region(models.Model):
     name = models.CharField(max_length=200)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -204,6 +203,7 @@ class Story(models.Model):
 
 
 # TODO: do types properly
+# TODO: make units their own model so all this isn't hardcoded
 class Variable(Node):
     STOCK = 'Stock'
     FLOW = 'Flow'
@@ -243,6 +243,7 @@ class Variable(Node):
         ("kg", "kg"),
         ("kg / mois", "kg / mois"),
         ("kg / jour", "kg / jour"),
+        ("kg / tête / mois", "kg / tête / mois"),
         ("L", "L"),
         ("L / mois", "L / mois"),
         ("L / jour", "L / jour"),
@@ -256,6 +257,8 @@ class Variable(Node):
         ("mm / jour", "mm / jour"),
         ("NDVI", "NDVI"),
         ("USD / tonne", "USD / tonne"),
+        ('kg / hec', 'kg / hec'),
+        ('hec', 'hec'),
     )
     AGG_OPTIONS = (
         ("MEAN", "moyen"),
@@ -511,6 +514,9 @@ class HouseholdConstantValue(models.Model):
     )
     value = models.FloatField(null=True)
     admin0 = models.CharField(max_length=200, null=True, blank=True)
+    admin1 = models.CharField(max_length=200, null=True, blank=True)
+    admin2 = models.CharField(max_length=200, null=True, blank=True)
+    source = models.ForeignKey("source", related_name="householdconstantvalues", null=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return f"Element: {self.element}; Value: {self.value}"

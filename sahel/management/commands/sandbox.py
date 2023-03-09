@@ -1,23 +1,23 @@
 from django.core.management.base import BaseCommand
-import math
+from sahel.sd_model.model_operations import run_model
 
 
 class Command(BaseCommand):
+    help = 'hi'
+
+    def add_arguments(self, parser):
+        parser.add_argument('-s', '--scenariopks', nargs='+', type=int, help="scenario pks to be run")
+        parser.add_argument('-r', '--responsepks', nargs='+', type=int, help="response pks to be run")
+        parser.add_argument('-m', '--modelpk', nargs='?', type=int, help="model pk to be run")
+        parser.add_argument('-a', '--admin0', nargs='?', type=str, help="admin0 to be run")
+
     def handle(self, *args, **options):
-        exec("print('hello')", {"__builtins__": None, "print": print})
-
-        def smooth(input):
-            return input + 5
-
-        model_locals = {}
-        model_locals.update({"dog": 50})
-        model_locals.update({"cosine": math.cos})
-
-        print(model_locals.get("dog"))
-
-        exec("a = cosine", {"__builtins__": None, "math": math, "smooth": smooth}, model_locals)
-        a = model_locals.get("a")
-        print(a(1))
+        scenario_pks = options['scenariopks'] if options['scenariopks'] is not None else [1]
+        response_pks = options['responsepks'] if options['responsepks'] is not None else [1]
+        model_pk = options['modelpk'] if options['modelpk'] is not None else 1
+        admin0 = options['admin0'] if options['admin0'] is not None else 'Mauritanie'
+        run_model(scenario_pks, response_pks, model_pk, admin0)
+        return
 
 
 

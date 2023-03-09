@@ -1,1 +1,0 @@
-print([int(str) for str in [1, 2]])
