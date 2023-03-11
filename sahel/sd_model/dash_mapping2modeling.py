@@ -16,6 +16,8 @@ from django.db.models import Prefetch, Q
 import json
 from .translations import l
 
+# TODO: implement bulk edits for elements from interface
+
 LITE = True
 DEFAULT_SAMRAMODEL_PK = "1"
 DEFAULT_ADM0 = "Mauritanie"
@@ -1203,7 +1205,7 @@ def draw_model(
     group_nodes = []
     for element_group in element_groups:
         element_pks = [obj.pk for obj in element_group.elements.all()]
-        if story_pk == DEFAULT_STORY_PK or any(pk in element_pks_in_story for pk in element_pks):
+        if story_pk == default_story_pk or any(pk in element_pks_in_story for pk in element_pks):
             in_story = True
         else:
             in_story = False

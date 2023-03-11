@@ -46,6 +46,7 @@ class VariableAdmin(ImportExportModelAdmin):
         'samramodel',
         'sd_type'
     ]
+    list_display = ('__str__', 'sd_type', 'date_created', )
 
 
 class MeasuredDataPointResource(resources.ModelResource):
