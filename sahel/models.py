@@ -38,7 +38,7 @@ class Node(models.Model):
         ordering = ["label"]
 
     def __str__(self):
-        return f"{self.label}; pk: {self.pk}"
+        return f"{self.label} [{self.pk}]"
 
 
 class Sector(models.Model):
@@ -306,6 +306,9 @@ class Variable(Node):
     stock_initial_value_variable = models.OneToOneField(
         'self', related_name='stock', null=True, blank=True, on_delete=models.SET_NULL,
         limit_choices_to={'sd_type__in': CONSTANTS},
+    )
+    element_group = models.ForeignKey(
+        "elementgroup", related_name="variables", null=True, blank=True, on_delete=models.SET_NULL
     )
 
 

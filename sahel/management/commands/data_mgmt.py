@@ -7,9 +7,13 @@ import pandas as pd
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-
-        print(Variable.objects.filter(pk__in=[175, 77, 193, 13, 160]))
-
+        for variable in Variable.objects.all():
+            if variable.element_id is not None:
+                print(f"{variable} has element")
+                if variable.element.element_group_id is not None:
+                    print(f"{variable.element} has group")
+                    variable.element_group_id = variable.element.element_group_id
+                    variable.save()
         pass
 
 

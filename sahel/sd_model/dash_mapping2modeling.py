@@ -55,7 +55,7 @@ app.layout = html.Div(children=[
                         id="layers-input",
                         options=[
                             {"label": f'{l("Group", LANG)}s', "value": "group"},
-                            {"label": f'{l("Element", LANG)}s', "value": "element"},
+                            {"label": f'{l("Element", LANG)}s', "value": "element", "disabled": LITE},
                             {"label": f'{l("Variable", LANG)}s', "value": "variable"},
                         ],
                         value=DEFAULT_LAYERS,
@@ -1031,9 +1031,12 @@ def draw_model(
             usable = False
 
         parent = None
-        if variable.element_id is not None:
+        if not LITE and variable.element_id is not None:
             parent = f"element_{variable.element_id}"
+        elif variable.element_group_id is not None:
+            parent = f"group_{variable.element_group_id}"
 
+        # TODO: implement in_story functionality
         if story_pk == DEFAULT_STORY_PK or variable.element_id in element_pks_in_story:
             in_story = True
         else:
@@ -1114,82 +1117,86 @@ def draw_model(
             )
 
     # ELEMENTS
-    # nodes
-    queryset = ElementPosition.objects.filter(story_id=story_pk)
-    elements = elements.select_subclasses().prefetch_related(
-        Prefetch("elementpositions", queryset=queryset, to_attr="story_position"),
-        Prefetch("variables")
-    )
-    print(f"{len(elements)=}")
-    for element in elements:
-        if element.pk in element_pks_in_story:
-            in_story = True
-        else:
-            in_story = False
 
-        class_append = "" if in_story else " hidden"
-        if not element.variables.exists():
-            class_append += " no_children"
-            if not element.story_position:
-                print(f"no position set for {element}")
-                position = ElementPosition.objects.filter(element=element, story_id=default_story_pk).first()
-                if position is None:
-                    print(f"default position had not yet been set for {element}, setting to zero now")
-                    position = ElementPosition(
-                        element=element, story_id=default_story_pk, x_pos=0.0, y_pos=0.0
-                    )
-                    position.save()
-                x_pos, y_pos = position.x_pos, position.y_pos
-            else:
-                x_pos, y_pos = element.story_position[0].x_pos, element.story_position[0].y_pos
-        else:
-            x_pos, y_pos = None, None
+    # TODO: find way to implement this quicker when not using elements
 
-        cyto_elements.append(
-            {
-                "data": {
-                    "id": f"element_{element.pk}",
-                    "label": element.label,
-                    "hierarchy": "element",
-                    "parent": f"group_{element.element_group_id}",
-                    **{
-                        field: getattr(element, field, None)
-                        for field in SituationalAnalysis.SA_FIELDS
-                    },
-                },
-                "classes": f"element {element.element_type}" + class_append,
-                "position": {"x": x_pos, "y": y_pos}
-            }
+    if not LITE:
+        # nodes
+        queryset = ElementPosition.objects.filter(story_id=story_pk)
+        elements = elements.select_subclasses().prefetch_related(
+            Prefetch("elementpositions", queryset=queryset, to_attr="story_position"),
+            Prefetch("variables")
         )
+        print(f"{len(elements)=}")
+        for element in elements:
+            if element.pk in element_pks_in_story:
+                in_story = True
+            else:
+                in_story = False
 
-    # connections
-    elementconnections = ElementConnection.objects.filter(
-        to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
-    ).select_related(
-        "from_element__situationalanalysis", "from_element__theoryofchange", "from_element__shockstructure"
-    )
-    print(f"{len(elementconnections)=}")
-    for connection in elementconnections:
-        element_type = ""
-        try:
-            element_type += " " + connection.from_element.theoryofchange.element_type
-        except Element.theoryofchange.RelatedObjectDoesNotExist:
-            pass
-        try:
-            element_type += " " + connection.from_element.situationalanalysis.element_type
-        except Element.situationalanalysis.RelatedObjectDoesNotExist:
-            pass
-        try:
-            element_type += " " + connection.from_element.shockstructure.element_type
-        except Element.shockstructure.RelatedObjectDoesNotExist:
-            pass
-        cyto_elements.append({
-            "data": {
-                "source": f"element_{connection.from_element_id}",
-                "target": f"element_{connection.to_element_id}"
-            },
-            "classes": "element" + element_type
-        })
+            class_append = "" if in_story else " hidden"
+            if not element.variables.exists():
+                class_append += " no_children"
+                if not element.story_position:
+                    print(f"no position set for {element}")
+                    position = ElementPosition.objects.filter(element=element, story_id=default_story_pk).first()
+                    if position is None:
+                        print(f"default position had not yet been set for {element}, setting to zero now")
+                        position = ElementPosition(
+                            element=element, story_id=default_story_pk, x_pos=0.0, y_pos=0.0
+                        )
+                        position.save()
+                    x_pos, y_pos = position.x_pos, position.y_pos
+                else:
+                    x_pos, y_pos = element.story_position[0].x_pos, element.story_position[0].y_pos
+            else:
+                x_pos, y_pos = None, None
+
+            cyto_elements.append(
+                {
+                    "data": {
+                        "id": f"element_{element.pk}",
+                        "label": element.label,
+                        "hierarchy": "element",
+                        "parent": f"group_{element.element_group_id}",
+                        **{
+                            field: getattr(element, field, None)
+                            for field in SituationalAnalysis.SA_FIELDS
+                        },
+                    },
+                    "classes": f"element {element.element_type}" + class_append,
+                    "position": {"x": x_pos, "y": y_pos}
+                }
+            )
+
+        # connections
+        elementconnections = ElementConnection.objects.filter(
+            to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
+        ).select_related(
+            "from_element__situationalanalysis", "from_element__theoryofchange", "from_element__shockstructure"
+        )
+        print(f"{len(elementconnections)=}")
+        for connection in elementconnections:
+            element_type = ""
+            try:
+                element_type += " " + connection.from_element.theoryofchange.element_type
+            except Element.theoryofchange.RelatedObjectDoesNotExist:
+                pass
+            try:
+                element_type += " " + connection.from_element.situationalanalysis.element_type
+            except Element.situationalanalysis.RelatedObjectDoesNotExist:
+                pass
+            try:
+                element_type += " " + connection.from_element.shockstructure.element_type
+            except Element.shockstructure.RelatedObjectDoesNotExist:
+                pass
+            cyto_elements.append({
+                "data": {
+                    "source": f"element_{connection.from_element_id}",
+                    "target": f"element_{connection.to_element_id}"
+                },
+                "classes": "element" + element_type
+            })
 
     # GROUPS
     element_groups = ElementGroup.objects.all().prefetch_related("elements")

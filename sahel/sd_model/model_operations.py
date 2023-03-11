@@ -50,14 +50,13 @@ def run_model(
         Q(sd_type="Household Constant")
     )
 
-    model_output_pks = [str(element.pk) for element in elements]
     stop = time.time()
     print(f"init took {stop - start} s")
     start = time.time()
 
     model_output_pks = []
     for element in elements:
-        if element.sd_type in ["Variable", "Stock", "Flow"] and element.model_output_variable:
+        if element.sd_type in [Variable.VARIABLE, Variable.STOCK, Variable.FLOW, Variable.RESPONSE_PULSE]:
             model_output_pks.append(str(element.pk))
 
     # initialise all elements and set constants
