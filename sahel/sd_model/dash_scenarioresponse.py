@@ -133,9 +133,7 @@ def rerun_model(n_clicks, adm0, scenario_pks, response_pks):
         raise PreventUpdate
     start = time.time()
     n = len(scenario_pks) * len(response_pks)
-    startdate = datetime.date(2023, 1, 1)
-    enddate = datetime.date(2025, 1, 1)
-    run_model(scenario_pks, response_pks, DEFAULT_SAMRAMODEL_PK, adm0, startdate=startdate, enddate=enddate)
+    run_model(scenario_pks, response_pks, DEFAULT_SAMRAMODEL_PK, adm0)
     stop = time.time()
     duration = stop - start
     duration_per = duration / n

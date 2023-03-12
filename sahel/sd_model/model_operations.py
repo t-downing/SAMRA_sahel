@@ -20,8 +20,8 @@ def run_model(
         adm0: str,
         adm1: str = None,
         adm2: str = None,
-        startdate: date = date(2022, 7, 1),
-        enddate: date = date(2024, 7, 1),
+        startdate: date = date(2023, 1, 1),
+        enddate: date = date(2025, 1, 1),
         timestep: int = 2,
 ):
     if adm0 not in ADMIN0S:
