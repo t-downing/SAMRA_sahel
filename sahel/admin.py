@@ -138,7 +138,7 @@ class VariableConnectionResource(resources.ModelResource):
 class VariableConnectionAdmin(ImportExportModelAdmin):
     resource_class = VariableConnectionResource
     list_display = ['from_variable', 'to_variable']
-    search_fields = ['from_variable', 'to_variable']
+    search_fields = ['from_variable__label', 'to_variable__label']
 
 
 # REGISTRATION
