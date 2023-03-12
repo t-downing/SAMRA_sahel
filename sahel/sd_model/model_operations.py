@@ -154,9 +154,11 @@ def run_model(
                 if element.sd_type == "Input":
                     # load measured points
                     m_start = time.time()
-                    df_m = df_m_all[df_m_all["element_id"] == int(pk)]
-                    if not df_m.empty:
-                        df_m = df_m.groupby("date").mean().reset_index()[["date", "value"]]
+                    df_m = pd.DataFrame()
+                    if not df_m_all.empty:
+                        df_m = df_m_all[df_m_all["element_id"] == int(pk)]
+                        if not df_m.empty:
+                            df_m = df_m.groupby("date").mean().reset_index()[["date", "value"]]
                     m_time += time.time() - m_start
 
                     # load forecasted points

@@ -63,6 +63,7 @@ class MeasuredDataPointAdmin(ImportExportModelAdmin):
         'admin1',
         'admin2',
     ]
+    list_display = ['value', 'date', 'admin0', 'admin1', 'admin2']
 
 
 class ResponseConstantResource(resources.ModelResource):
@@ -129,10 +130,21 @@ class SeasonalInputAdmin(ImportExportModelAdmin):
     ]
 
 
+class VariableConnectionResource(resources.ModelResource):
+    class Meta:
+        model = models.VariableConnection
+
+
+class VariableConnectionAdmin(ImportExportModelAdmin):
+    resource_class = VariableConnectionResource
+    list_display = ['from_variable', 'to_variable']
+    search_fields = ['from_variable', 'to_variable']
+
+
 # REGISTRATION
 admin.site.register(models.Variable, VariableAdmin)
 admin.site.register(models.SimulatedDataPoint)
-admin.site.register(models.VariableConnection)
+admin.site.register(models.VariableConnection, VariableConnectionAdmin)
 admin.site.register(models.ElementGroup)
 admin.site.register(models.Source)
 admin.site.register(models.RegularDataset)

@@ -7,13 +7,7 @@ import pandas as pd
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        for variable in Variable.objects.all():
-            if variable.element_id is not None:
-                print(f"{variable} has element")
-                if variable.element.element_group_id is not None:
-                    print(f"{variable.element} has group")
-                    variable.element_group_id = variable.element.element_group_id
-                    variable.save()
+        MeasuredDataPoint.objects.filter(date=date(2020, 5, 15), element_id=131).delete()
         pass
 
 

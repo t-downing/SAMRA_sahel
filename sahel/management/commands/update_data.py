@@ -54,6 +54,7 @@ def update_mali_wfp_price_data():
 
     df = df[df["admin1"].isin(MALI_ADMIN1S)]
     df["price"] = df["price"].replace({0: np.nan})
+    df = df.dropna()
 
     elements = Variable.objects.filter(vam_commodity__isnull=False)
 
@@ -69,6 +70,7 @@ def update_mali_wfp_price_data():
             objs.append(MeasuredDataPoint(
                 element=element,
                 date=row["date"],
+                admin0='Mali',
                 admin1=row["admin1"],
                 admin2=row["admin2"],
                 market=row["market"],
@@ -84,6 +86,7 @@ def update_mali_wfp_price_data():
     MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=62).delete()
     MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=63).delete()
     MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=42).delete()
+    MeasuredDataPoint.objects.filter(source=source, date=date(2020, 5, 15), element_id=131).delete()
 
 
 def update_mrt_wfp():
@@ -542,7 +545,7 @@ def read_ven_producerprices():
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        # update_mali_wfp_price_data()
+        update_mali_wfp_price_data()
         # update_dm_suividesprix()
         # update_dm_globallivestock()
         # update_acled()
@@ -550,5 +553,5 @@ class Command(BaseCommand):
         # read_ven_producerprices()
         # update_mrt_wfp()
         # update_mrt_prixmarche()
-        update_dm_phm_bkn_maraichange()
+        # update_dm_phm_bkn_maraichange()
         pass

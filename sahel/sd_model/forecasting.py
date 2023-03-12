@@ -12,7 +12,7 @@ from ..models import Variable, Source, ForecastedDataPoint
 
 def forecast_element(element_pk, adm0, sarima_params=None):
     use_model = 'ETS'
-    forecast_years = 2
+    forecast_years = 3
     variable = Variable.objects.get(pk=element_pk)
     df = pd.DataFrame(variable.measureddatapoints.filter(admin0=adm0).values())
 
