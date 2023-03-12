@@ -47,6 +47,7 @@ class VariableAdmin(ImportExportModelAdmin):
         'sd_type'
     ]
     list_display = ('__str__', 'sd_type', 'date_created', )
+    search_fields = ['label']
 
 
 class MeasuredDataPointResource(resources.ModelResource):
@@ -111,11 +112,8 @@ class ResponsePulseResource(resources.ModelResource):
 
 class ResponsePulseAdmin(ImportExportModelAdmin):
     resource_class = ResponsePulseResource
-    list_filter = [
-        'element',
-        'responseoption',
-        'admin0',
-    ]
+    list_filter = ['element', 'responseoption', 'admin0']
+    list_display = ['value', 'startdate', 'element', 'responseoption']
 
 
 class SeasonalInputResource(resources.ModelResource):

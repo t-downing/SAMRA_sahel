@@ -473,7 +473,7 @@ class ResponseOption(models.Model):
     samramodel = models.ForeignKey("samramodel", related_name="responseoptions", on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
-        return f"{self.name}; pk {self.pk}"
+        return f"{self.name} [{self.pk}]"
 
 
 class Scenario(models.Model):
@@ -533,7 +533,7 @@ class PulseValue(models.Model):
     responseoption = models.ForeignKey("responseoption", related_name="pulsevalues", on_delete=models.CASCADE)
     admin0 = models.CharField(max_length=200, null=True, blank=True)
     value = models.FloatField()
-    startdate = models.DateField()
+    startdate = models.DateField(null=True, blank=True)
     enddate = models.DateField(null=True, blank=True)
 
     def __str__(self):

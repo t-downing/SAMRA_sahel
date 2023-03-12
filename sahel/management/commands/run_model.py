@@ -14,21 +14,6 @@ class Command(BaseCommand):
         parser.add_argument('-a', '--admin0', nargs='?', type=str, help="admin0 to be run")
 
     def handle(self, *args, **options):
-        # scenarios = models.Scenario.objects.all()
-        # responses = models.ResponseOption.objects.all()
-        #
-        # total = len(scenarios) * len(responses)
-        # count = 0
-        # for scenario in scenarios:
-        #     for response in responses:
-        #         start = time.time()
-        #         run_model(scenario.pk, response.pk)
-        #         duration = time.time() - start
-        #         count += 1
-        #         eta = duration * (total - count)
-        #         print(f"Progress: {round(count / total, 3)}; ETA: {round(eta)} s")
-        # run_model([1, 2, 3], [2, 3, 12, 13], 1, 'Mauritanie')
-
         scenario_pks = options['scenariopks'] if options['scenariopks'] is not None else [1]
         response_pks = options['responsepks'] if options['responsepks'] is not None else [1]
         model_pk = options['modelpk'] if options['modelpk'] is not None else 1

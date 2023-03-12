@@ -235,6 +235,7 @@ def run_model(
         })
 
     # TODO: if value doesn't exist for specific admin1,2, just take one from admin0
+    # TODO: set constant based on sd_type, not just whichever one happens to exist
     for scenario_pk in scenario_pks:
         print(f"SETTING UP SCENARIO {scenario_pk}")
         scenario_constants = {}
@@ -259,7 +260,6 @@ def run_model(
             response_pv_dff = pd.DataFrame()
             if not response_pv_df.empty:
                 response_pv_dff = response_pv_df[response_pv_df['responseoption_id'] == responseoption_pk]
-            print(f"{response_pv_dff=}")
             # check that constants are all there and set pulses
             constants = household_constants | scenario_constants | response_constants
             for element in elements:
@@ -272,10 +272,11 @@ def run_model(
                     model.converter(pk).equation = 0.0
                     if not response_pv_dff.empty:
                         response_pv_dfff = response_pv_dff[response_pv_dff['element_id'] == int(pk)]
-                        print(f"{response_pv_dfff=}")
                         for row in response_pv_dfff.itertuples():
-                            pulse_start_ord = (row.startdate - pd.DateOffset(days=15)).toordinal()
-                            pulse_stop_ord = (row.startdate + pd.DateOffset(days=15)).toordinal()
+                            # set pulsedate to starttime + 1mo if does not exist
+                            pulsedate = row.startdate if row.startdate is not None else startdate + pd.DateOffset(months=1)
+                            pulse_start_ord = (pulsedate - pd.DateOffset(days=15)).toordinal()
+                            pulse_stop_ord = (pulsedate + pd.DateOffset(days=15)).toordinal()
                             model.converter(pk).equation += sd.If(
                                 sd.And(sd.time() > pulse_start_ord, sd.time() < pulse_stop_ord), row.value, 0.0
                             )

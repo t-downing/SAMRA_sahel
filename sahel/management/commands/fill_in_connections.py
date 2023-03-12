@@ -7,6 +7,8 @@ class Command(BaseCommand):
     help = 'Automatically fills in VariableConnections based on equations'
 
     def handle(self, *args, **options):
+        # add exception for couts totaux
+        to_pk_exceptions = [102]
         variables = Variable.objects.filter(sd_type__in=[Variable.VARIABLE, Variable.FLOW], equation__isnull=False)
         connections = VariableConnection.objects.all().values()
         objs = []
@@ -23,7 +25,7 @@ class Command(BaseCommand):
                     ))
 
         VariableConnection.objects.bulk_create(objs)
-
+        VariableConnection.objects.filter(to_variable_id__in=to_pk_exceptions).delete()
         return
 
 
