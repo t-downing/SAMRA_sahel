@@ -18,10 +18,12 @@ RUN pip config set global.index-url https://packtest.gva.icrc.priv/pypi/AI_Pytho
     pip install -r requirements.txt && \
     useradd samra
 
-RUN chmod u+x /app/entrypoint.sh
-
 USER samra
 
 COPY . /app/
+
+USER root
+RUN chmod +x /app/entrypoint.sh
+USER samra
 
 ENTRYPOINT [ "bash", "-c", "/app/entrypoint.sh" ]
