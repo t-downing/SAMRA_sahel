@@ -21,6 +21,4 @@ USER samra
 
 COPY . /app/
 
-RUN chmod u+x /app/entrypoint.sh
-
 ENTRYPOINT [ "/app/entrypoint.sh" ]
