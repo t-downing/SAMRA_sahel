@@ -21,4 +21,4 @@ USER samra
 
 COPY . /app/
 
-ENTRYPOINT [ "/app/entrypoint.sh" ]
+ENTRYPOINT [ "bash", "-c", "/app/entrypoint.sh" ]
