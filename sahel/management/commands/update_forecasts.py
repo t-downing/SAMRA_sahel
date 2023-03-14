@@ -11,10 +11,13 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('-e', '--variablepks', nargs='+', type=int, help="variable pks to be forecasted")
         parser.add_argument('-a', '--admin0', nargs='?', type=str, help="admin0 to be forecasted")
+        parser.add_argument('-t', '--all', action='store_true')
 
     def handle(self, *args, **options):
         variable_pks = options['variablepks']
         admin0 = options['admin0'] if options['admin0'] is not None else 'Mauritanie'
+        if options['all']:
+            variable_pks = [variable.pk for variable in Variable.objects.filter(sd_type=Variable.INPUT)]
         if variable_pks is not None:
             for variable_pk in variable_pks:
                 forecast_element(variable_pk, admin0)

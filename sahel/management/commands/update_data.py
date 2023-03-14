@@ -251,6 +251,7 @@ def update_dm_suividesprix():
             source=source,
             value=row[avg_cols].mean(),
             date=row["date"],
+            admin0='Mali',
             admin1=row["Région "].capitalize(),
             admin2=row["Cercle "].capitalize()
         ))
@@ -296,6 +297,7 @@ def update_dm_globallivestock():
         source=source,
         value=row.value,
         date=row.date,
+        admin0='Mali',
         admin1=row.admin1,
         admin2=row.admin2,
     ) for row in df.itertuples()]
@@ -545,9 +547,9 @@ def read_ven_producerprices():
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        update_mali_wfp_price_data()
-        # update_dm_suividesprix()
-        # update_dm_globallivestock()
+        # update_mali_wfp_price_data()
+        update_dm_suividesprix()
+        update_dm_globallivestock()
         # update_acled()
         # update_ndvi('Mauritanie')
         # read_ven_producerprices()

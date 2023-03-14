@@ -47,8 +47,12 @@ def forecast_element(element_pk, adm0, sarima_params=None):
     objs = []
     for admin1 in df["admin1"].unique():
         print(f"FORECASTING {admin1} NOW")
-        dff = df[df["admin1"] == admin1]
+        if admin1 is not None:
+            dff = df[df["admin1"] == admin1]
+        else:
+            dff = df
         dff = dff.resample(period).mean().interpolate()["value"]
+        print(dff)
         message = ''
         if use_model == 'ExpSmo':
             model = ExponentialSmoothing(dff, trend="add", damped_trend=True)

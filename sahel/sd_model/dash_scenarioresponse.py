@@ -269,7 +269,7 @@ def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks, _):
         ))
 
     eff_fig.update_layout(barmode="group", showlegend=True, legend=dict(title="Réponse"),
-                          title_text=f"Rapport coût-efficacité contre {ResponseOption.objects.get(pk=baseline_response_pk)}"
+                          title_text=f"Rapport coût-efficacité contre {ResponseOption.objects.get(pk=baseline_response_pk).name}"
                                      f" pour {element.label}",
                           )
     y_title = "1" if agg_unit == f"1000 {CURRENCY.get(adm0)}" else f"{agg_unit} / {divider_text} {CURRENCY.get(adm0)}"

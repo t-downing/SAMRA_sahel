@@ -112,9 +112,11 @@ def update_graph(element_pk, adm0, *_):
             line=dict(color="black", width=2, dash="dash"), legendgroup="AVG"))
 
     for admin1, color in zip(admin1s, default_colors):
-        dff = df[df["admin1"] == admin1]
+        if admin1 is not None:
+            dff = df[df["admin1"] == admin1]
+        else:
+            dff = df
         dff = dff.groupby(["date", "forecasted"]).mean().reset_index()
-        print(dff.columns)
         fig.add_trace(go.Scatter(
             x=dff[~dff["forecasted"]]["date"],
             y=dff[~dff["forecasted"]]["value"],
