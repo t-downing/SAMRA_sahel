@@ -1,3 +1,6 @@
+import time
+
+import plotly.colors
 from django_plotly_dash import DjangoDash
 from dash import html, dcc
 from dash.dependencies import Input, Output, State, MATCH, ALL
@@ -8,7 +11,7 @@ import pandas as pd
 import json
 import plotly.graph_objects as go
 
-from sahel.models import Source, Variable, MeasuredDataPoint, SP_NAMES
+from sahel.models import Source, Variable, MeasuredDataPoint, SP_NAMES, ForecastedDataPoint
 
 DEFAULT_SOURCE_PK = 1
 
@@ -37,10 +40,17 @@ app.layout = dbc.Container(fluid=True, style={"background-color": "#f8f9fc"}, ch
                         dbc.InputGroupAddon("Pays", addon_type="prepend"),
                         dbc.Select(id=(ADMIN0_INPUT := "admin0-input")),
                     ]),
-                    dbc.InputGroup(className="mb-2", children=[
+                    dbc.InputGroup(className="mb-3", children=[
                         dbc.InputGroupAddon("Niveau", addon_type="prepend"),
                         dbc.Select(id=(AVG_INPUT := "avg-input")),
                     ]),
+                    dbc.Checklist(
+                        id=(FORECAST_INPUT := "forecast-input"),
+                        className="mb-2",
+                        options=[{"label": "Montrer prévisions", "value": (SHOW_FORECAST := "show-forecast")}],
+                        value=[],
+                        switch=True,
+                    )
                 ]),
             ]),
         ]),
@@ -82,7 +92,11 @@ def populate_initial(_):
     Input(SOURCE_INPUT, "value")
 )
 def populate_variable_admin0_input(source_pk):
+    start = time.time()
     df = pd.DataFrame(MeasuredDataPoint.objects.filter(source_id=source_pk).values())
+    print(f"initial mdp hit took {time.time() - start}")
+    if df.empty:
+        return [], None, [], None, []
     variables = Variable.objects.filter(pk__in=df['element_id'].unique()).values()
     admin0s = df['admin0'].unique()
     admin_disabled = {
@@ -115,19 +129,54 @@ def populate_avg_by(admin0, options):
 
 
 @app.callback(
+    Output(FORECAST_INPUT, "options"),
+    Output(FORECAST_INPUT, "value"),
+    Input(AVG_INPUT, "value"),
+    State(FORECAST_INPUT, "options"),
+    State(FORECAST_INPUT, "value"),
+)
+def populate_showforecast(avg_by, options, value):
+    if avg_by in ["Pays", "admin1"]:
+        options[0].update({"disabled": False})
+    else:
+        options[0].update({"disabled": True})
+        value = []
+    return options, value
+
+
+@app.callback(
     Output(LINE_GRAPH, "figure"),
     Input(VARIABLE_INPUT, "value"),
     Input(ADMIN0_INPUT, "value"),
     Input(AVG_INPUT, "value"),
+    Input(FORECAST_INPUT, "value"),
     State(SOURCE_INPUT, "value"),
 )
-def update_graph(variable_pk, admin0, avg_by, source_pk):
+def update_graph(variable_pk, admin0, avg_by, forecast_input, source_pk):
+    fig = go.Figure(layout=dict(template="simple_white"))
+    show_forecast = SHOW_FORECAST in forecast_input
+    if None in [variable_pk, admin0, avg_by, source_pk]:
+        fig.layout.annotations = [dict(
+            text="Aucune donnée quantitative",
+            opacity=0.1,
+            font=dict(color="black", size=30),
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+        )]
+        return fig
+    colors = iter(plotly.colors.DEFAULT_PLOTLY_COLORS)
     avg_by_local = SP_NAMES.get(admin0).get(avg_by, avg_by)
     variable = Variable.objects.get(pk=variable_pk)
+    start = time.time()
     df = pd.DataFrame(MeasuredDataPoint.objects.filter(
         source_id=source_pk, element_id=variable_pk, admin0=admin0
     ).values())
-    fig = go.Figure(layout=dict(template="simple_white"))
+    print(f"mdp hit took {time.time() - start}")
+    if show_forecast:
+        df_f = pd.DataFrame(ForecastedDataPoint.objects.filter(element_id=variable_pk, admin0=admin0).values())
     moyenne = "" if avg_by == "Marché" else "moyenne "
     fig.update_layout(
         title_text=f"{variable.label}<br><sup>{admin0} - {moyenne}par {avg_by_local.lower()}</sup>",
@@ -138,16 +187,31 @@ def update_graph(variable_pk, admin0, avg_by, source_pk):
     fig.update_yaxes(title_text=f"Valeur ({variable.unit.replace('LCY', SP_NAMES.get(admin0).get('currency'))})")
     if avg_by == 'Pays':
         df = df.groupby("date").mean().reset_index()
+        color = next(colors)
         fig.add_trace(go.Scatter(
             x=df["date"],
             y=df["value"],
             name=admin0,
             mode="lines",
+            line_color=color,
         ))
+        if show_forecast:
+            df_f = df_f.groupby("date").mean().reset_index()
+            fig.add_trace(go.Scatter(
+                x=df_f["date"],
+                y=df_f["value"],
+                name=f"{admin0} - prévisé",
+                showlegend=False,
+                mode="lines",
+                line={"color": color, "dash": "dash"},
+            ))
     else:
         admin1s = df['admin1'].unique()
         for admin1 in admin1s:
+            color = next(colors)
             dff = df[df['admin1'] == admin1]
+            if show_forecast:
+                dff_f = df_f[df_f['admin1'] == admin1]
             if avg_by == 'admin1':
                 dff = dff.groupby("date").mean().reset_index()
                 fig.add_trace(go.Scatter(
@@ -155,7 +219,18 @@ def update_graph(variable_pk, admin0, avg_by, source_pk):
                     y=dff["value"],
                     name=admin1,
                     mode="lines",
+                    line_color=color,
                 ))
+                if show_forecast:
+                    dff_f = dff_f.groupby("date").mean().reset_index()
+                    fig.add_trace(go.Scatter(
+                        x=dff_f["date"],
+                        y=dff_f["value"],
+                        name=f"{admin1} - prévisé",
+                        mode="lines",
+                        showlegend=False,
+                        line={"color": color, "dash": "dash"},
+                    ))
             else:
                 admin2s = dff['admin2'].unique()
                 for admin2 in admin2s:
