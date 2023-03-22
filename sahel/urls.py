@@ -16,4 +16,5 @@ urlpatterns = [
     path("response_list", views.ResponseListView.as_view(), name="response_list"),
     path("archive_schema", views.ModelDiagramView.as_view(), name="mapping2modeling"),
     path("evidencebit/create", views.EBCreateView.as_view(), name="eb_create"),
+    path("dataexplorer", views.DataExplorerView.as_view(), name="dataexplorer"),
 ]

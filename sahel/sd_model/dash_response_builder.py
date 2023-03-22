@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output, State, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, Variable, ResponseConstantValue, PulseValue, ADMIN0S, CURRENCY
+from sahel.models import ResponseOption, Variable, ResponseConstantValue, PulseValue, ADMIN0S, SP_NAMES
 
 from sahel.sd_model.model_operations import run_model, timer
 
@@ -222,7 +222,7 @@ def build_response(response_pk, adm0, *_):
                     addon_type="append"
                 ),
             ])),
-            html.Td(constantvalue.element.unit.replace('LCY', CURRENCY.get(adm0))),
+            html.Td(constantvalue.element.unit.replace('LCY', SP_NAMES.get(adm0).get("currency"))),
             html.Td("N/A", style={"color": "gray"}),
             html.Td(dbc.Button(
                 "Supprimer",
@@ -247,7 +247,7 @@ def build_response(response_pk, adm0, *_):
                     addon_type="append"
                 ),
             ])),
-            html.Td(pulsevalue.element.unit.replace('LCY', CURRENCY.get(adm0))),
+            html.Td(pulsevalue.element.unit.replace('LCY', SP_NAMES.get(adm0).get("currency"))),
             html.Td(pulsevalue.startdate),
             html.Td(dbc.Button(
                 "Supprimer",
@@ -289,4 +289,4 @@ def newvalue_unit_and_date(element_pk, adm0):
     variable = Variable.objects.get(pk=element_pk)
     unit = variable.unit
     disabled = True if variable.sd_type == 'Constant' else False
-    return unit.replace('LCY', CURRENCY.get(adm0)), disabled
+    return unit.replace('LCY', SP_NAMES.get(adm0).get("currency")), disabled

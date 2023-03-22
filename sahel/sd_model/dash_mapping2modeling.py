@@ -1558,7 +1558,7 @@ def right_sidebar(selectednodedata, cyto_elements, adm0, scenario_pk, responseop
             fig.update_layout(
                 legend=dict(yanchor="bottom", x=0, y=1),
                 showlegend=True,
-                yaxis=dict(title=variable.unit.replace("LCY", CURRENCY.get(adm0)) + unit_append),
+                yaxis=dict(title=variable.unit.replace("LCY", SP_NAMES.get(adm0).get("currency")) + unit_append),
             )
             fig_div = dcc.Graph(figure=fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2")
             children.append(fig_div)

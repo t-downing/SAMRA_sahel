@@ -6,7 +6,7 @@ from dash.dependencies import Input, Output, State, MATCH, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario, MeasuredDataPoint
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario, MeasuredDataPoint, SP_NAMES
 from sahel.sd_model.model_operations import run_model
 
 import plotly.graph_objects as go
@@ -260,7 +260,7 @@ def update_simple_graph(livestock_pk, cereal_pk):
 
     cereal_element = Variable.objects.get(pk=cereal_pk)
     cereal_name = cereal_element.label.removeprefix("Prix de ").removeprefix("Prix du ").removeprefix("Prix d'")
-    cereal_unit = cereal_element.unit.removeprefix("FCFA / ")
+    cereal_unit = cereal_element.unit.removeprefix("LCY / ")
 
     livestock_element = Variable.objects.get(pk=livestock_pk)
     livestock_name = livestock_element.label.removeprefix("Prix de ")

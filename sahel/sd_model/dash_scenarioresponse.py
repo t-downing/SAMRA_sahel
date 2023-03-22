@@ -7,7 +7,7 @@ from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 
-from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario, ADMIN0S, CURRENCY
+from sahel.models import ResponseOption, SimulatedDataPoint, Variable, Scenario, ADMIN0S, SP_NAMES
 from sahel.sd_model.model_operations import run_model, timer, read_results
 
 import plotly.graph_objects as go
@@ -168,7 +168,7 @@ def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks, _):
     df, df_cost, df_agg, df_cost_agg, agg_text, agg_unit, divider_text, unit = read_results(
         adm0=adm0, element_pk=element_pk, scenario_pks=scenario_pks, response_pks=response_pks, agg_value=agg_value
     )
-    agg_unit = agg_unit.replace('LCY', CURRENCY.get(adm0))
+    agg_unit = agg_unit.replace('LCY', SP_NAMES.get(adm0).get("currency"))
 
     # bar graph
     decimals = 2 if element.unit == "1" else 1
@@ -248,7 +248,7 @@ def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks, _):
     scatter_fig.update_layout(
         showlegend=True, title_text="Comparaison avec coûts",
     )
-    scatter_fig.update_xaxes(title_text=f"Coûts totaux CICR ({CURRENCY.get(adm0)})")
+    scatter_fig.update_xaxes(title_text=f"Coûts totaux CICR ({SP_NAMES.get(adm0).get('currency')})")
     scatter_fig.update_yaxes(title_text=f"{element.label} {agg_text} ({agg_unit})")
 
     # efficiency graph
@@ -272,7 +272,7 @@ def update_graphs(adm0, element_pk, agg_value, scenario_pks, response_pks, _):
                           title_text=f"Rapport coût-efficacité contre {ResponseOption.objects.get(pk=baseline_response_pk).name}"
                                      f" pour {element.label}",
                           )
-    y_title = "1" if agg_unit == f"1000 {CURRENCY.get(adm0)}" else f"{agg_unit} / {divider_text} {CURRENCY.get(adm0)}"
+    y_title = "1" if agg_unit == f"1000 {SP_NAMES.get(adm0).get('currency')}" else f"{agg_unit} / {divider_text} {SP_NAMES.get(adm0).get('currency')}"
     eff_fig.update_yaxes(title_text=y_title)
     eff_fig.update_xaxes(ticklen=0, showline=False, tickfont_size=14)
     eff_fig.add_hline(y=0, line_width=1, line_color="black", opacity=1)

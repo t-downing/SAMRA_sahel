@@ -8,9 +8,19 @@ import datetime
 
 
 ADMIN0S = ['Mali', 'Mauritanie']
-CURRENCY = {
-    'Mali': 'FCFA',
-    'Mauritanie': 'MRU'
+SP_NAMES = {
+    'Mali': {
+        "currency": "FCFA",
+        "admin1": "Région",
+        "admin2": "Cercle",
+        "admin3": "Commune",
+    },
+    'Mauritanie': {
+        "currency": "MRU",
+        "admin1": "Wilaya",
+        "admin2": "Moughataa",
+        "admin3": "Commune",
+    },
 }
 
 
