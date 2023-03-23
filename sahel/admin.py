@@ -66,6 +66,21 @@ class MeasuredDataPointAdmin(ImportExportModelAdmin):
     list_display = ['value', 'date', 'admin0', 'admin1', 'admin2']
 
 
+class ForecastedDataPointResource(resources.ModelResource):
+    class Meta:
+        model = models.ForecastedDataPoint
+
+
+class ForecastedDataPointAdmin(ImportExportModelAdmin):
+    resource_class = ForecastedDataPointResource
+    list_filter = [
+        'element',
+        'admin0',
+        'admin1',
+    ]
+    list_display = ['value', 'date', 'admin0', 'admin1']
+
+
 class ResponseConstantResource(resources.ModelResource):
     class Meta:
         model = models.ResponseConstantValue
@@ -152,7 +167,7 @@ admin.site.register(models.MeasuredDataPoint, MeasuredDataPointAdmin)
 admin.site.register(models.ResponseOption)
 admin.site.register(models.ResponseConstantValue, ResponseConstantAdmin)
 admin.site.register(models.SeasonalInputDataPoint, SeasonalInputAdmin)
-admin.site.register(models.ForecastedDataPoint)
+admin.site.register(models.ForecastedDataPoint, ForecastedDataPointAdmin)
 admin.site.register(models.PulseValue, ResponsePulseAdmin)
 admin.site.register(models.HouseholdConstantValue, HouseholdConstantAdmin)
 admin.site.register(models.Scenario)

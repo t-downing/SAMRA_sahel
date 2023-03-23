@@ -162,7 +162,7 @@ def update_mrt_prixmarche():
                 element_id=variable.pk,
                 date=row["date"],
                 admin0="Mauritanie",
-                admin1='Hodh Ech Chargui',
+                admin1='Hodh Ech Chargi',
                 admin2='Bassikounou',
                 market=row["market"],
                 value=row["value"]/unit,

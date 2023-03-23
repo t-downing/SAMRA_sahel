@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 
 from sahel.models import Source, Variable, MeasuredDataPoint, SP_NAMES, ForecastedDataPoint
 
-DEFAULT_SOURCE_PK = 1
+DEFAULT_SOURCE_PK = 12
 
 app = DjangoDash("dataexplorer", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -93,8 +93,16 @@ def populate_initial(_):
 )
 def populate_variable_admin0_input(source_pk):
     start = time.time()
-    df = pd.DataFrame(MeasuredDataPoint.objects.filter(source_id=source_pk).values())
+    # distinct with fields only works with PSQL
+    distinct_fields = ['element_id', 'admin0', 'admin1', 'admin2', 'market']
+    df = pd.DataFrame(
+        MeasuredDataPoint.objects.filter(source_id=source_pk)
+            .order_by(*distinct_fields)
+            .distinct(*distinct_fields)
+            .values(*distinct_fields)
+    )
     print(f"initial mdp hit took {time.time() - start}")
+    print(df)
     if df.empty:
         return [], None, [], None, []
     variables = Variable.objects.filter(pk__in=df['element_id'].unique()).values()
@@ -125,7 +133,7 @@ def populate_avg_by(admin0, options):
         label = SP_NAMES.get(admin0).get(option.get("value"))
         if label is not None:
             option.update({"label": label})
-    return options, "admin1"
+    return options, "Marché"
 
 
 @app.callback(
