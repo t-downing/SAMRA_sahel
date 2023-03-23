@@ -16,6 +16,11 @@ class ElementResource(resources.ModelResource):
 
 class ElementResourceAdmin(ImportExportModelAdmin):
     resource_class = ElementResource
+    list_filter = [
+        'samramodel',
+    ]
+    list_display = ('__str__', 'date_created', )
+    search_fields = ['label']
 
 
 class SituationalAnalysisResource(resources.ModelResource):
