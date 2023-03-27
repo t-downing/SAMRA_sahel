@@ -23,8 +23,8 @@ DEFAULT_SAMRAMODEL_PK = "1"
 DEFAULT_ADM0 = "Mauritanie"
 DEFAULT_STORY_PK = "1"
 DEFAULT_LAYERS = [
-    'group',
-    # 'element',
+    # 'group',
+    'element',
     'variable',
 ]
 LANG = "EN"
@@ -56,8 +56,8 @@ app.layout = html.Div(children=[
                     dbc.Checklist(
                         id="layers-input",
                         options=[
-                            {"label": f'{l("Group", LANG)}s', "value": "group"},
-                            {"label": f'{l("Element", LANG)}s', "value": "element", "disabled": LITE},
+                            {"label": f'{l("Group", LANG)}s', "value": "group", "disabled": LITE},
+                            {"label": f'{l("Element", LANG)}s', "value": "element"},
                             {"label": f'{l("Variable", LANG)}s', "value": "variable"},
                         ],
                         value=DEFAULT_LAYERS,
@@ -1017,12 +1017,13 @@ def draw_model(
 
     # VARIABLES
     # nodes
-    queryset = VariablePosition.objects.filter(story_id=story_pk)
-    variables = Variable.objects.filter(
-        Q(element_id__in=element_pks_in_story) |
-        Q(samramodel_id=samramodel_pk)
-    ).prefetch_related(Prefetch(
-        "variablepositions", queryset=queryset, to_attr="story_position"
+    position_queryset = VariablePosition.objects.filter(story_id=story_pk)
+    if story_pk == default_story_pk:
+        variable_query = Q(samramodel_id=samramodel_pk)
+    else:
+        variable_query = Q(element_id__in=element_pks_in_story)
+    variables = Variable.objects.filter(variable_query).prefetch_related(Prefetch(
+        "variablepositions", queryset=position_queryset, to_attr="story_position"
     ))
     print(f"{len(variables)=}")
     variable_pks = [variable.pk for variable in variables]
@@ -1033,7 +1034,7 @@ def draw_model(
             usable = False
 
         parent = None
-        if not LITE and variable.element_id is not None:
+        if variable.element_id is not None:
             parent = f"element_{variable.element_id}"
         elif variable.element_group_id is not None:
             parent = f"group_{variable.element_group_id}"
@@ -1119,109 +1120,108 @@ def draw_model(
             )
 
     # ELEMENTS
-
     # TODO: find way to implement this quicker when not using elements
 
-    if not LITE:
-        # nodes
-        queryset = ElementPosition.objects.filter(story_id=story_pk)
-        elements = elements.select_subclasses().prefetch_related(
-            Prefetch("elementpositions", queryset=queryset, to_attr="story_position"),
-            Prefetch("variables")
-        )
-        print(f"{len(elements)=}")
-        for element in elements:
-            if element.pk in element_pks_in_story:
-                in_story = True
-            else:
-                in_story = False
-
-            class_append = "" if in_story else " hidden"
-            if not element.variables.exists():
-                class_append += " no_children"
-                if not element.story_position:
-                    print(f"no position set for {element}")
-                    position = ElementPosition.objects.filter(element=element, story_id=default_story_pk).first()
-                    if position is None:
-                        print(f"default position had not yet been set for {element}, setting to zero now")
-                        position = ElementPosition(
-                            element=element, story_id=default_story_pk, x_pos=0.0, y_pos=0.0
-                        )
-                        position.save()
-                    x_pos, y_pos = position.x_pos, position.y_pos
-                else:
-                    x_pos, y_pos = element.story_position[0].x_pos, element.story_position[0].y_pos
-            else:
-                x_pos, y_pos = None, None
-
-            cyto_elements.append(
-                {
-                    "data": {
-                        "id": f"element_{element.pk}",
-                        "label": element.label,
-                        "hierarchy": "element",
-                        "parent": f"group_{element.element_group_id}",
-                        **{
-                            field: getattr(element, field, None)
-                            for field in SituationalAnalysis.SA_FIELDS
-                        },
-                    },
-                    "classes": f"element {element.element_type}" + class_append,
-                    "position": {"x": x_pos, "y": y_pos}
-                }
-            )
-
-        # connections
-        elementconnections = ElementConnection.objects.filter(
-            to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
-        ).select_related(
-            "from_element__situationalanalysis", "from_element__theoryofchange", "from_element__shockstructure"
-        )
-        print(f"{len(elementconnections)=}")
-        for connection in elementconnections:
-            element_type = ""
-            try:
-                element_type += " " + connection.from_element.theoryofchange.element_type
-            except Element.theoryofchange.RelatedObjectDoesNotExist:
-                pass
-            try:
-                element_type += " " + connection.from_element.situationalanalysis.element_type
-            except Element.situationalanalysis.RelatedObjectDoesNotExist:
-                pass
-            try:
-                element_type += " " + connection.from_element.shockstructure.element_type
-            except Element.shockstructure.RelatedObjectDoesNotExist:
-                pass
-            cyto_elements.append({
-                "data": {
-                    "source": f"element_{connection.from_element_id}",
-                    "target": f"element_{connection.to_element_id}"
-                },
-                "classes": "element" + element_type
-            })
-
-    # GROUPS
-    element_groups = ElementGroup.objects.all().prefetch_related("elements")
-    group_nodes = []
-    for element_group in element_groups:
-        element_pks = [obj.pk for obj in element_group.elements.all()]
-        if story_pk == default_story_pk or any(pk in element_pks_in_story for pk in element_pks):
+    # nodes
+    position_queryset = ElementPosition.objects.filter(story_id=story_pk)
+    elements = elements.select_subclasses().prefetch_related(
+        Prefetch("elementpositions", queryset=position_queryset, to_attr="story_position"),
+        Prefetch("variables")
+    )
+    print(f"{len(elements)=}")
+    for element in elements:
+        if element.pk in element_pks_in_story:
             in_story = True
         else:
             in_story = False
+
         class_append = "" if in_story else " hidden"
-        group_nodes.append({
+        if not element.variables.exists():
+            class_append += " no_children"
+            if not element.story_position:
+                print(f"no position set for {element}")
+                position = ElementPosition.objects.filter(element=element, story_id=default_story_pk).first()
+                if position is None:
+                    print(f"default position had not yet been set for {element}, setting to zero now")
+                    position = ElementPosition(
+                        element=element, story_id=default_story_pk, x_pos=0.0, y_pos=0.0
+                    )
+                    position.save()
+                x_pos, y_pos = position.x_pos, position.y_pos
+            else:
+                x_pos, y_pos = element.story_position[0].x_pos, element.story_position[0].y_pos
+        else:
+            x_pos, y_pos = None, None
+
+        cyto_elements.append(
+            {
+                "data": {
+                    "id": f"element_{element.pk}",
+                    "label": element.label,
+                    "hierarchy": "element",
+                    "parent": f"group_{element.element_group_id}",
+                    **{
+                        field: getattr(element, field, None)
+                        for field in SituationalAnalysis.SA_FIELDS
+                    },
+                },
+                "classes": f"element {element.element_type}" + class_append,
+                "position": {"x": x_pos, "y": y_pos}
+            }
+        )
+
+    # connections
+    elementconnections = ElementConnection.objects.filter(
+        to_element_id__in=element_pks_in_story, from_element_id__in=element_pks_in_story
+    ).select_related(
+        "from_element__situationalanalysis", "from_element__theoryofchange", "from_element__shockstructure"
+    )
+    print(f"{len(elementconnections)=}")
+    for connection in elementconnections:
+        element_type = ""
+        try:
+            element_type += " " + connection.from_element.theoryofchange.element_type
+        except Element.theoryofchange.RelatedObjectDoesNotExist:
+            pass
+        try:
+            element_type += " " + connection.from_element.situationalanalysis.element_type
+        except Element.situationalanalysis.RelatedObjectDoesNotExist:
+            pass
+        try:
+            element_type += " " + connection.from_element.shockstructure.element_type
+        except Element.shockstructure.RelatedObjectDoesNotExist:
+            pass
+        cyto_elements.append({
             "data": {
-                "id": f"group_{element_group.id}",
-                "label": element_group.label,
-                "hierarchy": "group"
+                "source": f"element_{connection.from_element_id}",
+                "target": f"element_{connection.to_element_id}"
             },
-            "classes": "group" + class_append,
-            "grabbable": False,
-            "selectable": True,
-            "pannable": True
+            "classes": "element" + element_type
         })
-    cyto_elements.extend(group_nodes)
+
+    # GROUPS
+    if not LITE:
+        element_groups = ElementGroup.objects.all().prefetch_related("elements")
+        group_nodes = []
+        for element_group in element_groups:
+            element_pks = [obj.pk for obj in element_group.elements.all()]
+            if story_pk == default_story_pk or any(pk in element_pks_in_story for pk in element_pks):
+                in_story = True
+            else:
+                in_story = False
+            class_append = "" if in_story else " hidden"
+            group_nodes.append({
+                "data": {
+                    "id": f"group_{element_group.id}",
+                    "label": element_group.label,
+                    "hierarchy": "group"
+                },
+                "classes": "group" + class_append,
+                "grabbable": False,
+                "selectable": True,
+                "pannable": True
+            })
+        cyto_elements.extend(group_nodes)
 
     # check that all connections have a valid source and target
     node_ids = [obj.get("data").get("id") for obj in cyto_elements if "id" in obj.get("data")]
@@ -1240,6 +1240,9 @@ def draw_model(
         if movement_allowed:
             print("movement is allowed, dumping into store")
             return [], story_pk, json.dumps(cyto_elements)
+        elif current_story_pk != story_pk:
+            print(f"{current_story_pk=} and {story_pk=}, dumping into store")
+            return [], "init", json.dumps(cyto_elements)
         else:
             print("movement is not allowed, drawing elements, making store None")
             return cyto_elements, story_pk, None
