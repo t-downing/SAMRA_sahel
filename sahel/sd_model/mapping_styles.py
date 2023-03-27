@@ -59,7 +59,7 @@ stylesheet = [
          "line-color": "#9965cd",
          "target-arrow-color": "#9965cd",
      }},
-    {"selector": ".SA",
+    {"selector": f".{SituationalAnalysis.SITUATIONAL_ANALYSIS}",
      "style": {
          # chocolate
          "background-color": "#d2691e",
@@ -68,7 +68,7 @@ stylesheet = [
          "line-color": "#e99b63",
          "target-arrow-color": "#e99b63",
      }},
-    {"selector": ".SE .SH",
+    {"selector": f".{ShockStructure.SHOCK_EFFECT}, .{ShockStructure.SHOCK}",
      "style": {
          "background-color": "#F08080",
          "border-color": "crimson",
@@ -76,12 +76,21 @@ stylesheet = [
          "line-color": "crimson",
          "target-arrow-color": "crimson",
      }},
+    {"selector": f"node.{ShockStructure.SHOCK}",
+     "style": {
+        "font-size": 25,
+        # "shape": "triangle",
+        "width": 150,
+        "height": 150,
+        # "text-valign": "bottom",
+     }},
 
     # edges
     {
         "selector": "edge.element",
         "style": {
             "arrow-scale": 2,
+            "control-point-distance": "-50px",
         }
     },
 

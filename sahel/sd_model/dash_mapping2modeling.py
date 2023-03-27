@@ -30,6 +30,7 @@ DEFAULT_LAYERS = [
 LANG = "EN"
 MALI_ADM1S = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
 MRT_ADM1S = ['Hodh Ech Chargi']
+BASELINE_RESPONSE_PK = 1
 
 app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP, ])
 
@@ -72,6 +73,7 @@ app.layout = html.Div(children=[
             dbc.Tab(label='Modeling', children=[
                 dbc.Select(id=(SCENARIO_INPUT := "scenario-input"), placeholder="Scénario", className="mb-2"),
                 dbc.Select(id=(RESPONSE_INPUT := "responseoption-input"), placeholder="Réponse", className="mb-2"),
+                dbc.Select(id=(RESPONSE2_INPUT := "responseoption2-input"), placeholder="Réponse", className="mb-2"),
                 dbc.Button(
                     id=(RUN_SUBMIT := 'run-submit'), children="Exécuter modèle", className="mb-2", size='sm', color='primary',
                 ),
@@ -251,9 +253,12 @@ def populate_initial(_):
     Output("scenario-input", "options"),
     Output("scenario-input", "value"),
     Output("scenario-input", "disabled"),
-    Output("responseoption-input", "options"),
-    Output("responseoption-input", "value"),
-    Output("responseoption-input", "disabled"),
+    Output(RESPONSE_INPUT, "options"),
+    Output(RESPONSE_INPUT, "value"),
+    Output(RESPONSE_INPUT, "disabled"),
+    Output(RESPONSE2_INPUT, "options"),
+    Output(RESPONSE2_INPUT, "value"),
+    Output(RESPONSE2_INPUT, "disabled"),
     Input("samramodel-input", "value")
 )
 def adm0_scenarioresponse_input(samramodel_pk):
@@ -276,11 +281,16 @@ def adm0_scenarioresponse_input(samramodel_pk):
             sahel_adm0s, DEFAULT_ADM0, False,
             scenario_options, scenario_value, False,
             response_options, response_value, False,
+            response_options + [{"value": None, "label": "---"}], None, False,
         )
     else:
-        return None, None, True, \
-               None, None, True, \
-               None, None, True
+        return (
+           None, None, True,
+           None, None, True,
+           None, None, True,
+           None, None, True,
+        )
+
 
 
 @app.callback(
@@ -1229,7 +1239,6 @@ def draw_model(
 
     # check that all connections have a valid source and target
     node_ids = [obj.get("data").get("id") for obj in cyto_elements if "id" in obj.get("data")]
-    print(f"{cyto_elements=}")
     for obj in cyto_elements:
         if "source" in obj.get("data"):
             if obj.get("data").get("source") not in node_ids:
@@ -1260,12 +1269,22 @@ def draw_model(
     Input("cyto", "elements"),
     Input("adm0-input", "value"),
     Input('scenario-input', 'value'),
-    Input('responseoption-input', 'value'),
+    Input(RESPONSE_INPUT, 'value'),
+    Input(RESPONSE2_INPUT, 'value'),
     State("allow-movement-switch", "value"),
     State("samramodel-input", "value")
 )
 @timer
-def right_sidebar(selectednodedata, cyto_elements, adm0, scenario_pk, responseoption_pk, movement_allowed, samrammodel_pk):
+def right_sidebar(
+        selectednodedata,
+        cyto_elements,
+        adm0,
+        scenario_pk,
+        responseoption_pk,
+        responseoption2_pk,
+        movement_allowed,
+        samrammodel_pk
+):
     # TODO: admin1 and admin2 filtering on graph
     # TODO: prefetch everything relevant to speed up
     # TODO: add other constant types
@@ -1531,15 +1550,30 @@ def right_sidebar(selectednodedata, cyto_elements, adm0, scenario_pk, responseop
 
             # simulated DPs
             # TODO: disagg by admin1-2
-            df = pd.DataFrame(SimulatedDataPoint.objects
-                              .filter(element=variable, scenario_id=scenario_pk, responseoption_id=responseoption_pk, admin0=adm0)
-                              .values("date", "value"))
+            df = pd.DataFrame(
+                SimulatedDataPoint.objects.filter(
+                    element=variable,
+                    scenario_id=scenario_pk,
+                    responseoption_id__in=[responseoption_pk, responseoption2_pk],
+                    admin0=adm0
+                ).values("date", "value", "responseoption_id"))
             if not df.empty:
+                response = ResponseOption.objects.get(pk=responseoption_pk)
+                dff = df[df["responseoption_id"] == int(responseoption_pk)]
                 fig.add_trace(go.Scatter(
-                    x=df["date"],
-                    y=df["value"],
-                    name="Simulé",
+                    x=dff["date"],
+                    y=dff["value"],
+                    name=response.name,
                 ))
+                if responseoption2_pk is not None:
+                    print(f"{responseoption_pk=}")
+                    response = ResponseOption.objects.get(pk=responseoption2_pk)
+                    dff = df[df["responseoption_id"] == int(responseoption2_pk)]
+                    fig.add_trace(go.Scatter(
+                        x=dff["date"],
+                        y=dff["value"],
+                        name=response.name,
+                    ))
 
             # measured DPs
             # TODO: disagg by admin2

@@ -83,6 +83,9 @@ class Element(Node):
     # stories = models.ManyToManyField("story", related_name="elements", blank=True)
     kumu_id = models.CharField(max_length=100, null=True, blank=True)
 
+    class Meta:
+        ordering = ["-date_created"]
+
 
 class Region(models.Model):
     name = models.CharField(max_length=200)

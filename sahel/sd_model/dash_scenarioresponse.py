@@ -18,7 +18,7 @@ import pandas as pd
 DASHES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
 DEFAULT_ADM0 = 'Mauritanie'
 DEFAULT_SAMRAMODEL_PK = 1
-DEFAULT_RESPONSE_PKS = [1, 2, 3, 5, 14]
+DEFAULT_RESPONSE_PKS = [1, 3, 5]
 
 app = DjangoDash("scenarioresponse", external_stylesheets=[dbc.themes.BOOTSTRAP])
 
