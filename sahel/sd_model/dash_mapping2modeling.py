@@ -31,7 +31,7 @@ LANG = "EN"
 MALI_ADM1S = ["Gao", "Kidal", "Mopti", "Tombouctou", "Ménaka"]
 MRT_ADM1S = ['Hodh Ech Chargi']
 
-app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = DjangoDash("mapping2modeling", external_stylesheets=[dbc.themes.BOOTSTRAP, ])
 
 app.layout = html.Div(children=[
     # INIT
@@ -112,7 +112,7 @@ app.layout = html.Div(children=[
                           options=[{"label": "Allow movement", "value": 1}],
                           value=[], switch=True, inline=True),
         ]),
-        dbc.Button(className="mb-3", id="update-movement", children="GO", size="sm", color="primary"),
+        dbc.Button(className="mb-3", id="update-movement", children="Refresh", size="sm", color="primary"),
     ]),
 
     # MODALS
@@ -1101,6 +1101,8 @@ def draw_model(
     stocks = Variable.objects.filter(sd_type="Stock", pk__in=variable_pks).prefetch_related("inflows", "outflows")
     for stock in stocks:
         for inflow in stock.inflows.all():
+            if inflow.pk not in variable_pks:
+                continue
             has_equation = "no" if inflow.equation is None else "yes"
             cyto_elements.append(
                 {"data": {"source": str(inflow.pk),
@@ -1110,6 +1112,8 @@ def draw_model(
                  "classes": "variable"}
             )
         for outflow in stock.outflows.all():
+            if outflow.pk not in variable_pks:
+                continue
             has_equation = "no" if outflow.equation is None else "yes"
             cyto_elements.append(
                 {"data": {"source": str(stock.pk),
@@ -1225,6 +1229,7 @@ def draw_model(
 
     # check that all connections have a valid source and target
     node_ids = [obj.get("data").get("id") for obj in cyto_elements if "id" in obj.get("data")]
+    print(f"{cyto_elements=}")
     for obj in cyto_elements:
         if "source" in obj.get("data"):
             if obj.get("data").get("source") not in node_ids:
