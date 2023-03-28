@@ -78,10 +78,10 @@ stylesheet = [
      }},
     {"selector": f"node.{ShockStructure.SHOCK}",
      "style": {
-        "font-size": 25,
         # "shape": "triangle",
         "width": 150,
         "height": 150,
+        "border-width": 5,
         # "text-valign": "bottom",
      }},
 

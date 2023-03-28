@@ -602,11 +602,14 @@ def show_layers(layers, colorbody_field, colorborder_field):
             {"selector": ".element",
              "style": {
                  "text-valign": "center",
+                 "font-size": 25,
              }}
         ])
     added_stylesheet.append({
         "selector": ".no_children",
-        "style": {"text-valign": "center"}
+        "style": {
+            "text-valign": "center",
+        }
     })
 
     # COLOR
@@ -1550,6 +1553,7 @@ def right_sidebar(
 
             # simulated DPs
             # TODO: disagg by admin1-2
+            responseoption2_pk = None if responseoption2_pk == "---" else responseoption2_pk
             df = pd.DataFrame(
                 SimulatedDataPoint.objects.filter(
                     element=variable,
@@ -1602,7 +1606,8 @@ def right_sidebar(
                 showlegend=True,
                 yaxis=dict(title=variable.unit.replace("LCY", SP_NAMES.get(adm0).get("currency")) + unit_append),
             )
-            fig_div = dcc.Graph(figure=fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2")
+            fig_div = dcc.Graph(figure=fig, id="element-detail-graph", style={"height": "300px"}, className="mb-2",
+                                config={'displayModeBar': False})
             children.append(fig_div)
 
         # TODO: show seasonal values
