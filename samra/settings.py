@@ -95,17 +95,14 @@ DATABASES = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     },
-    'default': {
-        'ENGINE': 'mssql',
-        'NAME': 'SAMRA',
-        'USER': 'l_samra_sql_t',
-        'HOST': 'gvalabaidb03t.gva.icrc.priv',
-        'PORT': '',
-        'PASSWORD': os.environ.get("MSSQL_PASSWORD"),
-        'OPTIONS': {
-            'driver': 'ODBC Driver 18 for SQL Server',
-            'extra_params': 'TrustServerCertificate=yes',
-        },
+    "default": {
+        "ENGINE": "mssql",
+        "NAME": "SAMRA",
+        "USER": "l_samra_sql_t",
+        "PASSWORD": os.environ.get("MSSQL_PASSWORD"),
+        "HOST": "gvalabaidb03t.gva.icrc.priv",
+        "PORT": "1433",
+        "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server", }
     },
 }
 

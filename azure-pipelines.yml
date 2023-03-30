@@ -1,0 +1,32 @@
+trigger:
+- main
+- development
+- refs/tags/*
+
+variables:
+  docker_tag: $[ replace(replace(variables['Build.SourceBranch'], 'refs/heads/', ''), 'refs/tags/', '') ]
+
+pool:
+  name: Build-Docker
+
+steps:
+- task: Docker@2
+  displayName: build
+  inputs:
+    command: 'build'
+    containerRegistry: 'Harbor (prod)'
+    repository: 'project_iss_ai_prod/samra'
+    tags: |
+      $(docker_tag)
+      latest
+    arguments: '--build-arg HTTP_PROXY=$(HTTP_PROXY) --build-arg HTTPS_PROXY=$(HTTP_PROXY) --build-arg NO_PROXY=$(NO_PROXY) --build-arg http_proxy=$(HTTP_PROXY) --build-arg https_proxy=$(HTTP_PROXY) --build-arg no_proxy=$(NO_PROXY)'
+
+- task: Docker@2
+  displayName: push
+  inputs:
+    containerRegistry: 'Harbor (prod)'
+    repository: 'project_iss_ai_prod/samra'
+    command: 'push'
+    tags: |
+      $(docker_tag)
+      latest
