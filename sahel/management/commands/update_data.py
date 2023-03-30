@@ -548,10 +548,11 @@ def read_ven_producerprices():
 class Command(BaseCommand):
     def handle(self, *args, **options):
         # update_mali_wfp_price_data()
-        update_dm_suividesprix()
-        update_dm_globallivestock()
+        # update_dm_suividesprix()
+        # update_dm_globallivestock()
         # update_acled()
-        # update_ndvi('Mauritanie')
+        update_ndvi('Mauritanie')
+        update_ndvi('Mali')
         # read_ven_producerprices()
         # update_mrt_wfp()
         # update_mrt_prixmarche()
