@@ -1,9 +1,11 @@
 from django.contrib import admin
 from . import models
 from import_export import resources
-from import_export.admin import ImportExportModelAdmin
+from import_export.admin import ImportExportModelAdmin, ExportActionModelAdmin
 from import_export.fields import Field
 from import_export.widgets import ManyToManyWidget
+
+from rangefilter.filters import DateRangeFilter
 
 admin.site.site_header = "SAMRA administration"
 admin.site.site_title = "SAMRA site admin"
@@ -58,12 +60,16 @@ class VariableAdmin(ImportExportModelAdmin):
 class MeasuredDataPointResource(resources.ModelResource):
     class Meta:
         model = models.MeasuredDataPoint
+        exclude = ['id', ]
+        import_id_fields = ["element", "source", "date", "admin0", "admin1", "admin2", "market", ]
 
 
 class MeasuredDataPointAdmin(ImportExportModelAdmin):
     resource_class = MeasuredDataPointResource
     list_filter = [
         'element',
+        'source',
+        ("date", DateRangeFilter),
         'admin0',
         'admin1',
         'admin2',
@@ -161,6 +167,16 @@ class VariableConnectionAdmin(ImportExportModelAdmin):
     search_fields = ['from_variable__label', 'to_variable__label']
 
 
+class VariablePositionResource(resources.ModelResource):
+    class Meta:
+        model = models.VariablePosition
+
+
+class VariablePositionAdmin(ImportExportModelAdmin):
+    resource_class = VariablePositionResource
+    list_display = ["variable", "story"]
+
+
 # REGISTRATION
 admin.site.register(models.Variable, VariableAdmin)
 admin.site.register(models.SimulatedDataPoint)
@@ -183,7 +199,7 @@ admin.site.register(models.TheoryOfChange)
 admin.site.register(models.ShockStructure)
 admin.site.register(models.ElementConnection)
 admin.site.register(models.Story)
-admin.site.register(models.VariablePosition)
+admin.site.register(models.VariablePosition, VariablePositionAdmin)
 admin.site.register(models.SamraModel)
 admin.site.register(models.EvidenceBit)
 admin.site.register(models.Sector)

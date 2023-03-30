@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'import_export',
     "massadmin",
     "colorfield",
+    "rangefilter"
 ]
 
 MIDDLEWARE = [
